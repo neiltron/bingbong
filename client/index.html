@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sonicify - Claude Code Audio Monitor</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+      background: #0a0a0f;
+      color: #e0e0e0;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 0;
+      border-bottom: 1px solid #2a2a3a;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-size: 1.5em;
+      font-weight: 400;
+      color: #fff;
+    }
+
+    h1 span {
+      color: #4ECDC4;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #ff4444;
+      transition: background 0.3s;
+    }
+
+    .status-dot.connected {
+      background: #44ff44;
+      box-shadow: 0 0 10px #44ff44;
+    }
+
+    #connect-btn {
+      background: #4ECDC4;
+      color: #0a0a0f;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+
+    #connect-btn:hover {
+      background: #45B7D1;
+    }
+
+    #connect-btn:disabled {
+      background: #333;
+      color: #666;
+      cursor: not-allowed;
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 20px;
+    }
+
+    .visualizer-section {
+      background: #12121a;
+      border-radius: 8px;
+      padding: 20px;
+      border: 1px solid #2a2a3a;
+    }
+
+    #visualizer {
+      width: 100%;
+      height: 400px;
+      background: #0a0a0f;
+      border-radius: 4px;
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .panel {
+      background: #12121a;
+      border-radius: 8px;
+      padding: 15px;
+      border: 1px solid #2a2a3a;
+    }
+
+    .panel h2 {
+      font-size: 0.9em;
+      font-weight: 500;
+      color: #888;
+      margin-bottom: 15px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .sessions-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .session-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      background: #1a1a24;
+      border-radius: 4px;
+    }
+
+    .session-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .session-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .session-id {
+      font-size: 0.85em;
+      color: #fff;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .session-meta {
+      font-size: 0.75em;
+      color: #666;
+    }
+
+    .pan-indicator {
+      width: 60px;
+      height: 6px;
+      background: #2a2a3a;
+      border-radius: 3px;
+      position: relative;
+    }
+
+    .pan-dot {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      background: #4ECDC4;
+      border-radius: 50%;
+      top: -1px;
+      transform: translateX(-50%);
+    }
+
+    .event-log {
+      max-height: 300px;
+      overflow-y: auto;
+      font-size: 0.8em;
+    }
+
+    .event-item {
+      padding: 8px;
+      border-bottom: 1px solid #1a1a24;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .event-type {
+      color: #4ECDC4;
+      font-weight: 500;
+    }
+
+    .event-tool {
+      color: #FF6B6B;
+    }
+
+    .event-time {
+      color: #666;
+      font-size: 0.9em;
+    }
+
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .control-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .control-row label {
+      font-size: 0.85em;
+      color: #888;
+    }
+
+    input[type="range"] {
+      width: 100px;
+      accent-color: #4ECDC4;
+    }
+
+    .mute-btn {
+      background: none;
+      border: 1px solid #4ECDC4;
+      color: #4ECDC4;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 12px;
+      transition: all 0.2s;
+    }
+
+    .mute-btn:hover {
+      background: #4ECDC4;
+      color: #0a0a0f;
+    }
+
+    .mute-btn.muted {
+      border-color: #ff4444;
+      color: #ff4444;
+    }
+
+    .empty-state {
+      color: #444;
+      font-style: italic;
+      text-align: center;
+      padding: 20px;
+    }
+
+    @media (max-width: 900px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1><span>Sonicify</span> Claude Code</h1>
+      <div class="status">
+        <div class="status-dot" id="status-dot"></div>
+        <span id="status-text">Disconnected</span>
+        <button id="connect-btn">Connect</button>
+      </div>
+    </header>
+
+    <div class="main-grid">
+      <div class="visualizer-section">
+        <canvas id="visualizer"></canvas>
+      </div>
+
+      <div class="sidebar">
+        <div class="panel">
+          <h2>Controls</h2>
+          <div class="controls">
+            <div class="control-row">
+              <label>Master Volume</label>
+              <input type="range" id="volume" min="0" max="100" value="70">
+            </div>
+            <div class="control-row">
+              <label>Reverb</label>
+              <input type="range" id="reverb" min="0" max="100" value="30">
+            </div>
+            <button class="mute-btn" id="mute-btn">Mute</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Active Sessions</h2>
+          <div class="sessions-list" id="sessions-list">
+            <div class="empty-state">No active sessions</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Event Log</h2>
+          <div class="event-log" id="event-log">
+            <div class="empty-state">Waiting for events...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================
+    // Configuration
+    // ============================================
+    const WS_URL = 'ws://localhost:3333/ws';
+
+    // Sound mappings - notes and characteristics for each event/tool
+    const SOUND_CONFIG = {
+      // Event types
+      SessionStart: { note: 'C4', duration: 0.4, type: 'sine', gain: 0.4 },
+      SessionEnd: { note: 'G3', duration: 0.5, type: 'sine', gain: 0.3 },
+      Stop: { notes: ['C5', 'E5', 'G5'], duration: 0.6, type: 'sine', gain: 0.5 },
+      SubagentStop: { note: 'E5', duration: 0.3, type: 'triangle', gain: 0.35 },
+      PreCompact: { note: 'D4', duration: 0.2, type: 'sawtooth', gain: 0.15 },
+
+      // Tool-specific sounds (for PreToolUse/PostToolUse)
+      tools: {
+        Read: { note: 'A4', duration: 0.08, type: 'sine', gain: 0.15 },
+        Write: { note: 'E4', duration: 0.12, type: 'triangle', gain: 0.25 },
+        Edit: { note: 'D4', duration: 0.1, type: 'triangle', gain: 0.2 },
+        Bash: { note: 'F3', duration: 0.15, type: 'square', gain: 0.12 },
+        Task: { notes: ['G4', 'B4'], duration: 0.25, type: 'sine', gain: 0.35 },
+        Grep: { note: 'B4', duration: 0.06, type: 'sine', gain: 0.1 },
+        Glob: { note: 'C5', duration: 0.06, type: 'sine', gain: 0.1 },
+        WebFetch: { note: 'F#4', duration: 0.15, type: 'sine', gain: 0.2 },
+        WebSearch: { note: 'G#4', duration: 0.2, type: 'sine', gain: 0.25 },
+        TodoWrite: { note: 'A3', duration: 0.1, type: 'triangle', gain: 0.15 },
+        default: { note: 'C4', duration: 0.1, type: 'sine', gain: 0.15 }
+      }
+    };
+
+    // Note to frequency mapping
+    const NOTE_FREQ = {
+      'C3': 130.81, 'D3': 146.83, 'E3': 164.81, 'F3': 174.61, 'F#3': 185.00,
+      'G3': 196.00, 'G#3': 207.65, 'A3': 220.00, 'B3': 246.94,
+      'C4': 261.63, 'D4': 293.66, 'E4': 329.63, 'F4': 349.23, 'F#4': 369.99,
+      'G4': 392.00, 'G#4': 415.30, 'A4': 440.00, 'B4': 493.88,
+      'C5': 523.25, 'D5': 587.33, 'E5': 659.25, 'F5': 698.46,
+      'G5': 783.99, 'A5': 880.00, 'B5': 987.77
+    };
+
+    // ============================================
+    // Audio Engine
+    // ============================================
+    class AudioEngine {
+      constructor() {
+        this.ctx = null;
+        this.masterGain = null;
+        this.convolver = null;
+        this.reverbGain = null;
+        this.dryGain = null;
+        this.muted = false;
+        this.volume = 0.7;
+        this.reverbAmount = 0.3;
+      }
+
+      async init() {
+        if (this.ctx) return;
+
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+        // Create master gain
+        this.masterGain = this.ctx.createGain();
+        this.masterGain.gain.value = this.volume;
+
+        // Create reverb path
+        this.convolver = this.ctx.createConvolver();
+        this.reverbGain = this.ctx.createGain();
+        this.reverbGain.gain.value = this.reverbAmount;
+
+        this.dryGain = this.ctx.createGain();
+        this.dryGain.gain.value = 1 - this.reverbAmount;
+
+        // Generate impulse response for reverb
+        await this.createReverbImpulse();
+
+        // Connect: source -> [dry + reverb] -> master -> output
+        this.convolver.connect(this.reverbGain);
+        this.reverbGain.connect(this.masterGain);
+        this.dryGain.connect(this.masterGain);
+        this.masterGain.connect(this.ctx.destination);
+
+        console.log('Audio engine initialized');
+      }
+
+      async createReverbImpulse() {
+        const duration = 2;
+        const decay = 2;
+        const sampleRate = this.ctx.sampleRate;
+        const length = sampleRate * duration;
+        const impulse = this.ctx.createBuffer(2, length, sampleRate);
+
+        for (let channel = 0; channel < 2; channel++) {
+          const data = impulse.getChannelData(channel);
+          for (let i = 0; i < length; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+          }
+        }
+
+        this.convolver.buffer = impulse;
+      }
+
+      setVolume(value) {
+        this.volume = value;
+        if (this.masterGain) {
+          this.masterGain.gain.value = this.muted ? 0 : value;
+        }
+      }
+
+      setReverb(value) {
+        this.reverbAmount = value;
+        if (this.reverbGain && this.dryGain) {
+          this.reverbGain.gain.value = value;
+          this.dryGain.gain.value = 1 - value * 0.5;
+        }
+      }
+
+      toggleMute() {
+        this.muted = !this.muted;
+        if (this.masterGain) {
+          this.masterGain.gain.value = this.muted ? 0 : this.volume;
+        }
+        return this.muted;
+      }
+
+      playSound(config, pan = 0) {
+        if (!this.ctx || this.muted) return;
+
+        const now = this.ctx.currentTime;
+        const notes = config.notes || [config.note];
+
+        notes.forEach((note, i) => {
+          const freq = NOTE_FREQ[note] || 440;
+          const delay = i * 0.05; // Slight delay for chords
+
+          // Create oscillator
+          const osc = this.ctx.createOscillator();
+          osc.type = config.type || 'sine';
+          osc.frequency.value = freq;
+
+          // Create gain for envelope
+          const gainNode = this.ctx.createGain();
+          gainNode.gain.value = 0;
+
+          // Create panner
+          const panner = this.ctx.createStereoPanner();
+          panner.pan.value = pan;
+
+          // Connect: osc -> gain -> panner -> [dry + convolver]
+          osc.connect(gainNode);
+          gainNode.connect(panner);
+          panner.connect(this.dryGain);
+          panner.connect(this.convolver);
+
+          // Envelope
+          const attackTime = 0.01;
+          const releaseTime = config.duration * 0.7;
+          const gain = config.gain || 0.2;
+
+          gainNode.gain.setValueAtTime(0, now + delay);
+          gainNode.gain.linearRampToValueAtTime(gain, now + delay + attackTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, now + delay + config.duration);
+
+          // Start and stop
+          osc.start(now + delay);
+          osc.stop(now + delay + config.duration + 0.1);
+        });
+      }
+
+      playEvent(event) {
+        const { event_type, tool_name, pan } = event;
+
+        // Get sound config based on event type
+        let config;
+
+        if (event_type === 'PreToolUse' || event_type === 'PostToolUse') {
+          // Use tool-specific sound
+          config = SOUND_CONFIG.tools[tool_name] || SOUND_CONFIG.tools.default;
+
+          // Make PostToolUse slightly different (higher pitch)
+          if (event_type === 'PostToolUse' && config.note) {
+            const noteIndex = Object.keys(NOTE_FREQ).indexOf(config.note);
+            if (noteIndex > 0) {
+              config = { ...config, note: Object.keys(NOTE_FREQ)[noteIndex + 1] || config.note };
+            }
+          }
+        } else {
+          // Use event type sound
+          config = SOUND_CONFIG[event_type] || SOUND_CONFIG.tools.default;
+        }
+
+        this.playSound(config, pan || 0);
+      }
+    }
+
+    // ============================================
+    // Visualizer
+    // ============================================
+    class Visualizer {
+      constructor(canvas) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.particles = [];
+        this.sessions = new Map();
+
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+        this.animate();
+      }
+
+      resize() {
+        const rect = this.canvas.parentElement.getBoundingClientRect();
+        this.canvas.width = rect.width;
+        this.canvas.height = 400;
+      }
+
+      addEvent(event) {
+        const { pan, color, event_type, tool_name } = event;
+
+        // Calculate x position from pan (-1 to 1 -> 0 to width)
+        const x = (pan + 1) / 2 * this.canvas.width;
+        const y = this.canvas.height / 2;
+
+        // Particle properties based on event
+        let size = 20;
+        let lifetime = 60;
+
+        if (event_type === 'Stop') {
+          size = 50;
+          lifetime = 120;
+        } else if (event_type === 'PreToolUse' || event_type === 'PostToolUse') {
+          size = tool_name === 'Task' ? 35 : 15;
+          lifetime = 45;
+        }
+
+        this.particles.push({
+          x, y,
+          vx: (Math.random() - 0.5) * 2,
+          vy: (Math.random() - 0.5) * 2,
+          size,
+          color: color || '#4ECDC4',
+          alpha: 1,
+          lifetime,
+          maxLifetime: lifetime
+        });
+      }
+
+      updateSession(session) {
+        this.sessions.set(session.session_id, session);
+      }
+
+      animate() {
+        const { ctx, canvas } = this;
+
+        // Clear with fade effect
+        ctx.fillStyle = 'rgba(10, 10, 15, 0.15)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Draw center line
+        ctx.strokeStyle = 'rgba(74, 74, 90, 0.3)';
+        ctx.beginPath();
+        ctx.moveTo(canvas.width / 2, 0);
+        ctx.lineTo(canvas.width / 2, canvas.height);
+        ctx.stroke();
+
+        // Draw L/R labels
+        ctx.fillStyle = 'rgba(74, 74, 90, 0.5)';
+        ctx.font = '12px monospace';
+        ctx.fillText('L', 10, 20);
+        ctx.fillText('R', canvas.width - 20, 20);
+
+        // Draw session positions
+        for (const session of this.sessions.values()) {
+          const x = (session.pan + 1) / 2 * canvas.width;
+          ctx.beginPath();
+          ctx.arc(x, canvas.height - 20, 5, 0, Math.PI * 2);
+          ctx.fillStyle = session.color;
+          ctx.fill();
+        }
+
+        // Update and draw particles
+        this.particles = this.particles.filter(p => {
+          p.lifetime--;
+          p.alpha = p.lifetime / p.maxLifetime;
+          p.x += p.vx;
+          p.y += p.vy;
+          p.size *= 0.98;
+
+          if (p.lifetime <= 0) return false;
+
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fillStyle = p.color + Math.floor(p.alpha * 255).toString(16).padStart(2, '0');
+          ctx.fill();
+
+          // Glow effect
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size * 1.5, 0, Math.PI * 2);
+          ctx.fillStyle = p.color + Math.floor(p.alpha * 50).toString(16).padStart(2, '0');
+          ctx.fill();
+
+          return true;
+        });
+
+        requestAnimationFrame(() => this.animate());
+      }
+    }
+
+    // ============================================
+    // App State & UI
+    // ============================================
+    let ws = null;
+    let audioEngine = new AudioEngine();
+    let visualizer = null;
+    const sessions = new Map();
+    const eventLog = [];
+    const MAX_LOG_ITEMS = 50;
+
+    function updateUI() {
+      // Update sessions list
+      const sessionsEl = document.getElementById('sessions-list');
+      if (sessions.size === 0) {
+        sessionsEl.innerHTML = '<div class="empty-state">No active sessions</div>';
+      } else {
+        sessionsEl.innerHTML = Array.from(sessions.values()).map(s => `
+          <div class="session-item">
+            <div class="session-color" style="background: ${s.color}"></div>
+            <div class="session-info">
+              <div class="session-id">${s.session_id.slice(0, 12)}...</div>
+              <div class="session-meta">${s.machine_id} • ${s.event_count} events</div>
+            </div>
+            <div class="pan-indicator">
+              <div class="pan-dot" style="left: ${(s.pan + 1) / 2 * 100}%; background: ${s.color}"></div>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      // Update event log
+      const logEl = document.getElementById('event-log');
+      if (eventLog.length === 0) {
+        logEl.innerHTML = '<div class="empty-state">Waiting for events...</div>';
+      } else {
+        logEl.innerHTML = eventLog.slice(-MAX_LOG_ITEMS).reverse().map(e => `
+          <div class="event-item">
+            <span class="event-type">${e.event_type}</span>
+            ${e.tool_name ? `<span class="event-tool">${e.tool_name}</span>` : ''}
+            <span class="event-time">${new Date(e.timestamp).toLocaleTimeString()}</span>
+          </div>
+        `).join('');
+      }
+    }
+
+    function handleEvent(event) {
+      // Update session tracking
+      if (event.session_id) {
+        sessions.set(event.session_id, {
+          session_id: event.session_id,
+          machine_id: event.machine_id,
+          pan: event.pan,
+          color: event.color,
+          event_count: (sessions.get(event.session_id)?.event_count || 0) + 1
+        });
+        visualizer?.updateSession(sessions.get(event.session_id));
+      }
+
+      // Add to log
+      eventLog.push(event);
+      if (eventLog.length > MAX_LOG_ITEMS * 2) {
+        eventLog.splice(0, MAX_LOG_ITEMS);
+      }
+
+      // Play sound
+      audioEngine.playEvent(event);
+
+      // Visualize
+      visualizer?.addEvent(event);
+
+      // Update UI
+      updateUI();
+    }
+
+    async function connect() {
+      const btn = document.getElementById('connect-btn');
+      const dot = document.getElementById('status-dot');
+      const text = document.getElementById('status-text');
+
+      btn.disabled = true;
+      btn.textContent = 'Connecting...';
+
+      try {
+        // Initialize audio (requires user gesture)
+        await audioEngine.init();
+
+        ws = new WebSocket(WS_URL);
+
+        ws.onopen = () => {
+          dot.classList.add('connected');
+          text.textContent = 'Connected';
+          btn.textContent = 'Disconnect';
+          btn.disabled = false;
+          console.log('Connected to Sonicify server');
+        };
+
+        ws.onmessage = (msg) => {
+          try {
+            const data = JSON.parse(msg.data);
+
+            // Handle init message with existing sessions
+            if (data.type === 'init' && data.sessions) {
+              data.sessions.forEach(s => {
+                sessions.set(s.session_id, s);
+                visualizer?.updateSession(s);
+              });
+              updateUI();
+              return;
+            }
+
+            // Handle regular event
+            handleEvent(data);
+          } catch (err) {
+            console.error('Error parsing message:', err);
+          }
+        };
+
+        ws.onclose = () => {
+          dot.classList.remove('connected');
+          text.textContent = 'Disconnected';
+          btn.textContent = 'Connect';
+          btn.disabled = false;
+          ws = null;
+        };
+
+        ws.onerror = (err) => {
+          console.error('WebSocket error:', err);
+          text.textContent = 'Error';
+          btn.textContent = 'Retry';
+          btn.disabled = false;
+        };
+
+      } catch (err) {
+        console.error('Connection error:', err);
+        text.textContent = 'Error';
+        btn.textContent = 'Retry';
+        btn.disabled = false;
+      }
+    }
+
+    function disconnect() {
+      if (ws) {
+        ws.close();
+        ws = null;
+      }
+    }
+
+    // ============================================
+    // Initialize
+    // ============================================
+    document.addEventListener('DOMContentLoaded', () => {
+      // Initialize visualizer
+      const canvas = document.getElementById('visualizer');
+      visualizer = new Visualizer(canvas);
+
+      // Connect button
+      document.getElementById('connect-btn').addEventListener('click', () => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          disconnect();
+        } else {
+          connect();
+        }
+      });
+
+      // Volume control
+      document.getElementById('volume').addEventListener('input', (e) => {
+        audioEngine.setVolume(e.target.value / 100);
+      });
+
+      // Reverb control
+      document.getElementById('reverb').addEventListener('input', (e) => {
+        audioEngine.setReverb(e.target.value / 100);
+      });
+
+      // Mute button
+      document.getElementById('mute-btn').addEventListener('click', (e) => {
+        const muted = audioEngine.toggleMute();
+        e.target.textContent = muted ? 'Unmute' : 'Mute';
+        e.target.classList.toggle('muted', muted);
+      });
+    });
+  </script>
+</body>
+</html>

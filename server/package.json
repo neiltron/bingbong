@@ -1,0 +1,11 @@
+{
+  "name": "sonicify-server",
+  "version": "0.1.0",
+  "description": "Backend server for Sonicify Claude Code audio monitoring",
+  "type": "module",
+  "scripts": {
+    "start": "bun run index.ts",
+    "dev": "bun --watch run index.ts"
+  },
+  "dependencies": {}
+}
