@@ -15,7 +15,7 @@
 set -euo pipefail
 
 # Configuration
-SONICIFY_URL="${SONICIFY_URL:-http://localhost:3333}"
+SONICIFY_URL="${SONICIFY_URL:-http://localhost:3334}"
 SONICIFY_ENABLED="${SONICIFY_ENABLED:-true}"
 
 # Exit early if disabled

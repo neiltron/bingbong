@@ -203,7 +203,7 @@ agents:
 ## Getting Started
 
 See `src/` for implementation code:
-- `hooks/` - Claude Code hook scripts
+- `agents/claude/hooks/` - Claude Code hook scripts
 - `server/` - Backend WebSocket server
 - `client/` - Frontend audio application
 

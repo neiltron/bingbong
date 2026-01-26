@@ -66,7 +66,7 @@ Add to `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "/full/path/to/sonicify-claude-code/hooks/pre-tool-use.sh"
+            "command": "/full/path/to/sonicify-claude-code/agents/claude/hooks/pre-tool-use.sh"
           }
         ]
       }
@@ -77,7 +77,7 @@ Add to `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "/full/path/to/sonicify-claude-code/hooks/post-tool-use.sh"
+            "command": "/full/path/to/sonicify-claude-code/agents/claude/hooks/post-tool-use.sh"
           }
         ]
       }
@@ -88,7 +88,7 @@ Add to `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "/full/path/to/sonicify-claude-code/hooks/stop.sh"
+            "command": "/full/path/to/sonicify-claude-code/agents/claude/hooks/stop.sh"
           }
         ]
       }
@@ -99,7 +99,7 @@ Add to `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "/full/path/to/sonicify-claude-code/hooks/subagent-stop.sh"
+            "command": "/full/path/to/sonicify-claude-code/agents/claude/hooks/subagent-stop.sh"
           }
         ]
       }
@@ -110,7 +110,7 @@ Add to `~/.claude/settings.json`:
 
 **Important:** Replace `/full/path/to/` with the actual path to this project.
 
-Run `./setup.sh` to see the configuration with your actual paths.
+Run `./agents/claude/setup.sh` to see the configuration with your actual paths.
 
 ## Step 5: Use Claude Code
 
@@ -130,9 +130,9 @@ Every tool call will now emit a sound. When the agent completes, you'll hear a d
 - Click anywhere on the page (browsers require user interaction before playing audio)
 
 ### Hooks not firing?
-- Verify hook scripts are executable: `chmod +x hooks/*.sh`
+- Verify hook scripts are executable: `chmod +x agents/claude/hooks/*.sh`
 - Check paths in settings.json are absolute
-- Test manually: `echo '{"session_id":"test"}' | ./hooks/pre-tool-use.sh`
+- Test manually: `echo '{"session_id":"test"}' | ./agents/claude/hooks/pre-tool-use.sh`
 
 ### Server connection failed?
 - Verify nothing else is using port 3333
