@@ -204,6 +204,7 @@ agents:
 
 See `src/` for implementation code:
 - `agents/claude/hooks/` - Claude Code hook scripts
+- `agents/opencode/` - OpenCode plugin integration
 - `server/` - Backend WebSocket server
 - `client/` - Frontend audio application
 
