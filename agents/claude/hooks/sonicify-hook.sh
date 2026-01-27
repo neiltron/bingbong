@@ -39,7 +39,14 @@ TOOL_INPUT=$(echo "$INPUT" | jq -c '.tool_input // {}')
 TOOL_OUTPUT=$(echo "$INPUT" | jq -c '.tool_output // {}')
 
 # Build the event payload
-TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ" 2>/dev/null || date -u +"%Y-%m-%dT%H:%M:%SZ")
+# Generate ISO 8601 timestamp with milliseconds (portable across macOS and Linux)
+if date --version >/dev/null 2>&1; then
+    # GNU date (Linux) - supports nanoseconds
+    TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")
+else
+    # BSD date (macOS) - use Python for milliseconds
+    TIMESTAMP=$(python3 -c "from datetime import datetime; print(datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z')" 2>/dev/null || date -u +"%Y-%m-%dT%H:%M:%SZ")
+fi
 HOSTNAME=$(hostname)
 MACHINE_ID="${SONICIFY_MACHINE_ID:-$HOSTNAME}"
 
