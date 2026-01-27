@@ -1,25 +1,25 @@
 #!/bin/bash
 #
-# Sonicify Hook for Claude Code
+# Bingbong Hook for Claude Code
 #
 # This script is called by Claude Code hooks and emits events
-# to the Sonicify backend for audio rendering.
+# to the Bingbong backend for audio rendering.
 #
 # Usage: Called automatically by Claude Code via hook configuration
 #
 # Environment:
-#   SONICIFY_URL     - Backend server URL (default: http://localhost:3333)
-#   SONICIFY_ENABLED - Set to "false" to disable (default: true)
+#   BINGBONG_URL     - Backend server URL (default: http://localhost:3333)
+#   BINGBONG_ENABLED - Set to "false" to disable (default: true)
 #
 
 set -euo pipefail
 
 # Configuration
-SONICIFY_URL="${SONICIFY_URL:-http://localhost:3334}"
-SONICIFY_ENABLED="${SONICIFY_ENABLED:-true}"
+BINGBONG_URL="${BINGBONG_URL:-http://localhost:3334}"
+BINGBONG_ENABLED="${BINGBONG_ENABLED:-true}"
 
 # Exit early if disabled
-if [[ "$SONICIFY_ENABLED" == "false" ]]; then
+if [[ "$BINGBONG_ENABLED" == "false" ]]; then
     exit 0
 fi
 
@@ -48,7 +48,7 @@ else
     TIMESTAMP=$(python3 -c "from datetime import datetime; print(datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z')" 2>/dev/null || date -u +"%Y-%m-%dT%H:%M:%SZ")
 fi
 HOSTNAME=$(hostname)
-MACHINE_ID="${SONICIFY_MACHINE_ID:-$HOSTNAME}"
+MACHINE_ID="${BINGBONG_MACHINE_ID:-$HOSTNAME}"
 
 EVENT_PAYLOAD=$(jq -n \
     --arg event_type "$EVENT_TYPE" \
@@ -76,7 +76,7 @@ curl -s -X POST \
     -H "Content-Type: application/json" \
     -d "$EVENT_PAYLOAD" \
     --max-time 2 \
-    "${SONICIFY_URL}/events" \
+    "${BINGBONG_URL}/events" \
     > /dev/null 2>&1 &
 
 # Always exit successfully to not block Claude Code

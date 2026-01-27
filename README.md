@@ -1,4 +1,4 @@
-# Sonicify Claude Code
+# Bingbong Claude Code
 
 An auditory monitoring system for Claude Code sessions that creates a 3D audio landscape for observing AI agent activity.
 
@@ -191,7 +191,7 @@ Claude Code Web is more constrained, but potential approaches:
 
 ## Cursor Hooks Setup
 
-We ship a helper script that installs Sonicify hooks into Cursor's `hooks.json` without removing existing hooks.
+We ship a helper script that installs Bingbong hooks into Cursor's `hooks.json` without removing existing hooks.
 
 Project-level (repo-local):
 ```
@@ -233,10 +233,10 @@ The script de-duplicates our hook entries so it can be safely re-run.
 ## Configuration Ideas
 
 ```yaml
-# sonicify.config.yaml
+# bingbong.config.yaml
 backend:
-  url: "wss://sonicify.example.com"
-  auth_token: "${SONICIFY_TOKEN}"
+  url: "wss://bingbong.example.com"
+  auth_token: "${BINGBONG_TOKEN}"
 
 spatial:
   mode: "stereo"  # stereo | hrtf | surround

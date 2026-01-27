@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# Install Sonicify Cursor hooks into hooks.json without removing existing entries.
-# Idempotent: Can be run multiple times - removes old Sonicify hooks before adding new ones.
+# Install Bingbong Cursor hooks into hooks.json without removing existing entries.
+# Idempotent: Can be run multiple times - removes old Bingbong hooks before adding new ones.
 #
 # Usage:
 #   ./agents/cursor/install-hooks.sh        # project-level .cursor/hooks.json
@@ -12,7 +12,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-HOOK_SCRIPT="$SCRIPT_DIR/hooks/sonicify-hook.sh"
+HOOK_SCRIPT="$SCRIPT_DIR/hooks/bingbong-hook.sh"
 
 TARGET_SCOPE="project"
 HOOKS_PATH="$PROJECT_ROOT/.cursor/hooks.json"
@@ -54,22 +54,22 @@ EVENTS=(
 tmpfile="$(mktemp)"
 cp "$HOOKS_PATH" "$tmpfile"
 
-# Step 1: Remove ALL existing Sonicify hooks from all events
+# Step 1: Remove ALL existing Bingbong hooks from all events
 # This ensures clean state before adding new ones (handles path changes, updates, etc.)
-echo "Removing any existing Sonicify hooks..."
+echo "Removing any existing Bingbong hooks..."
 jq '
   .version = (.version // 1) |
   .hooks = (.hooks // {}) |
   .hooks = (.hooks |
     with_entries(
-      .value = [.value[]? | select(.command | contains("sonicify-hook.sh") | not)]
+      .value = [.value[]? | select(.command | contains("bingbong-hook.sh") | not)]
     )
   )
 ' "$tmpfile" > "${tmpfile}.cleaned"
 mv "${tmpfile}.cleaned" "$tmpfile"
 
 # Step 2: Add our hooks to the specified events
-echo "Installing Sonicify hooks for ${#EVENTS[@]} events..."
+echo "Installing Bingbong hooks for ${#EVENTS[@]} events..."
 for event in "${EVENTS[@]}"; do
   command="$HOOK_SCRIPT $event"
   jq \
@@ -85,7 +85,7 @@ done
 mv "$tmpfile" "$HOOKS_PATH"
 
 echo ""
-echo "✓ Successfully installed Sonicify hooks into ${TARGET_SCOPE} hooks file:"
+echo "✓ Successfully installed Bingbong hooks into ${TARGET_SCOPE} hooks file:"
 echo "  $HOOKS_PATH"
 echo ""
 echo "Events hooked: ${EVENTS[*]}"

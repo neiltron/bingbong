@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Sonicify Setup Script
+# Bingbong Setup Script
 # Installs hooks and configures Claude Code for audio monitoring
 #
 
@@ -11,7 +11,7 @@ HOOKS_DIR="$SCRIPT_DIR/hooks"
 CLAUDE_DIR="$HOME/.claude"
 
 echo "╔═══════════════════════════════════════════════════╗"
-echo "║          🎵 Sonicify Setup Script 🎵              ║"
+echo "║          🎵 Bingbong Setup Script 🎵              ║"
 echo "╚═══════════════════════════════════════════════════╝"
 echo ""
 
@@ -111,7 +111,7 @@ echo "════════════════════════�
 echo "Quick Start:"
 echo "═══════════════════════════════════════════════════"
 echo ""
-echo "1. Start the Sonicify server:"
+echo "1. Start the Bingbong server:"
 echo "   cd $SCRIPT_DIR/server && bun run start"
 echo ""
 echo "2. Open the client in your browser:"

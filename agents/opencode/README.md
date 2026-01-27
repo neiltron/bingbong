@@ -1,6 +1,6 @@
 # OpenCode Integration
 
-This directory contains the OpenCode plugin that emits Sonicify events.
+This directory contains the OpenCode plugin that emits Bingbong events.
 
 ## Install (project)
 
@@ -13,7 +13,7 @@ mkdir -p .opencode/plugins
 2. Copy the plugin:
 
 ```bash
-cp agents/opencode/plugins/sonicify.js .opencode/plugins/sonicify.js
+cp agents/opencode/plugins/bingbong.js .opencode/plugins/bingbong.js
 ```
 
 ## Install (system-wide)
@@ -27,13 +27,13 @@ mkdir -p ~/.config/opencode/plugins
 2. Copy the plugin:
 
 ```bash
-cp agents/opencode/plugins/sonicify.js ~/.config/opencode/plugins/sonicify.js
+cp agents/opencode/plugins/bingbong.js ~/.config/opencode/plugins/bingbong.js
 ```
 
 ## Configuration
 
 Optional environment variables:
 
-- `SONICIFY_URL` (default: `http://localhost:3333`)
-- `SONICIFY_ENABLED` (`false` disables all events)
-- `SONICIFY_MACHINE_ID` (override hostname)
+- `BINGBONG_URL` (default: `http://localhost:3333`)
+- `BINGBONG_ENABLED` (`false` disables all events)
+- `BINGBONG_MACHINE_ID` (override hostname)

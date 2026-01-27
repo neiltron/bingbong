@@ -1,5 +1,5 @@
 /**
- * Sonicify Server
+ * Bingbong Server
  *
  * Receives events from Claude Code hooks and broadcasts them
  * to connected frontend clients for audio rendering.
@@ -8,7 +8,7 @@
 const PORT = parseInt(process.env.PORT || "3333");
 
 // Types
-interface SonicifyEvent {
+interface BingbongEvent {
   event_type: string;
   session_id: string;
   machine_id: string;
@@ -19,7 +19,7 @@ interface SonicifyEvent {
   tool_output: Record<string, unknown>;
 }
 
-interface EnrichedEvent extends SonicifyEvent {
+interface EnrichedEvent extends BingbongEvent {
   // Enriched fields added by server
   pan: number; // -1 (left) to 1 (right)
   session_index: number;
@@ -58,7 +58,7 @@ const SESSION_COLORS = [
 // WebSocket clients
 const wsClients = new Set<WebSocket>();
 
-function getOrCreateSession(event: SonicifyEvent): Session {
+function getOrCreateSession(event: BingbongEvent): Session {
   const key = `${event.machine_id}:${event.session_id}`;
 
   let session = sessions.get(key);
@@ -92,7 +92,7 @@ function getOrCreateSession(event: SonicifyEvent): Session {
   return session;
 }
 
-function enrichEvent(event: SonicifyEvent): EnrichedEvent {
+function enrichEvent(event: BingbongEvent): EnrichedEvent {
   const session = getOrCreateSession(event);
 
   return {
@@ -159,7 +159,7 @@ const server = Bun.serve({
     // HTTP POST for events from hooks
     if (req.method === "POST" && url.pathname === "/events") {
       try {
-        const event = (await req.json()) as SonicifyEvent;
+        const event = (await req.json()) as BingbongEvent;
         const enriched = enrichEvent(event);
 
         console.log(
@@ -201,7 +201,7 @@ const server = Bun.serve({
     if (req.method === "GET" && url.pathname === "/") {
       return new Response(
         JSON.stringify({
-          name: "Sonicify Server",
+          name: "Bingbong Server",
           version: "0.1.0",
           sessions: sessions.size,
           clients: wsClients.size,
@@ -244,7 +244,7 @@ const server = Bun.serve({
 
 console.log(`
 ╔═══════════════════════════════════════════════════╗
-║           🎵 Sonicify Server Running 🎵            ║
+║           🎵 Bingbong Server Running 🎵            ║
 ╠═══════════════════════════════════════════════════╣
 ║  HTTP Events: http://localhost:${PORT}/events        ║
 ║  WebSocket:   ws://localhost:${PORT}/ws              ║

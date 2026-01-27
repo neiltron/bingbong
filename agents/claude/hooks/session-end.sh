@@ -1,4 +1,4 @@
 #!/bin/bash
-# Sonicify: SessionEnd hook wrapper
+# Bingbong: SessionEnd hook wrapper
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-exec "$SCRIPT_DIR/sonicify-hook.sh" "SessionEnd"
+exec "$SCRIPT_DIR/bingbong-hook.sh" "SessionEnd"

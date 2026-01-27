@@ -1,10 +1,10 @@
 #!/bin/bash
 #
-# Test script that sends simulated events to the Sonicify server
+# Test script that sends simulated events to the Bingbong server
 # Useful for testing the audio/visual frontend without Claude Code
 #
 
-SERVER_URL="${SONICIFY_URL:-http://localhost:3334}"
+SERVER_URL="${BINGBONG_URL:-http://localhost:3334}"
 
 # Generate a random session ID
 SESSION_ID="test-$(date +%s)-$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 6)"

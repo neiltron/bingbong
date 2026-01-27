@@ -3,9 +3,9 @@
 # Test script to verify install-hooks.sh idempotency
 #
 # This tests:
-# 1. First install adds Sonicify hooks
+# 1. First install adds Bingbong hooks
 # 2. User hooks are preserved
-# 3. Second install doesn't duplicate Sonicify hooks
+# 3. Second install doesn't duplicate Bingbong hooks
 # 4. User hooks remain intact after multiple installs
 #
 
@@ -16,7 +16,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 TEST_DIR="$PROJECT_ROOT/.cursor-test"
 TEST_HOOKS="$TEST_DIR/hooks.json"
 
-echo "=== Sonicify Cursor Hooks Installation Test ==="
+echo "=== Bingbong Cursor Hooks Installation Test ==="
 echo ""
 
 # Setup: Create test environment
@@ -45,7 +45,7 @@ cat > "$TEST_DIR/test-install-wrapper.sh" <<'WRAPPER'
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-HOOK_SCRIPT="$PROJECT_ROOT/agents/cursor/hooks/sonicify-hook.sh"
+HOOK_SCRIPT="$PROJECT_ROOT/agents/cursor/hooks/bingbong-hook.sh"
 HOOKS_PATH="$SCRIPT_DIR/hooks.json"
 
 mkdir -p "$(dirname "$HOOKS_PATH")"
@@ -70,19 +70,19 @@ EVENTS=(
 tmpfile="$(mktemp)"
 cp "$HOOKS_PATH" "$tmpfile"
 
-echo "Removing any existing Sonicify hooks..."
+echo "Removing any existing Bingbong hooks..."
 jq '
   .version = (.version // 1) |
   .hooks = (.hooks // {}) |
   .hooks = (.hooks |
     with_entries(
-      .value = [.value[]? | select(.command | contains("sonicify-hook.sh") | not)]
+      .value = [.value[]? | select(.command | contains("bingbong-hook.sh") | not)]
     )
   )
 ' "$tmpfile" > "${tmpfile}.cleaned"
 mv "${tmpfile}.cleaned" "$tmpfile"
 
-echo "Installing Sonicify hooks for ${#EVENTS[@]} events..."
+echo "Installing Bingbong hooks for ${#EVENTS[@]} events..."
 for event in "${EVENTS[@]}"; do
   command="$HOOK_SCRIPT $event"
   jq \
@@ -96,7 +96,7 @@ for event in "${EVENTS[@]}"; do
 done
 
 mv "$tmpfile" "$HOOKS_PATH"
-echo "✓ Successfully installed Sonicify hooks"
+echo "✓ Successfully installed Bingbong hooks"
 WRAPPER
 
 chmod +x "$TEST_DIR/test-install-wrapper.sh"
@@ -109,15 +109,15 @@ echo "After first install:"
 jq . "$TEST_HOOKS"
 echo ""
 
-# Verify: Count Sonicify hooks
-sonicify_count=$(jq '[.hooks[][] | select(.command | contains("sonicify-hook.sh"))] | length' "$TEST_HOOKS")
-user_count=$(jq '[.hooks[][] | select(.command | contains("sonicify-hook.sh") | not)] | length' "$TEST_HOOKS")
-echo "Sonicify hooks: $sonicify_count (expected: 10)"
+# Verify: Count Bingbong hooks
+bingbong_count=$(jq '[.hooks[][] | select(.command | contains("bingbong-hook.sh"))] | length' "$TEST_HOOKS")
+user_count=$(jq '[.hooks[][] | select(.command | contains("bingbong-hook.sh") | not)] | length' "$TEST_HOOKS")
+echo "Bingbong hooks: $bingbong_count (expected: 10)"
 echo "User hooks: $user_count (expected: 2)"
 echo ""
 
-if [[ "$sonicify_count" != "10" ]]; then
-  echo "❌ FAIL: Expected 10 Sonicify hooks, got $sonicify_count"
+if [[ "$bingbong_count" != "10" ]]; then
+  echo "❌ FAIL: Expected 10 Bingbong hooks, got $bingbong_count"
   exit 1
 fi
 
@@ -135,14 +135,14 @@ jq . "$TEST_HOOKS"
 echo ""
 
 # Verify: Should still have same counts
-sonicify_count=$(jq '[.hooks[][] | select(.command | contains("sonicify-hook.sh"))] | length' "$TEST_HOOKS")
-user_count=$(jq '[.hooks[][] | select(.command | contains("sonicify-hook.sh") | not)] | length' "$TEST_HOOKS")
-echo "Sonicify hooks: $sonicify_count (expected: 10)"
+bingbong_count=$(jq '[.hooks[][] | select(.command | contains("bingbong-hook.sh"))] | length' "$TEST_HOOKS")
+user_count=$(jq '[.hooks[][] | select(.command | contains("bingbong-hook.sh") | not)] | length' "$TEST_HOOKS")
+echo "Bingbong hooks: $bingbong_count (expected: 10)"
 echo "User hooks: $user_count (expected: 2)"
 echo ""
 
-if [[ "$sonicify_count" != "10" ]]; then
-  echo "❌ FAIL: Idempotency broken! Expected 10 Sonicify hooks, got $sonicify_count"
+if [[ "$bingbong_count" != "10" ]]; then
+  echo "❌ FAIL: Idempotency broken! Expected 10 Bingbong hooks, got $bingbong_count"
   exit 1
 fi
 
@@ -156,14 +156,14 @@ echo "=== Test 3: Third Installation (Idempotency) ==="
 "$TEST_DIR/test-install-wrapper.sh"
 echo ""
 
-sonicify_count=$(jq '[.hooks[][] | select(.command | contains("sonicify-hook.sh"))] | length' "$TEST_HOOKS")
-user_count=$(jq '[.hooks[][] | select(.command | contains("sonicify-hook.sh") | not)] | length' "$TEST_HOOKS")
-echo "Sonicify hooks: $sonicify_count (expected: 10)"
+bingbong_count=$(jq '[.hooks[][] | select(.command | contains("bingbong-hook.sh"))] | length' "$TEST_HOOKS")
+user_count=$(jq '[.hooks[][] | select(.command | contains("bingbong-hook.sh") | not)] | length' "$TEST_HOOKS")
+echo "Bingbong hooks: $bingbong_count (expected: 10)"
 echo "User hooks: $user_count (expected: 2)"
 echo ""
 
-if [[ "$sonicify_count" != "10" ]]; then
-  echo "❌ FAIL: Idempotency broken on third run! Expected 10 Sonicify hooks, got $sonicify_count"
+if [[ "$bingbong_count" != "10" ]]; then
+  echo "❌ FAIL: Idempotency broken on third run! Expected 10 Bingbong hooks, got $bingbong_count"
   exit 1
 fi
 
@@ -175,7 +175,7 @@ fi
 echo "=== All Tests Passed ✓ ==="
 echo ""
 echo "The install script is idempotent:"
-echo "- Sonicify hooks are installed correctly"
+echo "- Bingbong hooks are installed correctly"
 echo "- User hooks are preserved across multiple installs"
 echo "- No duplication occurs on repeated runs"
 echo ""

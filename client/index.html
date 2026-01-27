@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Sonicify - Claude Code Audio Monitor</title>
+        <title>Bingbong - Claude Code Audio Monitor</title>
         <style>
             * {
                 box-sizing: border-box;
@@ -284,7 +284,7 @@
     <body>
         <div class="container">
             <header>
-                <h1><span>Sonicify</span> Claude Code</h1>
+                <h1><span>Bingbong</span> Claude Code</h1>
                 <div class="status">
                     <div class="status-dot" id="status-dot"></div>
                     <span id="status-text">Disconnected</span>
@@ -899,7 +899,7 @@
                         text.textContent = "Connected";
                         btn.textContent = "Disconnect";
                         btn.disabled = false;
-                        console.log("Connected to Sonicify server");
+                        console.log("Connected to Bingbong server");
                     };
 
                     ws.onmessage = (msg) => {

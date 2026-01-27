@@ -1,13 +1,13 @@
-// Sonicify OpenCode plugin
-// Emits OpenCode events to the Sonicify server for audio rendering.
+// Bingbong OpenCode plugin
+// Emits OpenCode events to the Bingbong server for audio rendering.
 
 import os from "node:os";
 
 const DEFAULT_URL = "http://localhost:3333";
 
-const SONICIFY_URL = Bun.env.SONICIFY_URL || DEFAULT_URL;
-const SONICIFY_ENABLED = (Bun.env.SONICIFY_ENABLED || "true").toLowerCase() !== "false";
-const MACHINE_ID = Bun.env.SONICIFY_MACHINE_ID || os.hostname();
+const BINGBONG_URL = Bun.env.BINGBONG_URL || DEFAULT_URL;
+const BINGBONG_ENABLED = (Bun.env.BINGBONG_ENABLED || "true").toLowerCase() !== "false";
+const MACHINE_ID = Bun.env.BINGBONG_MACHINE_ID || os.hostname();
 
 const TOOL_EVENT_TYPES = new Set(["tool.execute.before", "tool.execute.after"]);
 
@@ -51,7 +51,7 @@ const sendEvent = async ({
   toolInput = {},
   toolOutput = {},
 }) => {
-  if (!SONICIFY_ENABLED) return;
+  if (!BINGBONG_ENABLED) return;
 
   const mappedEventType = mapEventType(eventType);
   const output =
@@ -71,7 +71,7 @@ const sendEvent = async ({
   };
 
   try {
-    await fetch(`${SONICIFY_URL}/events`, {
+    await fetch(`${BINGBONG_URL}/events`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -81,7 +81,7 @@ const sendEvent = async ({
   }
 };
 
-export const SonicifyPlugin = async ({ directory }) => {
+export const BingbongPlugin = async ({ directory }) => {
   return {
     event: async ({ event }) => {
       if (!event || TOOL_EVENT_TYPES.has(event.type)) return;

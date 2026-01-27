@@ -2,12 +2,12 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import os from "node:os";
 
 const DEFAULT_URL = "http://localhost:3333";
-const BUILT_URL = "__SONICIFY_URL__";
+const BUILT_URL = "__BINGBONG_URL__";
 
-const envUrl = process.env.SONICIFY_URL;
+const envUrl = process.env.BINGBONG_URL;
 const url = envUrl && envUrl.length > 0 ? envUrl : BUILT_URL || DEFAULT_URL;
-const enabled = (process.env.SONICIFY_ENABLED || "true").toLowerCase() !== "false";
-const machineId = process.env.SONICIFY_MACHINE_ID || os.hostname();
+const enabled = (process.env.BINGBONG_ENABLED || "true").toLowerCase() !== "false";
+const machineId = process.env.BINGBONG_MACHINE_ID || os.hostname();
 
 const EVENT_TYPE_MAP: Record<string, string> = {
   tool_call: "PreToolUse",

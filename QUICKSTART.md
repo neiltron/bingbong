@@ -1,4 +1,4 @@
-# Sonicify Quick Start
+# Bingbong Quick Start
 
 Get audio monitoring for Claude Code in 5 minutes.
 
@@ -18,7 +18,7 @@ bun run index.ts
 You should see:
 ```
 ╔═══════════════════════════════════════════════════╗
-║           🎵 Sonicify Server Running 🎵            ║
+║           🎵 Bingbong Server Running 🎵            ║
 ╠═══════════════════════════════════════════════════╣
 ║  HTTP Events: http://localhost:3333/events        ║
 ║  WebSocket:   ws://localhost:3333/ws              ║
@@ -66,7 +66,7 @@ Add to `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "/full/path/to/sonicify-claude-code/agents/claude/hooks/pre-tool-use.sh"
+            "command": "/full/path/to/bingbong-claude-code/agents/claude/hooks/pre-tool-use.sh"
           }
         ]
       }
@@ -77,7 +77,7 @@ Add to `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "/full/path/to/sonicify-claude-code/agents/claude/hooks/post-tool-use.sh"
+            "command": "/full/path/to/bingbong-claude-code/agents/claude/hooks/post-tool-use.sh"
           }
         ]
       }
@@ -88,7 +88,7 @@ Add to `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "/full/path/to/sonicify-claude-code/agents/claude/hooks/stop.sh"
+            "command": "/full/path/to/bingbong-claude-code/agents/claude/hooks/stop.sh"
           }
         ]
       }
@@ -99,7 +99,7 @@ Add to `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "/full/path/to/sonicify-claude-code/agents/claude/hooks/subagent-stop.sh"
+            "command": "/full/path/to/bingbong-claude-code/agents/claude/hooks/subagent-stop.sh"
           }
         ]
       }

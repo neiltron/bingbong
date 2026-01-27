@@ -1,4 +1,4 @@
 #!/bin/bash
-# Sonicify: SubagentStop hook wrapper
+# Bingbong: SubagentStop hook wrapper
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-exec "$SCRIPT_DIR/sonicify-hook.sh" "SubagentStop"
+exec "$SCRIPT_DIR/bingbong-hook.sh" "SubagentStop"
