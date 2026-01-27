@@ -63,16 +63,61 @@ Transform Claude Code sessions into an auditory experience where:
 
 Claude Code provides these hook events we can leverage:
 
-| Event | Description | Sound Mapping Ideas |
-|-------|-------------|---------------------|
-| `PreToolUse` | Before any tool executes | Soft attack, rising tone |
-| `PostToolUse` | After tool completes | Completion chime, varies by tool |
-| `SessionStart` | Session initialization | Welcome chord, establish position |
-| `SessionEnd` | Session cleanup | Fade-out, descending tone |
-| `Stop` | Main agent finishes | Distinct completion bell |
-| `SubagentStop` | Subagent completes | Lighter completion tone |
-| `Notification` | System notifications | Alert sound |
-| `PreCompact` | Context compaction | Compression/woosh sound |
+| Event | Description | Sound Mapping Ideas | Priority |
+|-------|-------------|---------------------|----------|
+| `PreToolUse` | Before any tool executes | Soft attack, rising tone | Medium |
+| `PostToolUse` | After tool completes | Completion chime, varies by tool | Medium |
+| `SessionStart` | Session initialization | Welcome chord, establish position | High |
+| `SessionEnd` | Session cleanup | Fade-out, descending tone | High |
+| `Stop` | Main agent finishes | **Distinct completion bell** | **High** |
+| `SubagentStop` | Subagent completes | Lighter completion tone | Medium |
+| `PermissionRequest` | User approval needed | **Alert bell, attention-grabbing** | **Critical** |
+| `Notification` | System notifications | Alert sound | Low |
+| `PreCompact` | Context compaction | Compression/woosh sound | Low |
+| `Setup` | Initial setup | Initialization tone | Low |
+| `UserPromptSubmit` | User submits prompt | Input acknowledgment | Medium |
+
+## Cursor IDE Hook Events (Mapped to Claude Code Baseline)
+
+Cursor IDE exposes a separate hook system with different event names. We map these to the closest Claude Code hooks where possible (and note gaps).
+
+| Cursor Event | Closest Claude Code Hook | Notes |
+|-------------|--------------------------|-------|
+| `beforeShellExecution` | `PreToolUse` | Treat as tool hook (`Bash`). |
+| `afterShellExecution` | `PostToolUse` | Treat as tool hook (`Bash`). |
+| `beforeMCPExecution` | `PreToolUse` | MCP tool invocation. |
+| `afterMCPExecution` | `PostToolUse` | MCP tool completion. |
+| `beforeReadFile` | `PreToolUse` | File read hook. |
+| `afterFileEdit` | `PostToolUse` | File edit hook. |
+| `beforeSubmitPrompt` | `UserPromptSubmit` | User submits prompt. |
+| `afterAgentResponse` | _No direct equivalent_ | Closest is `Notification`, but we treat as a distinct Cursor event. |
+| `afterAgentThought` | _No direct equivalent_ | Cursor-only signal. |
+| `stop` | `Stop` | Agent finishes. |
+
+Note: Cursor also exposes tab-completion/inline edit hooks (`beforeTabFileRead`, `afterTabFileEdit`), which we intentionally exclude for now.
+
+### Sound Design Notes
+
+**Critical Events** (`PermissionRequest`):
+- Must be immediately noticeable and distinct from all other sounds
+- Should persist or repeat until acknowledged
+- Similar urgency level to `Stop` but different character
+- Example: Rising alert tone, bell with reverb, or attention-grabbing chord
+
+**High Priority Events** (`Stop`, `SessionStart`, `SessionEnd`):
+- Clear, distinctive, and unmistakable
+- `Stop` should feel conclusive and satisfying
+- Session events establish spatial presence/departure
+
+**Medium Priority Events** (Tool operations, `UserPromptSubmit`):
+- Frequent but not overwhelming
+- Should be pleasant and non-intrusive
+- Tool-specific variations add context
+
+**Low Priority Events** (`Notification`, `PreCompact`, `Setup`):
+- Subtle, background-level sounds
+- Should not distract during active work
+- Informational rather than actionable
 
 ### Tool-Specific Sounds
 
@@ -144,6 +189,22 @@ Claude Code Web is more constrained, but potential approaches:
 
 *Note: Web integration may require Anthropic cooperation or creative workarounds.*
 
+## Cursor Hooks Setup
+
+We ship a helper script that installs Sonicify hooks into Cursor's `hooks.json` without removing existing hooks.
+
+Project-level (repo-local):
+```
+./agents/cursor/install-hooks.sh
+```
+
+User-level (applies across all Cursor projects):
+```
+./agents/cursor/install-hooks.sh --global
+```
+
+The script de-duplicates our hook entries so it can be safely re-run.
+
 ## Technical Considerations
 
 ### Hook Script Performance
@@ -192,6 +253,11 @@ sounds:
     envelope: "soft"
   Stop:
     chord: ["C4", "E4", "G4"]
+
+## Future TODOs (Cursor)
+
+- Cursor CLI hook coverage (currently limited vs IDE hooks).
+- Background Agents API webhooks for remote/background sessions.
     duration: 0.5
     envelope: "bell"
 
@@ -205,6 +271,7 @@ agents:
 See `src/` for implementation code:
 - `agents/claude/hooks/` - Claude Code hook scripts
 - `agents/opencode/` - OpenCode plugin integration
+- `agents/pi/` - pi-coding-agent extension integration
 - `server/` - Backend WebSocket server
 - `client/` - Frontend audio application
 
