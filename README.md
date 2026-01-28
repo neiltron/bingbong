@@ -8,9 +8,75 @@ Bingbong turns AI coding agent activity into spatial audio feedback. Each tool a
 
 **Supported agents:** Claude Code, Cursor, OpenCode, Pi
 
+## Prerequisites
+
+- [Bun](https://bun.sh) (or Node.js)
+- At least one supported agent installed
+
 ## Quick Start
 
-See [QUICKSTART.md](./QUICKSTART.md) for setup instructions.
+**1. Start the server:**
+```bash
+cd server
+bun install
+bun run index.ts
+```
+
+**2. Open the client:**
+```bash
+cd client
+open index.html
+# or serve via HTTP:
+python -m http.server 8000
+```
+
+Click "Connect" in the browser.
+
+**3. Install agent hooks:**
+
+| Agent | Installation |
+|-------|-------------|
+| **Claude Code** | `./agents/claude/setup.sh` |
+| **Cursor** | `./agents/cursor/install-hooks.sh` |
+| **OpenCode** | `./agents/opencode/install.sh` |
+| **Pi** | `./agents/pi/install.sh` |
+
+**4. Use your agent** - every action will produce audio feedback.
+
+## Configuration
+
+Server defaults to `http://localhost:3334`. Configure via environment:
+
+```bash
+BINGBONG_URL=http://localhost:3334
+BINGBONG_ENABLED=true
+BINGBONG_MACHINE_ID=my-laptop
+```
+
+## Testing
+
+Send test events without running an agent:
+```bash
+./test-events.sh
+```
+
+You should hear sounds and see particles in the visualizer.
+
+## Troubleshooting
+
+**No sounds?**
+- Click "Connect" in browser
+- Verify server is running on port 3334
+- Click anywhere on page (browsers require user interaction for audio)
+
+**Hooks not firing?**
+- Check scripts are executable: `chmod +x agents/*/hooks/*.sh`
+- Verify paths in agent config are absolute
+- Test manually: `echo '{"session_id":"test"}' | ./agents/claude/hooks/pre-tool-use.sh`
+
+**Server connection failed?**
+- Check nothing else is using port 3334
+- Verify server is running: `curl http://localhost:3334/`
 
 ## Architecture
 
@@ -35,85 +101,44 @@ Events are normalized across agents:
 
 Each tool (Read, Write, Bash, etc.) gets distinct sound characteristics.
 
-## Status
-
-**Current phase:** Phase 3 complete ✓
-
-- ✓ Phase 1: Hook scripts (Claude Code, Cursor, OpenCode, pi)
-- ✓ Phase 2: WebSocket server with session tracking
-- ✓ Phase 3: Web Audio client with synthesis + visualization
-- ⧗ Phase 4: Advanced 3D audio (HRTF, reverb zones)
-- ⧗ Phase 5: Multi-machine orchestration
-
-## Agent Integration
-
-| Agent | Installation |
-|-------|-------------|
-| **Claude Code** | `./agents/claude/setup.sh` |
-| **Cursor** | `./agents/cursor/install-hooks.sh` |
-| **OpenCode** | `./agents/opencode/install.sh` |
-| **Pi** | `./agents/pi/install.sh` |
-
 ## Sound Design
 
-**Critical events** (PermissionRequest): Immediately noticeable, persistent
-**High priority** (Stop, Session events): Clear and distinctive
-**Medium priority** (Tool operations): Pleasant, non-intrusive
-**Low priority** (PreCompact, etc.): Subtle background tones
+**Priority levels:**
+- **Critical** (PermissionRequest): Immediately noticeable, persistent
+- **High** (Stop, Session events): Clear and distinctive
+- **Medium** (Tool operations): Pleasant, non-intrusive
+- **Low** (PreCompact, etc.): Subtle background tones
 
-Tool-specific mappings:
+**Tool-specific mappings:**
 - `Read` → Page turn, soft (A4, 80ms)
 - `Write` → Typewriter click (E4, 120ms)
 - `Edit` → Pencil scratch (D4, 100ms)
 - `Bash` → Terminal beep (F3, 150ms, square wave)
 - `Task` → Dual tone for subagent launch (G4+B4, 250ms)
 - `Grep/Glob` → Quick search ping (B4/C5, 60ms)
-
-## Configuration
-
-Server defaults to `http://localhost:3334`. Configure via environment:
-
-```bash
-BINGBONG_URL=http://localhost:3334
-BINGBONG_ENABLED=true
-BINGBONG_MACHINE_ID=my-laptop
-```
-
-Client connects to `ws://localhost:3334/ws`.
+- `Stop` → Major triad completion chord (C5+E5+G5)
 
 ## Project Structure
 
 ```
 agents/
   claude/hooks/          # Claude Code hook scripts
-  cursor/                # Cursor IDE hooks + installer
+  cursor/                # Cursor hooks + installer
   opencode/plugins/      # OpenCode plugin
-  pi/extensions/         # pi-coding-agent extension
+  pi/extensions/         # Pi extension
 server/                  # Bun WebSocket server
 client/                  # Web Audio client (single HTML file)
 ```
 
-## Development
+## Development Status
 
-**Server:**
-```bash
-cd server
-bun install
-bun run index.ts
-```
+**Current phase:** Phase 3 complete ✓
 
-**Client:**
-```bash
-cd client
-open index.html
-# or
-python -m http.server 8000
-```
-
-**Testing:**
-```bash
-./test-events.sh  # Send sample events to server
-```
+- ✓ Phase 1: Hook scripts (Claude Code, Cursor, OpenCode, Pi)
+- ✓ Phase 2: WebSocket server with session tracking
+- ✓ Phase 3: Web Audio client with synthesis + visualization
+- ⧗ Phase 4: Advanced 3D audio (HRTF, reverb zones)
+- ⧗ Phase 5: Multi-machine orchestration
 
 ## Future Work
 
