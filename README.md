@@ -54,23 +54,19 @@ Install hooks via settings file:
 ./agents/claude/setup.sh
 ```
 
-### Cursor IDE
+### Cursor
 
-Project-level:
-```bash
-./agents/cursor/install-hooks.sh
-```
-
-Global (all projects):
 ```bash
 ./agents/cursor/install-hooks.sh --global
 ```
 
 ### OpenCode
 
-Plugin auto-loads from `~/.opencode/plugins/`
+```bash
+./agents/opencode/install.sh
+```
 
-### pi-coding-agent
+### Pi
 
 Extension installs via:
 ```bash
@@ -140,12 +136,13 @@ python -m http.server 8000
 
 ## Future Work
 
-**Codex integration:** Event support is currently in development by the Codex team. Once available, we'll add hooks for Codex sessions.
+**Codex integration:** Event support is [in development](https://github.com/openai/codex/issues/2109) by the Codex team.
 
-**Claude Code Web:** Browser-based integration is tentative at best. Would require either browser extension, proxy server, or official Anthropic API support.
+**Claude Code Web:** Tentative at best. Would require CCW plugin support of some kind.
 
 ## References
 
-- [Claude Code Hooks](https://docs.anthropic.com/claude-code/hooks)
-- [Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API)
-- [Cursor Hooks](https://docs.cursor.com/advanced/hooks)
+- [Claude Code hooks](https://docs.anthropic.com/claude-code/hooks)
+- [Cursor hooks](https://docs.cursor.com/advanced/hooks)
+- [Pi extensions](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent#extensions)
+- [OpenCode events](https://opencode.ai/docs/plugins/#events)
