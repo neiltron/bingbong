@@ -47,31 +47,12 @@ Each tool (Read, Write, Bash, etc.) gets distinct sound characteristics.
 
 ## Agent Integration
 
-### Claude Code
-
-Install hooks via settings file:
-```bash
-./agents/claude/setup.sh
-```
-
-### Cursor
-
-```bash
-./agents/cursor/install-hooks.sh
-```
-
-### OpenCode
-
-```bash
-./agents/opencode/install.sh
-```
-
-### Pi
-
-Extension installs via:
-```bash
-./agents/pi/install.sh
-```
+| Agent | Installation |
+|-------|-------------|
+| **Claude Code** | `./agents/claude/setup.sh` |
+| **Cursor** | `./agents/cursor/install-hooks.sh` |
+| **OpenCode** | `./agents/opencode/install.sh` |
+| **Pi** | `./agents/pi/install.sh` |
 
 ## Sound Design
 
