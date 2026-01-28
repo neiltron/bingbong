@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Bingbong - Claude Code Audio Monitor</title>
+        <title>Bingbong</title>
         <style>
             * {
                 box-sizing: border-box;
@@ -284,7 +284,7 @@
     <body>
         <div class="container">
             <header>
-                <h1><span>Bingbong</span> Claude Code</h1>
+                <h1><span>Bingbong</span></h1>
                 <div class="status">
                     <div class="status-dot" id="status-dot"></div>
                     <span id="status-text">Disconnected</span>
@@ -346,7 +346,7 @@
             // ============================================
             // Configuration
             // ============================================
-            const WS_URL = "ws://localhost:3334/ws";
+            const WS_URL = `ws://${location.host}/ws`;
 
             // Sound mappings - notes and characteristics for each event/tool
             const SOUND_CONFIG = {
