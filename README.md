@@ -10,28 +10,35 @@ Bingbong turns AI coding agent activity into spatial audio feedback. Each tool a
 
 ## Prerequisites
 
-- [Bun](https://bun.sh) (or Node.js)
+- [Bun](https://bun.sh) runtime
 - At least one supported agent installed
 
 ## Quick Start
 
-**1. Start the server:**
+**1. Run bingbong:**
+
 ```bash
-cd server
-bun install
-bun run index.ts
+# Install globally
+npm install -g bingbong
+bingbong
+
+# Or run directly with npx (requires Bun)
+npx bingbong
+
+# Or clone and run from source
+git clone https://github.com/yourusername/bingbong
+cd bingbong
+bun run start
 ```
 
-**2. Open the client:**
+**2. Open in browser:**
+
+The client is served automatically at `http://localhost:3334`. Click "Connect" to start.
+
+Use `--open` to auto-launch your browser:
 ```bash
-cd client
-open index.html
-
-# or serve via HTTP:
-npx serve client/ -p 8000
+bingbong --open
 ```
-
-Click "Connect" in the browser.
 
 **3. Install agent hooks:**
 
@@ -50,9 +57,26 @@ You can also test the events without burning any tokens with the test script:
 ./test-events.sh
 ```
 
+## CLI Options
+
+```
+bingbong [options]
+
+Options:
+  -p, --port <number>  Port to run server on (default: 3334)
+  -o, --open           Open browser automatically
+  -h, --help           Show help message
+  -v, --version        Show version number
+
+Examples:
+  bingbong              Start server on port 3334
+  bingbong --open       Start and open browser
+  bingbong --port 8080  Use custom port
+```
+
 ## Configuration
 
-Server defaults to `http://localhost:3334`. Configure via environment:
+Server defaults to `http://localhost:3334`. Configure agent hooks via environment:
 
 ```bash
 BINGBONG_URL=http://localhost:3334
@@ -119,13 +143,14 @@ Events are normalized across agents:
 ## Project Structure
 
 ```
+bin/                     # CLI entry point
+src/                     # Server source code
+client/                  # Web Audio client (single HTML file)
 agents/
   claude/hooks/          # Claude Code hook scripts
   cursor/                # Cursor hooks + installer
   opencode/plugins/      # OpenCode plugin
   pi/extensions/         # Pi extension
-server/                  # Bun WebSocket server
-client/                  # Web Audio client (single HTML file)
 ```
 
 ## Future Work
