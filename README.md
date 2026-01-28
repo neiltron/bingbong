@@ -4,13 +4,9 @@ Soundscapes for coding agents. Transform AI agent sessions into spatial audio fe
 
 ## What is this?
 
-Bingbong monitors AI coding agents and creates real-time audio landscapes:
-- **Different actions = distinct sounds** - Read, Write, Search each have unique tones
-- **Multiple agents = spatial positioning** - Each session gets its own stereo position
-- **Completion events = clear signals** - Know when your agent finishes without looking
-- **Ambient awareness** - Develop intuition for agent behavior patterns
+Bingbong turns AI coding agent activity into spatial audio feedback. Each tool and action produces distinct sounds, sessions are positioned in stereo space, and you can monitor agent activity without visual attention.
 
-**Supported agents:** Claude Code, Cursor IDE, OpenCode, pi-coding-agent
+**Supported agents:** Claude Code, Cursor, OpenCode, Pi
 
 ## Quick Start
 
