@@ -82,7 +82,7 @@ function getOrCreateSession(event: BingbongEvent): Session {
     sessions.set(key, session);
 
     console.log(
-      `[Session] New session: ${key} (index=${index}, pan=${session.pan.toFixed(2)})`
+      `[Session] New session: ${key} (index=${index}, pan=${session.pan.toFixed(2)})`,
     );
   }
 
@@ -163,7 +163,7 @@ const server = Bun.serve({
         const enriched = enrichEvent(event);
 
         console.log(
-          `[Event] ${enriched.event_type} | session=${enriched.session_id.slice(0, 8)} | tool=${enriched.tool_name || "n/a"}`
+          `[Event] ${enriched.event_type} | session=${enriched.session_id.slice(0, 8)} | tool=${enriched.tool_name || "n/a"}`,
         );
 
         broadcast(enriched);
@@ -208,7 +208,7 @@ const server = Bun.serve({
         }),
         {
           headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
+        },
       );
     }
 
@@ -226,7 +226,7 @@ const server = Bun.serve({
         JSON.stringify({
           type: "init",
           sessions: sessionList,
-        })
+        }),
       );
     },
 
@@ -244,7 +244,7 @@ const server = Bun.serve({
 
 console.log(`
 ╔═══════════════════════════════════════════════════╗
-║           🎵 Bingbong Server Running 🎵            ║
+║             Bingbong Server Running              ║
 ╠═══════════════════════════════════════════════════╣
 ║  HTTP Events: http://localhost:${PORT}/events        ║
 ║  WebSocket:   ws://localhost:${PORT}/ws              ║

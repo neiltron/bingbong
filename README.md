@@ -26,8 +26,9 @@ bun run index.ts
 ```bash
 cd client
 open index.html
+
 # or serve via HTTP:
-python -m http.server 8000
+npx serve client/ -p 8000
 ```
 
 Click "Connect" in the browser.
@@ -41,7 +42,13 @@ Click "Connect" in the browser.
 | **OpenCode** | `./agents/opencode/install.sh` |
 | **Pi** | `./agents/pi/install.sh` |
 
-**4. Use your agent** - every action will produce audio feedback.
+**4. Test it out** - every action and tool use should produce a sound.
+
+You can also test the events without burning any tokens with the test script:
+
+```bash
+./test-events.sh
+```
 
 ## Configuration
 
@@ -53,14 +60,7 @@ BINGBONG_ENABLED=true
 BINGBONG_MACHINE_ID=my-laptop
 ```
 
-## Testing
-
-Send test events without running an agent:
-```bash
-./test-events.sh
-```
-
-You should hear sounds and see particles in the visualizer.
+--- 
 
 ## Troubleshooting
 
@@ -99,8 +99,6 @@ Events are normalized across agents:
 | `PermissionRequest` | User approval needed | Critical |
 | `PreCompact` | Context compression | Low |
 
-Each tool (Read, Write, Bash, etc.) gets distinct sound characteristics.
-
 ## Sound Design
 
 **Priority levels:**
@@ -130,21 +128,12 @@ server/                  # Bun WebSocket server
 client/                  # Web Audio client (single HTML file)
 ```
 
-## Development Status
-
-**Current phase:** Phase 3 complete ✓
-
-- ✓ Phase 1: Hook scripts (Claude Code, Cursor, OpenCode, Pi)
-- ✓ Phase 2: WebSocket server with session tracking
-- ✓ Phase 3: Web Audio client with synthesis + visualization
-- ⧗ Phase 4: Advanced 3D audio (HRTF, reverb zones)
-- ⧗ Phase 5: Multi-machine orchestration
-
 ## Future Work
-
-**Codex integration:** Event support is [in development](https://github.com/openai/codex/issues/2109) by the Codex team.
-
-**Claude Code Web:** Tentative at best. Would require CCW plugin support of some kind.
+- [ ] Better 3d audio (HRTF, reverb zones)
+- [ ] Multiple machine orchestration
+- [ ] Use with pi-agent for workflow monitoring
+- [ ] Codex integration: Event support is [in development](https://github.com/openai/codex/issues/2109) by the Codex team.
+- [ ] Claude Code Web integration: Tentative at best. Would require CCW plugin support of some kind.
 
 ## References
 
