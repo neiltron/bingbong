@@ -57,7 +57,7 @@ Install hooks via settings file:
 ### Cursor
 
 ```bash
-./agents/cursor/install-hooks.sh --global
+./agents/cursor/install-hooks.sh
 ```
 
 ### OpenCode

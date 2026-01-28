@@ -1,26 +1,14 @@
 #!/bin/bash
 #
-# Install Bingbong Cursor hooks into hooks.json without removing existing entries.
+# Install Bingbong Cursor hooks globally.
 # Idempotent: Can be run multiple times - removes old Bingbong hooks before adding new ones.
-#
-# Usage:
-#   ./agents/cursor/install-hooks.sh        # project-level .cursor/hooks.json
-#   ./agents/cursor/install-hooks.sh --global  # user-level ~/.cursor/hooks.json
 #
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 HOOK_SCRIPT="$SCRIPT_DIR/hooks/bingbong-hook.sh"
-
-TARGET_SCOPE="project"
-HOOKS_PATH="$PROJECT_ROOT/.cursor/hooks.json"
-
-if [[ "${1:-}" == "--global" ]]; then
-  TARGET_SCOPE="global"
-  HOOKS_PATH="$HOME/.cursor/hooks.json"
-fi
+HOOKS_PATH="$HOME/.cursor/hooks.json"
 
 mkdir -p "$(dirname "$HOOKS_PATH")"
 
@@ -85,7 +73,7 @@ done
 mv "$tmpfile" "$HOOKS_PATH"
 
 echo ""
-echo "✓ Successfully installed Bingbong hooks into ${TARGET_SCOPE} hooks file:"
+echo "✓ Successfully installed Bingbong hooks globally:"
 echo "  $HOOKS_PATH"
 echo ""
 echo "Events hooked: ${EVENTS[*]}"
