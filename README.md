@@ -142,6 +142,12 @@ python -m http.server 8000
 ./test-events.sh  # Send sample events to server
 ```
 
+## Future Work
+
+**Codex integration:** Event support is currently in development by the Codex team. Once available, we'll add hooks for Codex sessions.
+
+**Claude Code Web:** Browser-based integration is tentative at best. Would require either browser extension, proxy server, or official Anthropic API support.
+
 ## References
 
 - [Claude Code Hooks](https://docs.anthropic.com/claude-code/hooks)
