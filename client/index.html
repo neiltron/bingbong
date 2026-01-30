@@ -530,15 +530,7 @@
             // ============================================
             // Configuration
             // ============================================
-            const WS_PORT = 3334;
-            const WS_URL = `ws://${window.location.hostname || "localhost"}:${WS_PORT}/ws`;
-
-            // Helper to escape HTML for safe DOM insertion
-            function escapeHtml(text) {
-                const div = document.createElement("div");
-                div.textContent = text;
-                return div.innerHTML;
-            }
+            const WS_URL = `ws://${location.host}/ws`;
 
             // Helper to create elements safely
             function createElement(tag, attrs = {}, children = []) {
