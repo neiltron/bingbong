@@ -11,6 +11,41 @@
                 padding: 0;
             }
 
+            /* Preserve focus visibility */
+            :focus-visible {
+                outline: 2px solid #4ecdc4;
+                outline-offset: 2px;
+            }
+
+            /* Skip link for keyboard navigation */
+            .skip-link {
+                position: absolute;
+                top: -40px;
+                left: 0;
+                background: #4ecdc4;
+                color: #0a0a0f;
+                padding: 8px 16px;
+                z-index: 100;
+                text-decoration: none;
+                font-size: 14px;
+                border-radius: 0 0 4px 0;
+            }
+
+            .skip-link:focus {
+                top: 0;
+            }
+
+            /* Reduced motion support */
+            @media (prefers-reduced-motion: reduce) {
+                *,
+                *::before,
+                *::after {
+                    animation-duration: 0.01ms !important;
+                    animation-iteration-count: 1 !important;
+                    transition-duration: 0.01ms !important;
+                }
+            }
+
             body {
                 font-family:
                     "SF Mono", "Monaco", "Inconsolata", "Roboto Mono", monospace;
@@ -165,7 +200,7 @@
 
             .session-meta {
                 font-size: 0.75em;
-                color: #666;
+                color: #999;
             }
 
             .pan-indicator {
@@ -219,7 +254,7 @@
             }
 
             .event-time {
-                color: #666;
+                color: #999;
                 font-size: 0.9em;
             }
 
@@ -268,7 +303,7 @@
             }
 
             .empty-state {
-                color: #444;
+                color: #888;
                 font-style: italic;
                 text-align: center;
                 padding: 20px;
@@ -282,71 +317,110 @@
         </style>
     </head>
     <body>
+        <a href="#main-content" class="skip-link">Skip to main content</a>
         <div class="container">
             <header>
                 <h1><span>Bingbong</span> Claude Code</h1>
                 <div class="status">
-                    <div class="status-dot" id="status-dot"></div>
+                    <div class="status-dot" id="status-dot" role="status" aria-label="Connection status: disconnected"></div>
                     <span id="status-text">Disconnected</span>
                     <button id="connect-btn">Connect</button>
                 </div>
             </header>
 
-            <div class="main-grid">
+            <main class="main-grid" id="main-content">
                 <div class="visualizer-section">
-                    <canvas id="visualizer"></canvas>
+                    <canvas id="visualizer" role="img" aria-label="Audio visualization showing particle effects for active Claude Code sessions">
+                        <p>Visual representation of audio events from connected Claude Code sessions</p>
+                    </canvas>
                 </div>
 
-                <div class="sidebar">
-                    <div class="panel">
-                        <h2>Controls</h2>
+                <aside class="sidebar" aria-label="Controls and session information">
+                    <section class="panel" aria-labelledby="controls-heading">
+                        <h2 id="controls-heading">Controls</h2>
                         <div class="controls">
                             <div class="control-row">
-                                <label>Master Volume</label>
+                                <label for="volume">Master Volume</label>
                                 <input
                                     type="range"
                                     id="volume"
                                     min="0"
                                     max="100"
                                     value="70"
+                                    aria-valuemin="0"
+                                    aria-valuemax="100"
+                                    aria-valuenow="70"
                                 />
                             </div>
                             <div class="control-row">
-                                <label>Reverb</label>
+                                <label for="reverb">Reverb</label>
                                 <input
                                     type="range"
                                     id="reverb"
                                     min="0"
                                     max="100"
                                     value="30"
+                                    aria-valuemin="0"
+                                    aria-valuemax="100"
+                                    aria-valuenow="30"
                                 />
                             </div>
-                            <button class="mute-btn" id="mute-btn">Mute</button>
+                            <button class="mute-btn" id="mute-btn" aria-pressed="false">Mute</button>
                         </div>
-                    </div>
+                    </section>
 
-                    <div class="panel">
-                        <h2>Active Sessions</h2>
-                        <div class="sessions-list" id="sessions-list">
-                            <div class="empty-state">No active sessions</div>
+                    <section class="panel" aria-labelledby="sessions-heading">
+                        <h2 id="sessions-heading">Active Sessions</h2>
+                        <div class="sessions-list" id="sessions-list" role="list" aria-live="polite">
+                            <div class="empty-state" role="listitem">No active sessions</div>
                         </div>
-                    </div>
+                    </section>
 
-                    <div class="panel">
-                        <h2>Event Log</h2>
-                        <div class="event-log" id="event-log">
+                    <section class="panel" aria-labelledby="eventlog-heading">
+                        <h2 id="eventlog-heading">Event Log</h2>
+                        <div class="event-log" id="event-log" role="log" aria-live="polite" aria-atomic="false">
                             <div class="empty-state">Waiting for events...</div>
                         </div>
-                    </div>
-                </div>
-            </div>
+                    </section>
+                </aside>
+            </main>
         </div>
 
         <script>
             // ============================================
             // Configuration
             // ============================================
-            const WS_URL = "ws://localhost:3334/ws";
+            const WS_PORT = 3334;
+            const WS_URL = `ws://${window.location.hostname || 'localhost'}:${WS_PORT}/ws`;
+
+            // Helper to escape HTML for safe DOM insertion
+            function escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            // Helper to create elements safely
+            function createElement(tag, attrs = {}, children = []) {
+                const el = document.createElement(tag);
+                for (const [key, value] of Object.entries(attrs)) {
+                    if (key === 'style' && typeof value === 'object') {
+                        Object.assign(el.style, value);
+                    } else if (key.startsWith('data-')) {
+                        el.dataset[key.slice(5)] = value;
+                    } else {
+                        el.setAttribute(key, value);
+                    }
+                }
+                for (const child of children) {
+                    if (typeof child === 'string') {
+                        el.appendChild(document.createTextNode(child));
+                    } else if (child) {
+                        el.appendChild(child);
+                    }
+                }
+                return el;
+            }
 
             // Sound mappings - notes and characteristics for each event/tool
             const SOUND_CONFIG = {
@@ -803,49 +877,61 @@
             const MAX_LOG_ITEMS = 50;
 
             function updateUI() {
-                // Update sessions list
+                // Update sessions list using safe DOM methods
                 const sessionsEl = document.getElementById("sessions-list");
+                sessionsEl.innerHTML = '';
+
                 if (sessions.size === 0) {
-                    sessionsEl.innerHTML =
-                        '<div class="empty-state">No active sessions</div>';
+                    sessionsEl.appendChild(
+                        createElement('div', { class: 'empty-state', role: 'listitem' }, ['No active sessions'])
+                    );
                 } else {
-                    sessionsEl.innerHTML = Array.from(sessions.values())
-                        .map(
-                            (s) => `
-          <div class="session-item">
-            <div class="session-color" style="background: ${s.color}"></div>
-            <div class="session-info">
-              <div class="session-id">${s.session_id.slice(0, 12)}...</div>
-              <div class="session-meta">${s.machine_id} • ${s.event_count} events</div>
-            </div>
-            <div class="pan-indicator">
-              <div class="pan-dot" style="left: ${((s.pan + 1) / 2) * 100}%; background: ${s.color}"></div>
-            </div>
-          </div>
-        `,
-                        )
-                        .join("");
+                    for (const s of sessions.values()) {
+                        const panPercent = ((s.pan + 1) / 2) * 100;
+                        const sessionItem = createElement('div', { class: 'session-item', role: 'listitem' }, [
+                            createElement('div', { class: 'session-color', style: { background: s.color }, 'aria-hidden': 'true' }),
+                            createElement('div', { class: 'session-info' }, [
+                                createElement('div', { class: 'session-id' }, [s.session_id.slice(0, 12) + '...']),
+                                createElement('div', { class: 'session-meta' }, [
+                                    `${s.machine_id || 'Unknown'} • ${s.event_count || 0} events`
+                                ])
+                            ]),
+                            createElement('div', { class: 'pan-indicator', 'aria-label': `Pan position: ${Math.round(s.pan * 100)}%` }, [
+                                createElement('div', { class: 'pan-dot', style: { left: `${panPercent}%`, background: s.color } })
+                            ])
+                        ]);
+                        sessionsEl.appendChild(sessionItem);
+                    }
                 }
 
-                // Update event log
+                // Update event log using safe DOM methods
                 const logEl = document.getElementById("event-log");
+                logEl.innerHTML = '';
+
                 if (eventLog.length === 0) {
-                    logEl.innerHTML =
-                        '<div class="empty-state">Waiting for events...</div>';
+                    logEl.appendChild(
+                        createElement('div', { class: 'empty-state' }, ['Waiting for events...'])
+                    );
                 } else {
-                    logEl.innerHTML = eventLog
-                        .slice(-MAX_LOG_ITEMS)
-                        .reverse()
-                        .map(
-                            (e) => `
-          <div class="event-item">
-            <span class="event-type">${e.event_type}</span>
-            ${e.tool_name ? `<span class="event-tool">${e.tool_name}</span>` : ""}
-            <span class="event-time">${new Date(e.timestamp).toLocaleTimeString()}</span>
-          </div>
-        `,
-                        )
-                        .join("");
+                    const recentEvents = eventLog.slice(-MAX_LOG_ITEMS).reverse();
+                    for (const e of recentEvents) {
+                        const eventChildren = [
+                            createElement('span', { class: 'event-type' }, [e.event_type || 'Unknown'])
+                        ];
+                        if (e.tool_name) {
+                            eventChildren.push(
+                                createElement('span', { class: 'event-tool' }, [e.tool_name])
+                            );
+                        }
+                        eventChildren.push(
+                            createElement('span', { class: 'event-time' }, [
+                                e.timestamp ? new Date(e.timestamp).toLocaleTimeString() : ''
+                            ])
+                        );
+                        logEl.appendChild(
+                            createElement('div', { class: 'event-item' }, eventChildren)
+                        );
+                    }
                 }
             }
 
@@ -880,6 +966,8 @@
                 updateUI();
             }
 
+            let audioInitFailed = false;
+
             async function connect() {
                 const btn = document.getElementById("connect-btn");
                 const dot = document.getElementById("status-dot");
@@ -887,19 +975,30 @@
 
                 btn.disabled = true;
                 btn.textContent = "Connecting...";
+                dot.setAttribute('aria-label', 'Connection status: connecting');
 
                 try {
                     // Initialize audio (requires user gesture)
-                    await audioEngine.init();
+                    try {
+                        await audioEngine.init();
+                        audioInitFailed = false;
+                    } catch (audioErr) {
+                        audioInitFailed = true;
+                        // Continue without audio - show warning but don't block connection
+                        const muteBtn = document.getElementById("mute-btn");
+                        muteBtn.textContent = "Audio unavailable";
+                        muteBtn.disabled = true;
+                        muteBtn.setAttribute('aria-disabled', 'true');
+                    }
 
                     ws = new WebSocket(WS_URL);
 
                     ws.onopen = () => {
                         dot.classList.add("connected");
-                        text.textContent = "Connected";
+                        dot.setAttribute('aria-label', 'Connection status: connected');
+                        text.textContent = audioInitFailed ? "Connected (no audio)" : "Connected";
                         btn.textContent = "Disconnect";
                         btn.disabled = false;
-                        console.log("Connected to Bingbong server");
                     };
 
                     ws.onmessage = (msg) => {
@@ -919,27 +1018,28 @@
                             // Handle regular event
                             handleEvent(data);
                         } catch (err) {
-                            console.error("Error parsing message:", err);
+                            // Silently handle parse errors for malformed messages
                         }
                     };
 
                     ws.onclose = () => {
                         dot.classList.remove("connected");
+                        dot.setAttribute('aria-label', 'Connection status: disconnected');
                         text.textContent = "Disconnected";
                         btn.textContent = "Connect";
                         btn.disabled = false;
                         ws = null;
                     };
 
-                    ws.onerror = (err) => {
-                        console.error("WebSocket error:", err);
-                        text.textContent = "Error";
+                    ws.onerror = () => {
+                        dot.setAttribute('aria-label', 'Connection status: error');
+                        text.textContent = "Connection failed";
                         btn.textContent = "Retry";
                         btn.disabled = false;
                     };
                 } catch (err) {
-                    console.error("Connection error:", err);
-                    text.textContent = "Error";
+                    dot.setAttribute('aria-label', 'Connection status: error');
+                    text.textContent = "Connection failed";
                     btn.textContent = "Retry";
                     btn.disabled = false;
                 }
@@ -992,7 +1092,16 @@
                         const muted = audioEngine.toggleMute();
                         e.target.textContent = muted ? "Unmute" : "Mute";
                         e.target.classList.toggle("muted", muted);
+                        e.target.setAttribute('aria-pressed', muted);
                     });
+
+                // Update aria-valuenow on range inputs
+                document.getElementById("volume").addEventListener("input", (e) => {
+                    e.target.setAttribute('aria-valuenow', e.target.value);
+                });
+                document.getElementById("reverb").addEventListener("input", (e) => {
+                    e.target.setAttribute('aria-valuenow', e.target.value);
+                });
             });
         </script>
     </body>
