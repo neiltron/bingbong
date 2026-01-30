@@ -132,15 +132,15 @@
                 border-radius: 8px;
                 padding: 20px;
                 border: 1px solid #2a2a3a;
-                contain: strict;
+                contain: layout paint;
             }
 
             #visualizer {
+                display: block;
                 width: 100%;
                 height: 400px;
                 background: #0a0a0f;
                 border-radius: 4px;
-                will-change: contents;
             }
 
             .sidebar {
@@ -772,15 +772,14 @@
                 }
 
                 resize() {
-                    const rect = this.canvas.parentElement.getBoundingClientRect();
+                    // Get the canvas's own rendered width (respects CSS width: 100% and parent padding)
+                    const rect = this.canvas.getBoundingClientRect();
                     this.width = rect.width;
                     this.dpr = window.devicePixelRatio || 1;
 
                     // Scale canvas for retina displays
                     this.canvas.width = this.width * this.dpr;
                     this.canvas.height = this.height * this.dpr;
-                    this.canvas.style.width = this.width + 'px';
-                    this.canvas.style.height = this.height + 'px';
                     this.ctx.scale(this.dpr, this.dpr);
 
                     // Redraw static elements after resize
