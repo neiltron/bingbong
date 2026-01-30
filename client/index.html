@@ -132,6 +132,7 @@
                 border-radius: 8px;
                 padding: 20px;
                 border: 1px solid #2a2a3a;
+                contain: strict;
             }
 
             #visualizer {
@@ -139,6 +140,7 @@
                 height: 400px;
                 background: #0a0a0f;
                 border-radius: 4px;
+                will-change: contents;
             }
 
             .sidebar {
@@ -152,6 +154,7 @@
                 border-radius: 8px;
                 padding: 15px;
                 border: 1px solid #2a2a3a;
+                contain: content;
             }
 
             .panel h2 {
@@ -598,8 +601,6 @@
                     this.reverbGain.connect(this.masterGain);
                     this.dryGain.connect(this.masterGain);
                     this.masterGain.connect(this.ctx.destination);
-
-                    console.log("Audio engine initialized");
                 }
 
                 async createReverbImpulse() {
@@ -746,28 +747,82 @@
             class Visualizer {
                 constructor(canvas) {
                     this.canvas = canvas;
-                    this.ctx = canvas.getContext("2d");
+                    this.ctx = canvas.getContext("2d", { alpha: false });
                     this.particles = [];
                     this.sessions = new Map();
+                    this.animationId = null;
+                    this.isAnimating = false;
+                    this.dpr = window.devicePixelRatio || 1;
+                    this.resizeTimeout = null;
+
+                    // Cache canvas dimensions
+                    this.width = 0;
+                    this.height = 400;
 
                     this.resize();
-                    window.addEventListener("resize", () => this.resize());
-                    this.animate();
+                    window.addEventListener("resize", () => this.throttledResize());
+                }
+
+                throttledResize() {
+                    if (this.resizeTimeout) return;
+                    this.resizeTimeout = setTimeout(() => {
+                        this.resize();
+                        this.resizeTimeout = null;
+                    }, 100);
                 }
 
                 resize() {
-                    const rect =
-                        this.canvas.parentElement.getBoundingClientRect();
-                    this.canvas.width = rect.width;
-                    this.canvas.height = 400;
+                    const rect = this.canvas.parentElement.getBoundingClientRect();
+                    this.width = rect.width;
+                    this.dpr = window.devicePixelRatio || 1;
+
+                    // Scale canvas for retina displays
+                    this.canvas.width = this.width * this.dpr;
+                    this.canvas.height = this.height * this.dpr;
+                    this.canvas.style.width = this.width + 'px';
+                    this.canvas.style.height = this.height + 'px';
+                    this.ctx.scale(this.dpr, this.dpr);
+
+                    // Redraw static elements after resize
+                    this.drawStatic();
+                }
+
+                drawStatic() {
+                    const { ctx } = this;
+
+                    // Clear canvas
+                    ctx.fillStyle = "#0a0a0f";
+                    ctx.fillRect(0, 0, this.width, this.height);
+
+                    // Draw center line
+                    ctx.strokeStyle = "rgba(74, 74, 90, 0.3)";
+                    ctx.beginPath();
+                    ctx.moveTo(this.width / 2, 0);
+                    ctx.lineTo(this.width / 2, this.height);
+                    ctx.stroke();
+
+                    // Draw L/R labels
+                    ctx.fillStyle = "rgba(74, 74, 90, 0.5)";
+                    ctx.font = "12px monospace";
+                    ctx.fillText("L", 10, 20);
+                    ctx.fillText("R", this.width - 20, 20);
+
+                    // Draw session positions
+                    for (const session of this.sessions.values()) {
+                        const x = ((session.pan + 1) / 2) * this.width;
+                        ctx.beginPath();
+                        ctx.arc(x, this.height - 20, 5, 0, Math.PI * 2);
+                        ctx.fillStyle = session.color;
+                        ctx.fill();
+                    }
                 }
 
                 addEvent(event) {
                     const { pan, color, event_type, tool_name } = event;
 
                     // Calculate x position from pan (-1 to 1 -> 0 to width)
-                    const x = ((pan + 1) / 2) * this.canvas.width;
-                    const y = this.canvas.height / 2;
+                    const x = ((pan + 1) / 2) * this.width;
+                    const y = this.height / 2;
 
                     // Particle properties based on event
                     let size = 20;
@@ -795,74 +850,103 @@
                         lifetime,
                         maxLifetime: lifetime,
                     });
+
+                    // Start animation if not running
+                    if (!this.isAnimating) {
+                        this.startAnimation();
+                    }
                 }
 
                 updateSession(session) {
                     this.sessions.set(session.session_id, session);
+                    // Redraw static elements to show new session
+                    if (!this.isAnimating) {
+                        this.drawStatic();
+                    }
+                }
+
+                startAnimation() {
+                    this.isAnimating = true;
+                    this.animate();
+                }
+
+                stopAnimation() {
+                    this.isAnimating = false;
+                    if (this.animationId) {
+                        cancelAnimationFrame(this.animationId);
+                        this.animationId = null;
+                    }
+                    // Draw final static state
+                    this.drawStatic();
                 }
 
                 animate() {
-                    const { ctx, canvas } = this;
+                    if (!this.isAnimating) return;
+
+                    const { ctx } = this;
 
                     // Clear with fade effect
                     ctx.fillStyle = "rgba(10, 10, 15, 0.15)";
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillRect(0, 0, this.width, this.height);
 
                     // Draw center line
                     ctx.strokeStyle = "rgba(74, 74, 90, 0.3)";
                     ctx.beginPath();
-                    ctx.moveTo(canvas.width / 2, 0);
-                    ctx.lineTo(canvas.width / 2, canvas.height);
+                    ctx.moveTo(this.width / 2, 0);
+                    ctx.lineTo(this.width / 2, this.height);
                     ctx.stroke();
 
                     // Draw L/R labels
                     ctx.fillStyle = "rgba(74, 74, 90, 0.5)";
                     ctx.font = "12px monospace";
                     ctx.fillText("L", 10, 20);
-                    ctx.fillText("R", canvas.width - 20, 20);
+                    ctx.fillText("R", this.width - 20, 20);
 
                     // Draw session positions
                     for (const session of this.sessions.values()) {
-                        const x = ((session.pan + 1) / 2) * canvas.width;
+                        const x = ((session.pan + 1) / 2) * this.width;
                         ctx.beginPath();
-                        ctx.arc(x, canvas.height - 20, 5, 0, Math.PI * 2);
+                        ctx.arc(x, this.height - 20, 5, 0, Math.PI * 2);
                         ctx.fillStyle = session.color;
                         ctx.fill();
                     }
 
                     // Update and draw particles
+                    let activeParticles = 0;
                     this.particles = this.particles.filter((p) => {
                         p.lifetime--;
+                        if (p.lifetime <= 0) return false;
+
+                        activeParticles++;
                         p.alpha = p.lifetime / p.maxLifetime;
                         p.x += p.vx;
                         p.y += p.vy;
                         p.size *= 0.98;
 
-                        if (p.lifetime <= 0) return false;
+                        const alphaHex = Math.floor(p.alpha * 255).toString(16).padStart(2, "0");
 
-                        ctx.beginPath();
-                        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-                        ctx.fillStyle =
-                            p.color +
-                            Math.floor(p.alpha * 255)
-                                .toString(16)
-                                .padStart(2, "0");
-                        ctx.fill();
-
-                        // Glow effect
+                        // Glow effect (drawn first, behind main circle)
                         ctx.beginPath();
                         ctx.arc(p.x, p.y, p.size * 1.5, 0, Math.PI * 2);
-                        ctx.fillStyle =
-                            p.color +
-                            Math.floor(p.alpha * 50)
-                                .toString(16)
-                                .padStart(2, "0");
+                        ctx.fillStyle = p.color + Math.floor(p.alpha * 50).toString(16).padStart(2, "0");
+                        ctx.fill();
+
+                        // Main particle
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                        ctx.fillStyle = p.color + alphaHex;
                         ctx.fill();
 
                         return true;
                     });
 
-                    requestAnimationFrame(() => this.animate());
+                    // Stop animation when no particles
+                    if (activeParticles === 0) {
+                        this.stopAnimation();
+                        return;
+                    }
+
+                    this.animationId = requestAnimationFrame(() => this.animate());
                 }
             }
 
@@ -876,9 +960,21 @@
             const eventLog = [];
             const MAX_LOG_ITEMS = 50;
 
+            // Cached DOM references (populated on DOMContentLoaded)
+            const DOM = {
+                sessionsEl: null,
+                logEl: null,
+                connectBtn: null,
+                statusDot: null,
+                statusText: null,
+                muteBtn: null,
+                volumeInput: null,
+                reverbInput: null
+            };
+
             function updateUI() {
                 // Update sessions list using safe DOM methods
-                const sessionsEl = document.getElementById("sessions-list");
+                const sessionsEl = DOM.sessionsEl;
                 sessionsEl.innerHTML = '';
 
                 if (sessions.size === 0) {
@@ -905,7 +1001,7 @@
                 }
 
                 // Update event log using safe DOM methods
-                const logEl = document.getElementById("event-log");
+                const logEl = DOM.logEl;
                 logEl.innerHTML = '';
 
                 if (eventLog.length === 0) {
@@ -969,9 +1065,7 @@
             let audioInitFailed = false;
 
             async function connect() {
-                const btn = document.getElementById("connect-btn");
-                const dot = document.getElementById("status-dot");
-                const text = document.getElementById("status-text");
+                const { connectBtn: btn, statusDot: dot, statusText: text, muteBtn } = DOM;
 
                 btn.disabled = true;
                 btn.textContent = "Connecting...";
@@ -985,7 +1079,6 @@
                     } catch (audioErr) {
                         audioInitFailed = true;
                         // Continue without audio - show warning but don't block connection
-                        const muteBtn = document.getElementById("mute-btn");
                         muteBtn.textContent = "Audio unavailable";
                         muteBtn.disabled = true;
                         muteBtn.setAttribute('aria-disabled', 'true');
@@ -1056,51 +1149,47 @@
             // Initialize
             // ============================================
             document.addEventListener("DOMContentLoaded", () => {
+                // Cache DOM references
+                DOM.sessionsEl = document.getElementById("sessions-list");
+                DOM.logEl = document.getElementById("event-log");
+                DOM.connectBtn = document.getElementById("connect-btn");
+                DOM.statusDot = document.getElementById("status-dot");
+                DOM.statusText = document.getElementById("status-text");
+                DOM.muteBtn = document.getElementById("mute-btn");
+                DOM.volumeInput = document.getElementById("volume");
+                DOM.reverbInput = document.getElementById("reverb");
+
                 // Initialize visualizer
                 const canvas = document.getElementById("visualizer");
                 visualizer = new Visualizer(canvas);
 
                 // Connect button
-                document
-                    .getElementById("connect-btn")
-                    .addEventListener("click", () => {
-                        if (ws && ws.readyState === WebSocket.OPEN) {
-                            disconnect();
-                        } else {
-                            connect();
-                        }
-                    });
+                DOM.connectBtn.addEventListener("click", () => {
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        disconnect();
+                    } else {
+                        connect();
+                    }
+                });
 
                 // Volume control
-                document
-                    .getElementById("volume")
-                    .addEventListener("input", (e) => {
-                        audioEngine.setVolume(e.target.value / 100);
-                    });
-
-                // Reverb control
-                document
-                    .getElementById("reverb")
-                    .addEventListener("input", (e) => {
-                        audioEngine.setReverb(e.target.value / 100);
-                    });
-
-                // Mute button
-                document
-                    .getElementById("mute-btn")
-                    .addEventListener("click", (e) => {
-                        const muted = audioEngine.toggleMute();
-                        e.target.textContent = muted ? "Unmute" : "Mute";
-                        e.target.classList.toggle("muted", muted);
-                        e.target.setAttribute('aria-pressed', muted);
-                    });
-
-                // Update aria-valuenow on range inputs
-                document.getElementById("volume").addEventListener("input", (e) => {
+                DOM.volumeInput.addEventListener("input", (e) => {
+                    audioEngine.setVolume(e.target.value / 100);
                     e.target.setAttribute('aria-valuenow', e.target.value);
                 });
-                document.getElementById("reverb").addEventListener("input", (e) => {
+
+                // Reverb control
+                DOM.reverbInput.addEventListener("input", (e) => {
+                    audioEngine.setReverb(e.target.value / 100);
                     e.target.setAttribute('aria-valuenow', e.target.value);
+                });
+
+                // Mute button
+                DOM.muteBtn.addEventListener("click", (e) => {
+                    const muted = audioEngine.toggleMute();
+                    e.target.textContent = muted ? "Unmute" : "Mute";
+                    e.target.classList.toggle("muted", muted);
+                    e.target.setAttribute('aria-pressed', muted);
                 });
             });
         </script>
