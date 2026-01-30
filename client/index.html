@@ -5,148 +5,308 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Bingbong</title>
         <style>
+            /* ============================================
+               Design Tokens
+               ============================================ */
+            :root {
+                /* Colors - Background */
+                --color-bg-base: #000e14;
+                --color-bg-surface: #00111a;
+                --color-bg-elevated: #00141f;
+
+                /* Colors - Border */
+                --color-border: #2a2a3a;
+
+                /* Colors - Text */
+                --color-text-primary: #e0e0e0;
+                --color-text-secondary: #999;
+                --color-text-muted: #888;
+                --color-text-inverse: #0a0a0f;
+                --color-text-bright: #fff;
+
+                /* Colors - Accent */
+                --color-accent: #003d5c;
+                --color-accent-hover: #003652;
+
+                /* Colors - Semantic */
+                --color-success: #6b9b6b;
+                --color-error: #ff4444;
+                --color-tool: #ff6b6b;
+
+                /* Typography */
+                --font-mono:
+                    "SF Mono", "Monaco", "Inconsolata", "Roboto Mono", monospace;
+                --font-size-xs: 0.75em;
+                --font-size-sm: 0.8em;
+                --font-size-base: 0.85em;
+                --font-size-md: 0.9em;
+                --font-size-lg: 1.5em;
+
+                /* Spacing */
+                --space-xs: 8px;
+                --space-sm: 10px;
+                --space-md: 15px;
+                --space-lg: 20px;
+
+                /* Radii */
+                --radius-sm: 4px;
+                --radius-md: 8px;
+                --radius-full: 50%;
+
+                /* Transitions */
+                --transition-fast: 0.2s ease;
+                --transition-base: 0.3s ease;
+
+                /* Layout */
+                --sidebar-width: 300px;
+                --container-max: 1400px;
+                --visualizer-height: 400px;
+            }
+
+            /* ============================================
+               Reset & Base
+               ============================================ */
             * {
                 box-sizing: border-box;
                 margin: 0;
                 padding: 0;
             }
 
+            :focus-visible {
+                outline: 2px solid var(--color-accent);
+                outline-offset: 2px;
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+                *,
+                *::before,
+                *::after {
+                    animation-duration: 0.01ms !important;
+                    animation-iteration-count: 1 !important;
+                    transition-duration: 0.01ms !important;
+                }
+            }
+
             body {
-                font-family:
-                    "SF Mono", "Monaco", "Inconsolata", "Roboto Mono", monospace;
-                background: #0a0a0f;
-                color: #e0e0e0;
+                font-family: var(--font-mono);
+                background: var(--color-bg-base);
+                color: var(--color-text-primary);
                 min-height: 100vh;
                 overflow-x: hidden;
             }
 
+            /* ============================================
+               Accessibility
+               ============================================ */
+            .skip-link {
+                position: absolute;
+                top: -40px;
+                left: 0;
+                background: var(--color-accent);
+                color: var(--color-text-inverse);
+                padding: var(--space-xs) var(--space-md);
+                z-index: 100;
+                text-decoration: none;
+                font-size: 14px;
+                border-radius: 0 0 var(--radius-sm) 0;
+            }
+
+            .skip-link:focus {
+                top: 0;
+            }
+
+            /* ============================================
+               Layout
+               ============================================ */
             .container {
-                max-width: 1400px;
+                max-width: var(--container-max);
                 margin: 0 auto;
-                padding: 20px;
+                padding: var(--space-lg);
             }
 
             header {
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
-                padding: 20px 0;
-                border-bottom: 1px solid #2a2a3a;
-                margin-bottom: 20px;
-            }
-
-            h1 {
-                font-size: 1.5em;
-                font-weight: 400;
-                color: #fff;
-            }
-
-            h1 span {
-                color: #4ecdc4;
-            }
-
-            .status {
-                display: flex;
-                align-items: center;
-                gap: 10px;
-            }
-
-            .status-dot {
-                width: 10px;
-                height: 10px;
-                border-radius: 50%;
-                background: #ff4444;
-                transition: background 0.3s;
-            }
-
-            .status-dot.connected {
-                background: #44ff44;
-                box-shadow: 0 0 10px #44ff44;
-            }
-
-            #connect-btn {
-                background: #4ecdc4;
-                color: #0a0a0f;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 4px;
-                cursor: pointer;
-                font-family: inherit;
-                font-size: 14px;
-                transition: background 0.2s;
-            }
-
-            #connect-btn:hover {
-                background: #45b7d1;
-            }
-
-            #connect-btn:disabled {
-                background: #333;
-                color: #666;
-                cursor: not-allowed;
+                padding: var(--space-lg) 0;
+                border-bottom: 1px solid var(--color-border);
+                margin-bottom: var(--space-lg);
             }
 
             .main-grid {
                 display: grid;
-                grid-template-columns: 1fr 300px;
-                gap: 20px;
-            }
-
-            .visualizer-section {
-                background: #12121a;
-                border-radius: 8px;
-                padding: 20px;
-                border: 1px solid #2a2a3a;
-            }
-
-            #visualizer {
-                width: 100%;
-                height: 400px;
-                background: #0a0a0f;
-                border-radius: 4px;
+                grid-template-columns: 1fr var(--sidebar-width);
+                gap: var(--space-lg);
             }
 
             .sidebar {
                 display: flex;
                 flex-direction: column;
-                gap: 20px;
+                gap: var(--space-lg);
             }
 
-            .panel {
-                background: #12121a;
-                border-radius: 8px;
-                padding: 15px;
-                border: 1px solid #2a2a3a;
+            @media (max-width: 900px) {
+                .main-grid {
+                    grid-template-columns: 1fr;
+                }
+            }
+
+            /* ============================================
+               Typography
+               ============================================ */
+            h1 {
+                font-size: var(--font-size-lg);
+                font-weight: 400;
+                color: var(--color-text-bright);
+            }
+
+            h1 span {
+                color: var(--color-accent);
             }
 
             .panel h2 {
-                font-size: 0.9em;
+                font-size: var(--font-size-md);
                 font-weight: 500;
-                color: #888;
-                margin-bottom: 15px;
+                color: var(--color-text-muted);
+                margin-bottom: var(--space-md);
                 text-transform: uppercase;
                 letter-spacing: 1px;
             }
 
+            /* ============================================
+               Components - Status
+               ============================================ */
+            .status {
+                display: flex;
+                align-items: center;
+                gap: var(--space-sm);
+            }
+
+            .status-dot {
+                width: 10px;
+                height: 10px;
+                border-radius: var(--radius-full);
+                background: var(--color-error);
+                transition: background var(--transition-base);
+            }
+
+            .status-dot.connected {
+                background: var(--color-success);
+                box-shadow: 0 0 10px var(--color-success);
+            }
+
+            /* ============================================
+               Components - Buttons
+               ============================================ */
+            .btn {
+                border: none;
+                border-radius: var(--radius-sm);
+                cursor: pointer;
+                font-family: inherit;
+                font-size: 14px;
+                transition: background var(--transition-fast);
+            }
+
+            .btn:disabled {
+                cursor: not-allowed;
+            }
+
+            #connect-btn {
+                background: var(--color-accent);
+                color: var(--color-text-inverse);
+                padding: var(--space-sm) var(--space-lg);
+                border: none;
+                border-radius: var(--radius-sm);
+                cursor: pointer;
+                font-family: inherit;
+                font-size: 14px;
+                transition: background var(--transition-fast);
+            }
+
+            #connect-btn:hover {
+                background: var(--color-accent-hover);
+            }
+
+            #connect-btn:disabled {
+                background: var(--color-bg-elevated);
+                color: var(--color-text-muted);
+                cursor: not-allowed;
+            }
+
+            .mute-btn {
+                background: none;
+                border: 1px solid var(--color-accent);
+                color: var(--color-accent);
+                padding: var(--space-xs) var(--space-md);
+                border-radius: var(--radius-sm);
+                cursor: pointer;
+                font-family: inherit;
+                font-size: 12px;
+                transition: all var(--transition-fast);
+            }
+
+            .mute-btn:hover {
+                background: var(--color-accent);
+                color: var(--color-text-inverse);
+            }
+
+            .mute-btn.muted {
+                border-color: var(--color-error);
+                color: var(--color-error);
+            }
+
+            /* ============================================
+               Components - Panel
+               ============================================ */
+            .panel {
+                background: var(--color-bg-surface);
+                border-radius: var(--radius-md);
+                padding: var(--space-md);
+                border: 1px solid var(--color-border);
+                contain: content;
+            }
+
+            /* ============================================
+               Components - Visualizer
+               ============================================ */
+            .visualizer-section {
+                background: var(--color-bg-surface);
+                border-radius: var(--radius-md);
+                padding: var(--space-lg);
+                border: 1px solid var(--color-border);
+                contain: layout paint;
+            }
+
+            #visualizer {
+                display: block;
+                width: 100%;
+                height: var(--visualizer-height);
+                background: var(--color-bg-base);
+                border-radius: var(--radius-sm);
+            }
+
+            /* ============================================
+               Components - Sessions
+               ============================================ */
             .sessions-list {
                 display: flex;
                 flex-direction: column;
-                gap: 10px;
+                gap: var(--space-sm);
             }
 
             .session-item {
                 display: flex;
                 align-items: center;
-                gap: 10px;
-                padding: 10px;
-                background: #1a1a24;
-                border-radius: 4px;
+                gap: var(--space-sm);
+                padding: var(--space-sm);
+                background: var(--color-bg-elevated);
+                border-radius: var(--radius-sm);
             }
 
             .session-color {
                 width: 12px;
                 height: 12px;
-                border-radius: 50%;
+                border-radius: var(--radius-full);
                 flex-shrink: 0;
             }
 
@@ -156,22 +316,22 @@
             }
 
             .session-id {
-                font-size: 0.85em;
-                color: #fff;
+                font-size: var(--font-size-base);
+                color: var(--color-text-bright);
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
             }
 
             .session-meta {
-                font-size: 0.75em;
-                color: #666;
+                font-size: var(--font-size-xs);
+                color: var(--color-text-secondary);
             }
 
             .pan-indicator {
                 width: 60px;
                 height: 6px;
-                background: #2a2a3a;
+                background: var(--color-border);
                 border-radius: 3px;
                 position: relative;
             }
@@ -180,22 +340,25 @@
                 position: absolute;
                 width: 8px;
                 height: 8px;
-                background: #4ecdc4;
-                border-radius: 50%;
+                background: var(--color-accent);
+                border-radius: var(--radius-full);
                 top: -1px;
                 transform: translateX(-50%);
             }
 
+            /* ============================================
+               Components - Event Log
+               ============================================ */
             .event-log {
                 max-height: 300px;
                 overflow-y: auto;
-                font-size: 0.8em;
+                font-size: var(--font-size-sm);
             }
 
             .event-item {
-                padding: 8px;
-                border-bottom: 1px solid #1a1a24;
-                animation: fadeIn 0.3s ease;
+                padding: var(--space-xs);
+                border-bottom: 1px solid var(--color-bg-elevated);
+                animation: fadeIn var(--transition-base);
             }
 
             @keyframes fadeIn {
@@ -210,23 +373,26 @@
             }
 
             .event-type {
-                color: #4ecdc4;
+                color: var(--color-accent);
                 font-weight: 500;
             }
 
             .event-tool {
-                color: #ff6b6b;
+                color: var(--color-tool);
             }
 
             .event-time {
-                color: #666;
-                font-size: 0.9em;
+                color: var(--color-text-secondary);
+                font-size: var(--font-size-md);
             }
 
+            /* ============================================
+               Components - Controls
+               ============================================ */
             .controls {
                 display: flex;
                 flex-direction: column;
-                gap: 15px;
+                gap: var(--space-md);
             }
 
             .control-row {
@@ -236,110 +402,128 @@
             }
 
             .control-row label {
-                font-size: 0.85em;
-                color: #888;
+                font-size: var(--font-size-base);
+                color: var(--color-text-muted);
             }
 
             input[type="range"] {
                 width: 100px;
-                accent-color: #4ecdc4;
+                accent-color: var(--color-accent);
             }
 
-            .mute-btn {
-                background: none;
-                border: 1px solid #4ecdc4;
-                color: #4ecdc4;
-                padding: 8px 16px;
-                border-radius: 4px;
-                cursor: pointer;
-                font-family: inherit;
-                font-size: 12px;
-                transition: all 0.2s;
-            }
-
-            .mute-btn:hover {
-                background: #4ecdc4;
-                color: #0a0a0f;
-            }
-
-            .mute-btn.muted {
-                border-color: #ff4444;
-                color: #ff4444;
-            }
-
+            /* ============================================
+               Components - Empty State
+               ============================================ */
             .empty-state {
-                color: #444;
+                color: var(--color-text-muted);
                 font-style: italic;
                 text-align: center;
-                padding: 20px;
-            }
-
-            @media (max-width: 900px) {
-                .main-grid {
-                    grid-template-columns: 1fr;
-                }
+                padding: var(--space-lg);
             }
         </style>
     </head>
     <body>
+        <a href="#main-content" class="skip-link">Skip to main content</a>
         <div class="container">
             <header>
                 <h1><span>Bingbong</span></h1>
                 <div class="status">
-                    <div class="status-dot" id="status-dot"></div>
+                    <div
+                        class="status-dot"
+                        id="status-dot"
+                        role="status"
+                        aria-label="Connection status: disconnected"
+                    ></div>
                     <span id="status-text">Disconnected</span>
                     <button id="connect-btn">Connect</button>
                 </div>
             </header>
 
-            <div class="main-grid">
+            <main class="main-grid" id="main-content">
                 <div class="visualizer-section">
-                    <canvas id="visualizer"></canvas>
+                    <canvas
+                        id="visualizer"
+                        role="img"
+                        aria-label="Audio visualization showing particle effects for active sessions"
+                    >
+                        <p>
+                            Visual representation of audio events from connected
+                            sessions
+                        </p>
+                    </canvas>
                 </div>
 
-                <div class="sidebar">
-                    <div class="panel">
-                        <h2>Controls</h2>
+                <aside
+                    class="sidebar"
+                    aria-label="Controls and session information"
+                >
+                    <section class="panel" aria-labelledby="controls-heading">
+                        <h2 id="controls-heading">Controls</h2>
                         <div class="controls">
                             <div class="control-row">
-                                <label>Master Volume</label>
+                                <label for="volume">Master Volume</label>
                                 <input
                                     type="range"
                                     id="volume"
                                     min="0"
                                     max="100"
                                     value="70"
+                                    aria-valuemin="0"
+                                    aria-valuemax="100"
+                                    aria-valuenow="70"
                                 />
                             </div>
                             <div class="control-row">
-                                <label>Reverb</label>
+                                <label for="reverb">Reverb</label>
                                 <input
                                     type="range"
                                     id="reverb"
                                     min="0"
                                     max="100"
                                     value="30"
+                                    aria-valuemin="0"
+                                    aria-valuemax="100"
+                                    aria-valuenow="30"
                                 />
                             </div>
-                            <button class="mute-btn" id="mute-btn">Mute</button>
+                            <button
+                                class="mute-btn"
+                                id="mute-btn"
+                                aria-pressed="false"
+                            >
+                                Mute
+                            </button>
                         </div>
-                    </div>
+                    </section>
 
-                    <div class="panel">
-                        <h2>Active Sessions</h2>
-                        <div class="sessions-list" id="sessions-list">
-                            <div class="empty-state">No active sessions</div>
+                    <section class="panel" aria-labelledby="sessions-heading">
+                        <h2 id="sessions-heading">Active Sessions</h2>
+                        <div
+                            class="sessions-list"
+                            id="sessions-list"
+                            role="list"
+                            aria-live="polite"
+                        >
+                            <div class="empty-state" role="listitem">
+                                No active sessions
+                            </div>
                         </div>
-                    </div>
+                    </section>
 
-                    <div class="panel">
-                        <h2>Event Log</h2>
-                        <div class="event-log" id="event-log">
+                    <section class="panel" aria-labelledby="eventlog-heading">
+                        <h2 id="eventlog-heading">Event Log</h2>
+                        <div
+                            class="event-log"
+                            id="event-log"
+                            role="log"
+                            aria-live="polite"
+                            aria-atomic="false"
+                        >
                             <div class="empty-state">Waiting for events...</div>
                         </div>
-                    </div>
-                </div>
-            </div>
+                    </section>
+                </aside>
+            </main>
         </div>
 
         <script>
@@ -347,6 +531,28 @@
             // Configuration
             // ============================================
             const WS_URL = `ws://${location.host}/ws`;
+
+            // Helper to create elements safely
+            function createElement(tag, attrs = {}, children = []) {
+                const el = document.createElement(tag);
+                for (const [key, value] of Object.entries(attrs)) {
+                    if (key === "style" && typeof value === "object") {
+                        Object.assign(el.style, value);
+                    } else if (key.startsWith("data-")) {
+                        el.dataset[key.slice(5)] = value;
+                    } else {
+                        el.setAttribute(key, value);
+                    }
+                }
+                for (const child of children) {
+                    if (typeof child === "string") {
+                        el.appendChild(document.createTextNode(child));
+                    } else if (child) {
+                        el.appendChild(child);
+                    }
+                }
+                return el;
+            }
 
             // Sound mappings - notes and characteristics for each event/tool
             const SOUND_CONFIG = {
@@ -524,8 +730,6 @@
                     this.reverbGain.connect(this.masterGain);
                     this.dryGain.connect(this.masterGain);
                     this.masterGain.connect(this.ctx.destination);
-
-                    console.log("Audio engine initialized");
                 }
 
                 async createReverbImpulse() {
@@ -672,28 +876,83 @@
             class Visualizer {
                 constructor(canvas) {
                     this.canvas = canvas;
-                    this.ctx = canvas.getContext("2d");
+                    this.ctx = canvas.getContext("2d", { alpha: false });
                     this.particles = [];
                     this.sessions = new Map();
+                    this.animationId = null;
+                    this.isAnimating = false;
+                    this.dpr = window.devicePixelRatio || 1;
+                    this.resizeTimeout = null;
+
+                    // Cache canvas dimensions
+                    this.width = 0;
+                    this.height = 400;
 
                     this.resize();
-                    window.addEventListener("resize", () => this.resize());
-                    this.animate();
+                    window.addEventListener("resize", () =>
+                        this.throttledResize(),
+                    );
+                }
+
+                throttledResize() {
+                    if (this.resizeTimeout) return;
+                    this.resizeTimeout = setTimeout(() => {
+                        this.resize();
+                        this.resizeTimeout = null;
+                    }, 100);
                 }
 
                 resize() {
-                    const rect =
-                        this.canvas.parentElement.getBoundingClientRect();
-                    this.canvas.width = rect.width;
-                    this.canvas.height = 400;
+                    // Get the canvas's own rendered width (respects CSS width: 100% and parent padding)
+                    const rect = this.canvas.getBoundingClientRect();
+                    this.width = rect.width;
+                    this.dpr = window.devicePixelRatio || 1;
+
+                    // Scale canvas for retina displays
+                    this.canvas.width = this.width * this.dpr;
+                    this.canvas.height = this.height * this.dpr;
+                    this.ctx.scale(this.dpr, this.dpr);
+
+                    // Redraw static elements after resize
+                    this.drawStatic();
+                }
+
+                drawStatic() {
+                    const { ctx } = this;
+
+                    // Clear canvas
+                    ctx.fillStyle = "#00141f";
+                    ctx.fillRect(0, 0, this.width, this.height);
+
+                    // Draw center line
+                    ctx.strokeStyle = "rgba(74, 74, 90, 0.3)";
+                    ctx.beginPath();
+                    ctx.moveTo(this.width / 2, 0);
+                    ctx.lineTo(this.width / 2, this.height);
+                    ctx.stroke();
+
+                    // Draw L/R labels
+                    ctx.fillStyle = "rgba(74, 74, 90, 0.5)";
+                    ctx.font = "12px monospace";
+                    ctx.fillText("L", 10, 20);
+                    ctx.fillText("R", this.width - 20, 20);
+
+                    // Draw session positions
+                    for (const session of this.sessions.values()) {
+                        const x = ((session.pan + 1) / 2) * this.width;
+                        ctx.beginPath();
+                        ctx.arc(x, this.height - 20, 5, 0, Math.PI * 2);
+                        ctx.fillStyle = session.color;
+                        ctx.fill();
+                    }
                 }
 
                 addEvent(event) {
                     const { pan, color, event_type, tool_name } = event;
 
                     // Calculate x position from pan (-1 to 1 -> 0 to width)
-                    const x = ((pan + 1) / 2) * this.canvas.width;
-                    const y = this.canvas.height / 2;
+                    const x = ((pan + 1) / 2) * this.width;
+                    const y = this.height / 2;
 
                     // Particle properties based on event
                     let size = 20;
@@ -721,61 +980,84 @@
                         lifetime,
                         maxLifetime: lifetime,
                     });
+
+                    // Start animation if not running
+                    if (!this.isAnimating) {
+                        this.startAnimation();
+                    }
                 }
 
                 updateSession(session) {
                     this.sessions.set(session.session_id, session);
+                    // Redraw static elements to show new session
+                    if (!this.isAnimating) {
+                        this.drawStatic();
+                    }
+                }
+
+                startAnimation() {
+                    this.isAnimating = true;
+                    this.animate();
+                }
+
+                stopAnimation() {
+                    this.isAnimating = false;
+                    if (this.animationId) {
+                        cancelAnimationFrame(this.animationId);
+                        this.animationId = null;
+                    }
+                    // Draw final static state
+                    this.drawStatic();
                 }
 
                 animate() {
-                    const { ctx, canvas } = this;
+                    if (!this.isAnimating) return;
+
+                    const { ctx } = this;
 
                     // Clear with fade effect
                     ctx.fillStyle = "rgba(10, 10, 15, 0.15)";
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillRect(0, 0, this.width, this.height);
 
                     // Draw center line
                     ctx.strokeStyle = "rgba(74, 74, 90, 0.3)";
                     ctx.beginPath();
-                    ctx.moveTo(canvas.width / 2, 0);
-                    ctx.lineTo(canvas.width / 2, canvas.height);
+                    ctx.moveTo(this.width / 2, 0);
+                    ctx.lineTo(this.width / 2, this.height);
                     ctx.stroke();
 
                     // Draw L/R labels
                     ctx.fillStyle = "rgba(74, 74, 90, 0.5)";
                     ctx.font = "12px monospace";
                     ctx.fillText("L", 10, 20);
-                    ctx.fillText("R", canvas.width - 20, 20);
+                    ctx.fillText("R", this.width - 20, 20);
 
                     // Draw session positions
                     for (const session of this.sessions.values()) {
-                        const x = ((session.pan + 1) / 2) * canvas.width;
+                        const x = ((session.pan + 1) / 2) * this.width;
                         ctx.beginPath();
-                        ctx.arc(x, canvas.height - 20, 5, 0, Math.PI * 2);
+                        ctx.arc(x, this.height - 20, 5, 0, Math.PI * 2);
                         ctx.fillStyle = session.color;
                         ctx.fill();
                     }
 
                     // Update and draw particles
+                    let activeParticles = 0;
                     this.particles = this.particles.filter((p) => {
                         p.lifetime--;
+                        if (p.lifetime <= 0) return false;
+
+                        activeParticles++;
                         p.alpha = p.lifetime / p.maxLifetime;
                         p.x += p.vx;
                         p.y += p.vy;
                         p.size *= 0.98;
 
-                        if (p.lifetime <= 0) return false;
+                        const alphaHex = Math.floor(p.alpha * 255)
+                            .toString(16)
+                            .padStart(2, "0");
 
-                        ctx.beginPath();
-                        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-                        ctx.fillStyle =
-                            p.color +
-                            Math.floor(p.alpha * 255)
-                                .toString(16)
-                                .padStart(2, "0");
-                        ctx.fill();
-
-                        // Glow effect
+                        // Glow effect (drawn first, behind main circle)
                         ctx.beginPath();
                         ctx.arc(p.x, p.y, p.size * 1.5, 0, Math.PI * 2);
                         ctx.fillStyle =
@@ -785,10 +1067,24 @@
                                 .padStart(2, "0");
                         ctx.fill();
 
+                        // Main particle
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                        ctx.fillStyle = p.color + alphaHex;
+                        ctx.fill();
+
                         return true;
                     });
 
-                    requestAnimationFrame(() => this.animate());
+                    // Stop animation when no particles
+                    if (activeParticles === 0) {
+                        this.stopAnimation();
+                        return;
+                    }
+
+                    this.animationId = requestAnimationFrame(() =>
+                        this.animate(),
+                    );
                 }
             }
 
@@ -802,50 +1098,125 @@
             const eventLog = [];
             const MAX_LOG_ITEMS = 50;
 
+            // Cached DOM references (populated on DOMContentLoaded)
+            const DOM = {
+                sessionsEl: null,
+                logEl: null,
+                connectBtn: null,
+                statusDot: null,
+                statusText: null,
+                muteBtn: null,
+                volumeInput: null,
+                reverbInput: null,
+            };
+
             function updateUI() {
-                // Update sessions list
-                const sessionsEl = document.getElementById("sessions-list");
+                // Update sessions list using safe DOM methods
+                const sessionsEl = DOM.sessionsEl;
+                sessionsEl.innerHTML = "";
+
                 if (sessions.size === 0) {
-                    sessionsEl.innerHTML =
-                        '<div class="empty-state">No active sessions</div>';
+                    sessionsEl.appendChild(
+                        createElement(
+                            "div",
+                            { class: "empty-state", role: "listitem" },
+                            ["No active sessions"],
+                        ),
+                    );
                 } else {
-                    sessionsEl.innerHTML = Array.from(sessions.values())
-                        .map(
-                            (s) => `
-          <div class="session-item">
-            <div class="session-color" style="background: ${s.color}"></div>
-            <div class="session-info">
-              <div class="session-id">${s.session_id.slice(0, 12)}...</div>
-              <div class="session-meta">${s.machine_id} • ${s.event_count} events</div>
-            </div>
-            <div class="pan-indicator">
-              <div class="pan-dot" style="left: ${((s.pan + 1) / 2) * 100}%; background: ${s.color}"></div>
-            </div>
-          </div>
-        `,
-                        )
-                        .join("");
+                    for (const s of sessions.values()) {
+                        const panPercent = ((s.pan + 1) / 2) * 100;
+                        const sessionItem = createElement(
+                            "div",
+                            { class: "session-item", role: "listitem" },
+                            [
+                                createElement("div", {
+                                    class: "session-color",
+                                    style: { background: s.color },
+                                    "aria-hidden": "true",
+                                }),
+                                createElement(
+                                    "div",
+                                    { class: "session-info" },
+                                    [
+                                        createElement(
+                                            "div",
+                                            { class: "session-id" },
+                                            [s.session_id.slice(0, 12) + "..."],
+                                        ),
+                                        createElement(
+                                            "div",
+                                            { class: "session-meta" },
+                                            [
+                                                `${s.machine_id || "Unknown"} • ${s.event_count || 0} events`,
+                                            ],
+                                        ),
+                                    ],
+                                ),
+                                createElement(
+                                    "div",
+                                    {
+                                        class: "pan-indicator",
+                                        "aria-label": `Pan position: ${Math.round(s.pan * 100)}%`,
+                                    },
+                                    [
+                                        createElement("div", {
+                                            class: "pan-dot",
+                                            style: {
+                                                left: `${panPercent}%`,
+                                                background: s.color,
+                                            },
+                                        }),
+                                    ],
+                                ),
+                            ],
+                        );
+                        sessionsEl.appendChild(sessionItem);
+                    }
                 }
 
-                // Update event log
-                const logEl = document.getElementById("event-log");
+                // Update event log using safe DOM methods
+                const logEl = DOM.logEl;
+                logEl.innerHTML = "";
+
                 if (eventLog.length === 0) {
-                    logEl.innerHTML =
-                        '<div class="empty-state">Waiting for events...</div>';
+                    logEl.appendChild(
+                        createElement("div", { class: "empty-state" }, [
+                            "Waiting for events...",
+                        ]),
+                    );
                 } else {
-                    logEl.innerHTML = eventLog
+                    const recentEvents = eventLog
                         .slice(-MAX_LOG_ITEMS)
-                        .reverse()
-                        .map(
-                            (e) => `
-          <div class="event-item">
-            <span class="event-type">${e.event_type}</span>
-            ${e.tool_name ? `<span class="event-tool">${e.tool_name}</span>` : ""}
-            <span class="event-time">${new Date(e.timestamp).toLocaleTimeString()}</span>
-          </div>
-        `,
-                        )
-                        .join("");
+                        .reverse();
+                    for (const e of recentEvents) {
+                        const eventChildren = [
+                            createElement("span", { class: "event-type" }, [
+                                e.event_type || "Unknown",
+                            ]),
+                        ];
+                        if (e.tool_name) {
+                            eventChildren.push(
+                                createElement("span", { class: "event-tool" }, [
+                                    e.tool_name,
+                                ]),
+                            );
+                        }
+                        eventChildren.push(
+                            createElement("span", { class: "event-time" }, [
+                                e.timestamp
+                                    ? new Date(e.timestamp).toLocaleTimeString()
+                                    : "",
+                            ]),
+                        );
+                        logEl.appendChild(
+                            createElement(
+                                "div",
+                                { class: "event-item" },
+                                eventChildren,
+                            ),
+                        );
+                    }
                 }
             }
 
@@ -880,26 +1251,46 @@
                 updateUI();
             }
 
+            let audioInitFailed = false;
+
             async function connect() {
-                const btn = document.getElementById("connect-btn");
-                const dot = document.getElementById("status-dot");
-                const text = document.getElementById("status-text");
+                const {
+                    connectBtn: btn,
+                    statusDot: dot,
+                    statusText: text,
+                    muteBtn,
+                } = DOM;
 
                 btn.disabled = true;
                 btn.textContent = "Connecting...";
+                dot.setAttribute("aria-label", "Connection status: connecting");
 
                 try {
                     // Initialize audio (requires user gesture)
-                    await audioEngine.init();
+                    try {
+                        await audioEngine.init();
+                        audioInitFailed = false;
+                    } catch (audioErr) {
+                        audioInitFailed = true;
+                        // Continue without audio - show warning but don't block connection
+                        muteBtn.textContent = "Audio unavailable";
+                        muteBtn.disabled = true;
+                        muteBtn.setAttribute("aria-disabled", "true");
+                    }
 
                     ws = new WebSocket(WS_URL);
 
                     ws.onopen = () => {
                         dot.classList.add("connected");
-                        text.textContent = "Connected";
+                        dot.setAttribute(
+                            "aria-label",
+                            "Connection status: connected",
+                        );
+                        text.textContent = audioInitFailed
+                            ? "Connected (no audio)"
+                            : "Connected";
                         btn.textContent = "Disconnect";
                         btn.disabled = false;
-                        console.log("Connected to Bingbong server");
                     };
 
                     ws.onmessage = (msg) => {
@@ -919,27 +1310,34 @@
                             // Handle regular event
                             handleEvent(data);
                         } catch (err) {
-                            console.error("Error parsing message:", err);
+                            // Silently handle parse errors for malformed messages
                         }
                     };
 
                     ws.onclose = () => {
                         dot.classList.remove("connected");
+                        dot.setAttribute(
+                            "aria-label",
+                            "Connection status: disconnected",
+                        );
                         text.textContent = "Disconnected";
                         btn.textContent = "Connect";
                         btn.disabled = false;
                         ws = null;
                     };
 
-                    ws.onerror = (err) => {
-                        console.error("WebSocket error:", err);
-                        text.textContent = "Error";
+                    ws.onerror = () => {
+                        dot.setAttribute(
+                            "aria-label",
+                            "Connection status: error",
+                        );
+                        text.textContent = "Connection failed";
                         btn.textContent = "Retry";
                         btn.disabled = false;
                     };
                 } catch (err) {
-                    console.error("Connection error:", err);
-                    text.textContent = "Error";
+                    dot.setAttribute("aria-label", "Connection status: error");
+                    text.textContent = "Connection failed";
                     btn.textContent = "Retry";
                     btn.disabled = false;
                 }
@@ -956,43 +1354,48 @@
             // Initialize
             // ============================================
             document.addEventListener("DOMContentLoaded", () => {
+                // Cache DOM references
+                DOM.sessionsEl = document.getElementById("sessions-list");
+                DOM.logEl = document.getElementById("event-log");
+                DOM.connectBtn = document.getElementById("connect-btn");
+                DOM.statusDot = document.getElementById("status-dot");
+                DOM.statusText = document.getElementById("status-text");
+                DOM.muteBtn = document.getElementById("mute-btn");
+                DOM.volumeInput = document.getElementById("volume");
+                DOM.reverbInput = document.getElementById("reverb");
+
                 // Initialize visualizer
                 const canvas = document.getElementById("visualizer");
                 visualizer = new Visualizer(canvas);
 
                 // Connect button
-                document
-                    .getElementById("connect-btn")
-                    .addEventListener("click", () => {
-                        if (ws && ws.readyState === WebSocket.OPEN) {
-                            disconnect();
-                        } else {
-                            connect();
-                        }
-                    });
+                DOM.connectBtn.addEventListener("click", () => {
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        disconnect();
+                    } else {
+                        connect();
+                    }
+                });
 
                 // Volume control
-                document
-                    .getElementById("volume")
-                    .addEventListener("input", (e) => {
-                        audioEngine.setVolume(e.target.value / 100);
-                    });
+                DOM.volumeInput.addEventListener("input", (e) => {
+                    audioEngine.setVolume(e.target.value / 100);
+                    e.target.setAttribute("aria-valuenow", e.target.value);
+                });
 
                 // Reverb control
-                document
-                    .getElementById("reverb")
-                    .addEventListener("input", (e) => {
-                        audioEngine.setReverb(e.target.value / 100);
-                    });
+                DOM.reverbInput.addEventListener("input", (e) => {
+                    audioEngine.setReverb(e.target.value / 100);
+                    e.target.setAttribute("aria-valuenow", e.target.value);
+                });
 
                 // Mute button
-                document
-                    .getElementById("mute-btn")
-                    .addEventListener("click", (e) => {
-                        const muted = audioEngine.toggleMute();
-                        e.target.textContent = muted ? "Unmute" : "Mute";
-                        e.target.classList.toggle("muted", muted);
-                    });
+                DOM.muteBtn.addEventListener("click", (e) => {
+                    const muted = audioEngine.toggleMute();
+                    e.target.textContent = muted ? "Unmute" : "Mute";
+                    e.target.classList.toggle("muted", muted);
+                    e.target.setAttribute("aria-pressed", muted);
+                });
             });
         </script>
     </body>
