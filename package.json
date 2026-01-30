@@ -1,0 +1,37 @@
+{
+  "name": "bingbong",
+  "version": "0.1.0",
+  "description": "Soundscapes for coding agents - audio monitoring for Claude Code, Cursor, and other AI coding assistants",
+  "type": "module",
+  "bin": {
+    "bingbong": "./bin/cli.ts"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "client/"
+  ],
+  "scripts": {
+    "start": "bun run bin/cli.ts",
+    "dev": "bun --watch run bin/cli.ts"
+  },
+  "keywords": [
+    "claude",
+    "cursor",
+    "ai",
+    "coding",
+    "audio",
+    "soundscape",
+    "websocket",
+    "monitoring"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/bingbong"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
+  }
+}
