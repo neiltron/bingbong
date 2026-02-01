@@ -60,7 +60,6 @@
                 /* Layout */
                 --sidebar-width: 300px;
                 --container-max: 1400px;
-                --visualizer-height: 400px;
             }
 
             /* ============================================
@@ -87,12 +86,18 @@
                 }
             }
 
+            html {
+                height: 100dvh;
+            }
+
             body {
                 font-family: var(--font-mono);
                 background: var(--color-bg-base);
                 color: var(--color-text-primary);
-                min-height: 100vh;
-                overflow-x: hidden;
+                height: 100dvh;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
             }
 
             /* ============================================
@@ -122,6 +127,10 @@
                 max-width: var(--container-max);
                 margin: 0 auto;
                 padding: var(--space-lg);
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                min-height: 0;
             }
 
             header {
@@ -137,17 +146,53 @@
                 display: grid;
                 grid-template-columns: 1fr var(--sidebar-width);
                 gap: var(--space-lg);
+                flex: 1;
+                min-height: 0;
             }
 
             .sidebar {
                 display: flex;
                 flex-direction: column;
                 gap: var(--space-lg);
+                height: 100%;
+                min-height: 0;
             }
 
             @media (max-width: 900px) {
+                html, body {
+                    height: auto;
+                    overflow: auto;
+                }
+
+                .container {
+                    flex: none;
+                    min-height: auto;
+                }
+
                 .main-grid {
                     grid-template-columns: 1fr;
+                    flex: none;
+                    min-height: auto;
+                }
+
+                #visualizer {
+                    height: 300px;
+                    flex: none;
+                }
+
+                .sidebar {
+                    height: auto;
+                }
+
+                .sidebar .panel:nth-child(2),
+                .sidebar .panel:nth-child(3) {
+                    flex: none;
+                }
+
+                .sessions-list,
+                .event-log {
+                    max-height: 250px;
+                    flex: none;
                 }
             }
 
@@ -266,6 +311,20 @@
                 contain: content;
             }
 
+            /* Controls panel: natural height, don't shrink */
+            .sidebar .panel:first-child {
+                flex-shrink: 0;
+            }
+
+            /* Sessions and Event Log panels: split remaining space */
+            .sidebar .panel:nth-child(2),
+            .sidebar .panel:nth-child(3) {
+                flex: 1;
+                min-height: 120px;
+                display: flex;
+                flex-direction: column;
+            }
+
             /* ============================================
                Components - Visualizer
                ============================================ */
@@ -275,12 +334,16 @@
                 padding: var(--space-lg);
                 border: 1px solid var(--color-border);
                 contain: layout paint;
+                display: flex;
+                flex-direction: column;
+                min-height: 0;
             }
 
             #visualizer {
                 display: block;
                 width: 100%;
-                height: var(--visualizer-height);
+                flex: 1;
+                min-height: 200px;
                 background: var(--color-bg-base);
                 border-radius: var(--radius-sm);
             }
@@ -292,6 +355,9 @@
                 display: flex;
                 flex-direction: column;
                 gap: var(--space-sm);
+                flex: 1;
+                overflow-y: auto;
+                min-height: 0;
             }
 
             .session-item {
@@ -350,9 +416,10 @@
                Components - Event Log
                ============================================ */
             .event-log {
-                max-height: 300px;
+                flex: 1;
                 overflow-y: auto;
                 font-size: var(--font-size-sm);
+                min-height: 0;
             }
 
             .event-item {
@@ -884,9 +951,9 @@
                     this.dpr = window.devicePixelRatio || 1;
                     this.resizeTimeout = null;
 
-                    // Cache canvas dimensions
+                    // Cache canvas dimensions (set by resize())
                     this.width = 0;
-                    this.height = 400;
+                    this.height = 0;
 
                     this.resize();
                     window.addEventListener("resize", () =>
@@ -903,9 +970,10 @@
                 }
 
                 resize() {
-                    // Get the canvas's own rendered width (respects CSS width: 100% and parent padding)
+                    // Get the canvas's rendered dimensions (respects CSS flex layout)
                     const rect = this.canvas.getBoundingClientRect();
                     this.width = rect.width;
+                    this.height = rect.height;
                     this.dpr = window.devicePixelRatio || 1;
 
                     // Scale canvas for retina displays
