@@ -13,7 +13,14 @@
   ],
   "scripts": {
     "start": "bun run bin/cli.ts",
-    "dev": "bun --watch run bin/cli.ts"
+    "dev:server": "bun --watch run bin/cli.ts",
+    "dev:client": "cd client && bunx vite",
+    "build:client": "cd client && bunx vite build",
+    "preview:client": "cd client && bunx vite preview"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0",
+    "typescript": "^5.3.0"
   },
   "keywords": [
     "claude",

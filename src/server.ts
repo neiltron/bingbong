@@ -209,16 +209,28 @@ export async function startServer(port: number) {
         });
       }
 
-      // GET / - serve client HTML
+      // GET / - serve client HTML (prefer dist/ for production builds)
       if (req.method === "GET" && url.pathname === "/") {
-        const clientPath = new URL("../client/index.html", import.meta.url)
+        // Try production build first
+        const distPath = new URL("../client/dist/index.html", import.meta.url)
           .pathname;
-        const file = Bun.file(clientPath);
-        if (await file.exists()) {
-          return new Response(file, {
+        const distFile = Bun.file(distPath);
+        if (await distFile.exists()) {
+          return new Response(distFile, {
             headers: { "Content-Type": "text/html", ...corsHeaders },
           });
         }
+
+        // Fallback to dev HTML (for when running without build)
+        const devPath = new URL("../client/index.html", import.meta.url)
+          .pathname;
+        const devFile = Bun.file(devPath);
+        if (await devFile.exists()) {
+          return new Response(devFile, {
+            headers: { "Content-Type": "text/html", ...corsHeaders },
+          });
+        }
+
         // Fallback to health check if client not found
         return new Response(
           JSON.stringify({
@@ -231,6 +243,39 @@ export async function startServer(port: number) {
             headers: { "Content-Type": "application/json", ...corsHeaders },
           }
         );
+      }
+
+      // Serve static assets from dist/assets/ (production build)
+      if (req.method === "GET" && url.pathname.startsWith("/assets/")) {
+        const assetPath = new URL(
+          `../client/dist${url.pathname}`,
+          import.meta.url
+        ).pathname;
+        const file = Bun.file(assetPath);
+        if (await file.exists()) {
+          // Determine content type from extension
+          const ext = url.pathname.split(".").pop()?.toLowerCase();
+          const contentTypes: Record<string, string> = {
+            js: "application/javascript",
+            css: "text/css",
+            map: "application/json",
+            woff: "font/woff",
+            woff2: "font/woff2",
+            png: "image/png",
+            jpg: "image/jpeg",
+            jpeg: "image/jpeg",
+            svg: "image/svg+xml",
+          };
+          const contentType = contentTypes[ext || ""] || "application/octet-stream";
+
+          return new Response(file, {
+            headers: {
+              "Content-Type": contentType,
+              "Cache-Control": "public, max-age=31536000, immutable",
+              ...corsHeaders,
+            },
+          });
+        }
       }
 
       // GET /health - health check / info
