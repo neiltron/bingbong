@@ -487,6 +487,81 @@
                 text-align: center;
                 padding: var(--space-lg);
             }
+
+            /* ============================================
+               Components - Spatial Canvas
+               ============================================ */
+            .spatial-container {
+                position: relative;
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+            }
+
+            .spatial-container canvas {
+                display: block;
+                width: 100%;
+                height: 100%;
+            }
+
+            .source-circle {
+                position: absolute;
+                transform: translate(-50%, -50%);
+                width: 56px;
+                height: 56px;
+                border-radius: 50%;
+                background: var(--color-bg-elevated);
+                border: 2px solid var(--session-color, var(--color-border));
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                cursor: grab;
+                user-select: none;
+                transition: box-shadow 0.2s, transform 0.1s, opacity 0.3s;
+                z-index: 10;
+                touch-action: none;
+            }
+
+            .source-circle:hover {
+                box-shadow: 0 0 15px color-mix(in srgb, var(--session-color) 50%, transparent);
+            }
+
+            .source-circle.selected {
+                border-width: 3px;
+                box-shadow: 0 0 20px color-mix(in srgb, var(--session-color) 70%, transparent);
+            }
+
+            .source-circle.dragging {
+                cursor: grabbing;
+                transform: translate(-50%, -50%) scale(1.05);
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+                z-index: 100;
+            }
+
+            .source-circle.disconnected {
+                opacity: 0.4;
+                border-style: dashed;
+                filter: grayscale(0.7);
+                pointer-events: none;
+            }
+
+            .source-icon {
+                font-size: 18px;
+                color: var(--session-color);
+                line-height: 1;
+            }
+
+            .source-label {
+                font-size: 9px;
+                color: var(--color-text-secondary);
+                margin-top: 2px;
+                white-space: nowrap;
+                max-width: 48px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                text-align: center;
+            }
         </style>
     </head>
     <body>
@@ -508,16 +583,17 @@
 
             <main class="main-grid" id="main-content">
                 <div class="visualizer-section">
-                    <canvas
-                        id="visualizer"
-                        role="img"
-                        aria-label="Audio visualization showing particle effects for active sessions"
-                    >
-                        <p>
-                            Visual representation of audio events from connected
-                            sessions
-                        </p>
-                    </canvas>
+                    <div class="spatial-container" id="spatial-container">
+                        <canvas
+                            id="visualizer"
+                            role="img"
+                            aria-label="Spatial audio visualization showing source positions"
+                        >
+                            <p>
+                                Spatial audio field with draggable source positions
+                            </p>
+                        </canvas>
+                    </div>
                 </div>
 
                 <aside
@@ -559,6 +635,13 @@
                                 aria-pressed="false"
                             >
                                 Mute
+                            </button>
+                            <button
+                                class="mute-btn"
+                                id="reset-layout-btn"
+                                style="margin-left: auto;"
+                            >
+                                Reset Layout
                             </button>
                         </div>
                     </section>
@@ -768,6 +851,7 @@
                     this.muted = false;
                     this.volume = 0.7;
                     this.reverbAmount = 0.3;
+                    this.sessionPanners = new Map(); // PannerNode per session
                 }
 
                 async init() {
@@ -797,6 +881,20 @@
                     this.reverbGain.connect(this.masterGain);
                     this.dryGain.connect(this.masterGain);
                     this.masterGain.connect(this.ctx.destination);
+
+                    // Set listener at origin for 3D audio
+                    const listener = this.ctx.listener;
+                    if (listener.positionX) {
+                        listener.positionX.setValueAtTime(0, this.ctx.currentTime);
+                        listener.positionY.setValueAtTime(0, this.ctx.currentTime);
+                        listener.positionZ.setValueAtTime(0, this.ctx.currentTime);
+                        listener.forwardX.setValueAtTime(0, this.ctx.currentTime);
+                        listener.forwardY.setValueAtTime(0, this.ctx.currentTime);
+                        listener.forwardZ.setValueAtTime(-1, this.ctx.currentTime);
+                        listener.upX.setValueAtTime(0, this.ctx.currentTime);
+                        listener.upY.setValueAtTime(1, this.ctx.currentTime);
+                        listener.upZ.setValueAtTime(0, this.ctx.currentTime);
+                    }
                 }
 
                 async createReverbImpulse() {
@@ -847,11 +945,58 @@
                     return this.muted;
                 }
 
-                playSound(config, pan = 0) {
+                createPannerForSession(sessionKey) {
+                    if (!this.ctx) return null;
+                    if (this.sessionPanners.has(sessionKey)) {
+                        return this.sessionPanners.get(sessionKey);
+                    }
+
+                    const panner = this.ctx.createPanner();
+                    panner.panningModel = 'HRTF';
+                    panner.distanceModel = 'inverse';
+                    panner.refDistance = 1;
+                    panner.maxDistance = 10;
+                    panner.rolloffFactor = 1.5; // Dramatic falloff
+                    panner.coneInnerAngle = 360;
+                    panner.coneOuterAngle = 360;
+
+                    // Connect to dry/wet paths
+                    panner.connect(this.dryGain);
+                    panner.connect(this.convolver);
+
+                    this.sessionPanners.set(sessionKey, panner);
+                    return panner;
+                }
+
+                updatePannerPosition(sessionKey, normX, normY) {
+                    const panner = this.sessionPanners.get(sessionKey);
+                    if (!panner || !this.ctx) return;
+
+                    // Convert normalized coords (0-1) to 3D space (-5 to +5)
+                    const x = (normX - 0.5) * 10;
+                    const z = (0.5 - normY) * 10; // Y inverted for front/back
+
+                    panner.positionX.setValueAtTime(x, this.ctx.currentTime);
+                    panner.positionY.setValueAtTime(0, this.ctx.currentTime);
+                    panner.positionZ.setValueAtTime(z, this.ctx.currentTime);
+                }
+
+                removePannerForSession(sessionKey) {
+                    const panner = this.sessionPanners.get(sessionKey);
+                    if (panner) {
+                        panner.disconnect();
+                        this.sessionPanners.delete(sessionKey);
+                    }
+                }
+
+                playSound(config, pan = 0, sessionKey = null) {
                     if (!this.ctx || this.muted) return;
 
                     const now = this.ctx.currentTime;
                     const notes = config.notes || [config.note];
+
+                    // Use session's 3D panner if available, otherwise create stereo panner
+                    const sessionPanner = sessionKey ? this.sessionPanners.get(sessionKey) : null;
 
                     notes.forEach((note, i) => {
                         const freq = NOTE_FREQ[note] || 440;
@@ -866,15 +1011,19 @@
                         const gainNode = this.ctx.createGain();
                         gainNode.gain.value = 0;
 
-                        // Create panner
-                        const panner = this.ctx.createStereoPanner();
-                        panner.pan.value = pan;
-
-                        // Connect: osc -> gain -> panner -> [dry + convolver]
+                        // Connect through session's 3D panner or fallback to stereo
                         osc.connect(gainNode);
-                        gainNode.connect(panner);
-                        panner.connect(this.dryGain);
-                        panner.connect(this.convolver);
+                        if (sessionPanner) {
+                            // Route through session's pre-configured PannerNode
+                            gainNode.connect(sessionPanner);
+                        } else {
+                            // Fallback: create stereo panner for non-session sounds
+                            const panner = this.ctx.createStereoPanner();
+                            panner.pan.value = pan;
+                            gainNode.connect(panner);
+                            panner.connect(this.dryGain);
+                            panner.connect(this.convolver);
+                        }
 
                         // Envelope
                         const attackTime = 0.01;
@@ -898,7 +1047,12 @@
                 }
 
                 playEvent(event) {
-                    const { event_type, tool_name, pan } = event;
+                    const { event_type, tool_name, pan, machine_id, session_id } = event;
+
+                    // Build session key for 3D panner lookup
+                    const sessionKey = machine_id && session_id
+                        ? `${machine_id}:${session_id}`
+                        : null;
 
                     // Get sound config based on event type
                     let config;
@@ -933,7 +1087,83 @@
                             SOUND_CONFIG.tools.default;
                     }
 
-                    this.playSound(config, pan || 0);
+                    this.playSound(config, pan || 0, sessionKey);
+                }
+            }
+
+            // ============================================
+            // Position Manager
+            // ============================================
+            class PositionManager {
+                constructor() {
+                    this.positions = new Map();
+                    this.loadFromStorage();
+                    this.cleanupStale();
+                }
+
+                storageKey(sessionKey) {
+                    return `bingbong:position:${sessionKey}`;
+                }
+
+                loadFromStorage() {
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        if (key?.startsWith('bingbong:position:')) {
+                            try {
+                                const data = JSON.parse(localStorage.getItem(key));
+                                const sessionKey = key.replace('bingbong:position:', '');
+                                this.positions.set(sessionKey, data);
+                            } catch (e) { /* ignore corrupt data */ }
+                        }
+                    }
+                }
+
+                savePosition(sessionKey, x, y) {
+                    const data = { x, y, savedAt: new Date().toISOString() };
+                    this.positions.set(sessionKey, data);
+                    localStorage.setItem(this.storageKey(sessionKey), JSON.stringify(data));
+                }
+
+                getPosition(sessionKey, index = 0) {
+                    const saved = this.positions.get(sessionKey);
+                    if (saved) return { x: saved.x, y: saved.y };
+                    return this.autoAssign(index);
+                }
+
+                hasPosition(sessionKey) {
+                    return this.positions.has(sessionKey);
+                }
+
+                autoAssign(index) {
+                    // First source at center
+                    if (index === 0) return { x: 0.5, y: 0.5 };
+
+                    // Golden angle spiral for subsequent sources
+                    const angle = (index * 137.5) * (Math.PI / 180);
+                    const ring = Math.ceil(Math.sqrt(index));
+                    const radius = 0.15 + (ring * 0.1);
+
+                    return {
+                        x: Math.max(0.1, Math.min(0.9, 0.5 + Math.cos(angle) * radius)),
+                        y: Math.max(0.1, Math.min(0.9, 0.5 + Math.sin(angle) * radius))
+                    };
+                }
+
+                cleanupStale() {
+                    const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+                    for (const [key, data] of this.positions) {
+                        if (new Date(data.savedAt).getTime() < thirtyDaysAgo) {
+                            this.positions.delete(key);
+                            localStorage.removeItem(this.storageKey(key));
+                        }
+                    }
+                }
+
+                clearAll() {
+                    for (const key of this.positions.keys()) {
+                        localStorage.removeItem(this.storageKey(key));
+                    }
+                    this.positions.clear();
                 }
             }
 
@@ -950,6 +1180,7 @@
                     this.isAnimating = false;
                     this.dpr = window.devicePixelRatio || 1;
                     this.resizeTimeout = null;
+                    this.sourceOverlay = null; // Set by integration code
 
                     // Cache canvas dimensions (set by resize())
                     this.width = 0;
@@ -986,41 +1217,72 @@
                 }
 
                 drawStatic() {
+                    this.drawRadarGrid();
+                }
+
+                // Get radar grid geometry (used by both canvas and overlay positioning)
+                getRadarGeometry() {
+                    const size = Math.min(this.width, this.height);
+                    const centerX = this.width / 2;
+                    const centerY = this.height / 2;
+                    const maxRadius = size * 0.45; // Leave padding for source circles
+                    return { size, centerX, centerY, maxRadius };
+                }
+
+                drawRadarGrid() {
                     const { ctx } = this;
+                    const { centerX, centerY, maxRadius } = this.getRadarGeometry();
 
                     // Clear canvas
                     ctx.fillStyle = "#00141f";
                     ctx.fillRect(0, 0, this.width, this.height);
 
-                    // Draw center line
-                    ctx.strokeStyle = "rgba(74, 74, 90, 0.3)";
+                    // Draw concentric circles (distance zones)
+                    ctx.strokeStyle = "rgba(42, 42, 58, 0.5)";
+                    ctx.lineWidth = 1;
+                    [0.25, 0.5, 0.75, 1].forEach(pct => {
+                        ctx.beginPath();
+                        ctx.arc(centerX, centerY, maxRadius * pct, 0, Math.PI * 2);
+                        ctx.stroke();
+                    });
+
+                    // Draw axis crosshair lines
                     ctx.beginPath();
-                    ctx.moveTo(this.width / 2, 0);
-                    ctx.lineTo(this.width / 2, this.height);
+                    ctx.moveTo(centerX - maxRadius, centerY);
+                    ctx.lineTo(centerX + maxRadius, centerY);
+                    ctx.moveTo(centerX, centerY - maxRadius);
+                    ctx.lineTo(centerX, centerY + maxRadius);
                     ctx.stroke();
 
-                    // Draw L/R labels
-                    ctx.fillStyle = "rgba(74, 74, 90, 0.5)";
-                    ctx.font = "12px monospace";
-                    ctx.fillText("L", 10, 20);
-                    ctx.fillText("R", this.width - 20, 20);
+                    // Draw listener indicator at center
+                    ctx.fillStyle = "#fff";
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, 6, 0, Math.PI * 2);
+                    ctx.fill();
 
-                    // Draw session positions
-                    for (const session of this.sessions.values()) {
-                        const x = ((session.pan + 1) / 2) * this.width;
-                        ctx.beginPath();
-                        ctx.arc(x, this.height - 20, 5, 0, Math.PI * 2);
-                        ctx.fillStyle = session.color;
-                        ctx.fill();
-                    }
+                    // Listener label
+                    ctx.fillStyle = "rgba(136, 136, 136, 0.7)";
+                    ctx.font = "10px var(--font-mono)";
+                    ctx.textAlign = "center";
+                    ctx.fillText("LISTENER", centerX, centerY + 22);
                 }
 
-                addEvent(event) {
-                    const { pan, color, event_type, tool_name } = event;
+                addEvent(event, sessionKey = null) {
+                    const { color, event_type, tool_name } = event;
+                    const { centerX, centerY, maxRadius } = this.getRadarGeometry();
 
-                    // Calculate x position from pan (-1 to 1 -> 0 to width)
-                    const x = ((pan + 1) / 2) * this.width;
-                    const y = this.height / 2;
+                    // Get particle spawn position from source overlay or fallback to center
+                    let x = centerX;
+                    let y = centerY;
+
+                    if (sessionKey && this.sourceOverlay) {
+                        const source = this.sourceOverlay.sources.get(sessionKey);
+                        if (source) {
+                            // Convert normalized position to canvas coordinates
+                            x = centerX + (source.pos.x - 0.5) * 2 * maxRadius;
+                            y = centerY + (source.pos.y - 0.5) * 2 * maxRadius;
+                        }
+                    }
 
                     // Particle properties based on event
                     let size = 20;
@@ -1084,30 +1346,11 @@
                     const { ctx } = this;
 
                     // Clear with fade effect
-                    ctx.fillStyle = "rgba(10, 10, 15, 0.15)";
+                    ctx.fillStyle = "rgba(0, 20, 31, 0.15)";
                     ctx.fillRect(0, 0, this.width, this.height);
 
-                    // Draw center line
-                    ctx.strokeStyle = "rgba(74, 74, 90, 0.3)";
-                    ctx.beginPath();
-                    ctx.moveTo(this.width / 2, 0);
-                    ctx.lineTo(this.width / 2, this.height);
-                    ctx.stroke();
-
-                    // Draw L/R labels
-                    ctx.fillStyle = "rgba(74, 74, 90, 0.5)";
-                    ctx.font = "12px monospace";
-                    ctx.fillText("L", 10, 20);
-                    ctx.fillText("R", this.width - 20, 20);
-
-                    // Draw session positions
-                    for (const session of this.sessions.values()) {
-                        const x = ((session.pan + 1) / 2) * this.width;
-                        ctx.beginPath();
-                        ctx.arc(x, this.height - 20, 5, 0, Math.PI * 2);
-                        ctx.fillStyle = session.color;
-                        ctx.fill();
-                    }
+                    // Redraw radar grid (faint, under particles)
+                    this.drawRadarGrid();
 
                     // Update and draw particles
                     let activeParticles = 0;
@@ -1157,11 +1400,227 @@
             }
 
             // ============================================
+            // Source Overlay (Draggable HTML elements)
+            // ============================================
+            class SourceOverlay {
+                constructor(container, canvas, positionManager, audioEngine) {
+                    this.container = container;
+                    this.canvas = canvas;
+                    this.positionManager = positionManager;
+                    this.audioEngine = audioEngine;
+                    this.sources = new Map();
+                    this.selectedKey = null;
+                    this.dragState = null;
+                    this.sessionIndex = 0; // Track index for auto-positioning
+
+                    // Global listeners for drag
+                    document.addEventListener('pointermove', (e) => this.onPointerMove(e));
+                    document.addEventListener('pointerup', (e) => this.onPointerUp(e));
+
+                    // Deselect on container click (not on source)
+                    this.container.addEventListener('click', (e) => {
+                        if (e.target === this.container || e.target === this.canvas) {
+                            this.deselect();
+                        }
+                    });
+
+                    // Handle window resize
+                    window.addEventListener('resize', () => this.repositionAll());
+                }
+
+                createSource(session) {
+                    const key = `${session.machine_id}:${session.session_id}`;
+
+                    // Skip if already exists
+                    if (this.sources.has(key)) {
+                        return;
+                    }
+
+                    // Get or auto-assign position
+                    const index = this.sessionIndex++;
+                    const pos = this.positionManager.getPosition(key, index);
+
+                    // Create element
+                    const el = document.createElement('div');
+                    el.className = 'source-circle';
+                    el.dataset.session = key;
+                    el.style.setProperty('--session-color', session.color);
+
+                    // Icon and label
+                    const icon = document.createElement('div');
+                    icon.className = 'source-icon';
+                    icon.textContent = '●';
+
+                    const label = document.createElement('div');
+                    label.className = 'source-label';
+                    label.textContent = session.session_id.slice(0, 8);
+
+                    el.appendChild(icon);
+                    el.appendChild(label);
+
+                    // Position element
+                    this.setElementPosition(el, pos.x, pos.y);
+
+                    // Event listeners
+                    el.addEventListener('pointerdown', (e) => this.onPointerDown(e, key));
+
+                    this.container.appendChild(el);
+                    this.sources.set(key, { el, pos, session });
+
+                    // Create panner and set initial position
+                    this.audioEngine.createPannerForSession(key);
+                    this.audioEngine.updatePannerPosition(key, pos.x, pos.y);
+                }
+
+                setElementPosition(el, normX, normY) {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const containerRect = this.container.getBoundingClientRect();
+                    const size = Math.min(rect.width, rect.height);
+                    const maxRadius = size * 0.45;
+                    const centerX = rect.width / 2;
+                    const centerY = rect.height / 2;
+
+                    // Convert normalized (0-1) to pixel position within radar
+                    const pixelX = centerX + (normX - 0.5) * 2 * maxRadius;
+                    const pixelY = centerY + (normY - 0.5) * 2 * maxRadius;
+
+                    el.style.left = `${pixelX}px`;
+                    el.style.top = `${pixelY}px`;
+                }
+
+                repositionAll() {
+                    for (const [key, source] of this.sources) {
+                        this.setElementPosition(source.el, source.pos.x, source.pos.y);
+                    }
+                }
+
+                onPointerDown(e, key) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    const source = this.sources.get(key);
+                    if (!source) return;
+
+                    // Select this source
+                    this.select(key);
+
+                    // Start drag
+                    source.el.classList.add('dragging');
+                    source.el.setPointerCapture(e.pointerId);
+
+                    this.dragState = {
+                        key,
+                        pointerId: e.pointerId,
+                        startPos: { ...source.pos }
+                    };
+                }
+
+                onPointerMove(e) {
+                    if (!this.dragState) return;
+
+                    const rect = this.canvas.getBoundingClientRect();
+                    const size = Math.min(rect.width, rect.height);
+                    const maxRadius = size * 0.45;
+                    const centerX = rect.width / 2;
+                    const centerY = rect.height / 2;
+
+                    // Calculate position relative to canvas
+                    const canvasX = e.clientX - rect.left;
+                    const canvasY = e.clientY - rect.top;
+
+                    // Convert to normalized coordinates
+                    let normX = 0.5 + (canvasX - centerX) / (2 * maxRadius);
+                    let normY = 0.5 + (canvasY - centerY) / (2 * maxRadius);
+
+                    // Clamp to bounds (with slight padding from edges)
+                    normX = Math.max(0.05, Math.min(0.95, normX));
+                    normY = Math.max(0.05, Math.min(0.95, normY));
+
+                    const source = this.sources.get(this.dragState.key);
+                    if (source) {
+                        source.pos = { x: normX, y: normY };
+                        this.setElementPosition(source.el, normX, normY);
+                        this.audioEngine.updatePannerPosition(this.dragState.key, normX, normY);
+                    }
+                }
+
+                onPointerUp(e) {
+                    if (!this.dragState) return;
+
+                    const source = this.sources.get(this.dragState.key);
+                    if (source) {
+                        source.el.classList.remove('dragging');
+                        source.el.releasePointerCapture(this.dragState.pointerId);
+                        // Save position to localStorage
+                        this.positionManager.savePosition(this.dragState.key, source.pos.x, source.pos.y);
+                    }
+
+                    this.dragState = null;
+                }
+
+                select(key) {
+                    // Deselect previous
+                    this.deselect();
+
+                    // Select new
+                    this.selectedKey = key;
+                    const source = this.sources.get(key);
+                    if (source) {
+                        source.el.classList.add('selected');
+                    }
+                }
+
+                deselect() {
+                    if (this.selectedKey) {
+                        const prev = this.sources.get(this.selectedKey);
+                        if (prev) {
+                            prev.el.classList.remove('selected');
+                        }
+                        this.selectedKey = null;
+                    }
+                }
+
+                removeSource(key) {
+                    const source = this.sources.get(key);
+                    if (!source) return;
+
+                    // Fade out then remove
+                    source.el.classList.add('disconnected');
+                    setTimeout(() => {
+                        source.el.remove();
+                        this.sources.delete(key);
+                        this.audioEngine.removePannerForSession(key);
+                    }, 1000);
+
+                    // Deselect if this was selected
+                    if (this.selectedKey === key) {
+                        this.selectedKey = null;
+                    }
+                }
+
+                resetLayout() {
+                    this.positionManager.clearAll();
+                    this.sessionIndex = 0;
+
+                    // Reposition all sources
+                    for (const [key, source] of this.sources) {
+                        const pos = this.positionManager.autoAssign(this.sessionIndex++);
+                        source.pos = pos;
+                        this.setElementPosition(source.el, pos.x, pos.y);
+                        this.audioEngine.updatePannerPosition(key, pos.x, pos.y);
+                        this.positionManager.savePosition(key, pos.x, pos.y);
+                    }
+                }
+            }
+
+            // ============================================
             // App State & UI
             // ============================================
             let ws = null;
             let audioEngine = new AudioEngine();
+            let positionManager = new PositionManager();
             let visualizer = null;
+            let sourceOverlay = null;
             const sessions = new Map();
             const eventLog = [];
             const MAX_LOG_ITEMS = 50;
@@ -1289,9 +1748,13 @@
             }
 
             function handleEvent(event) {
+                const sessionKey = event.machine_id && event.session_id
+                    ? `${event.machine_id}:${event.session_id}`
+                    : null;
+
                 // Update session tracking
                 if (event.session_id) {
-                    sessions.set(event.session_id, {
+                    const sessionData = {
                         session_id: event.session_id,
                         machine_id: event.machine_id,
                         pan: event.pan,
@@ -1299,8 +1762,14 @@
                         event_count:
                             (sessions.get(event.session_id)?.event_count || 0) +
                             1,
-                    });
-                    visualizer?.updateSession(sessions.get(event.session_id));
+                    };
+                    sessions.set(event.session_id, sessionData);
+                    visualizer?.updateSession(sessionData);
+
+                    // Create source overlay if not exists
+                    if (sourceOverlay && sessionKey) {
+                        sourceOverlay.createSource(sessionData);
+                    }
                 }
 
                 // Add to log
@@ -1312,8 +1781,8 @@
                 // Play sound
                 audioEngine.playEvent(event);
 
-                // Visualize
-                visualizer?.addEvent(event);
+                // Visualize (pass sessionKey for particle positioning)
+                visualizer?.addEvent(event, sessionKey);
 
                 // Update UI
                 updateUI();
@@ -1370,6 +1839,10 @@
                                 data.sessions.forEach((s) => {
                                     sessions.set(s.session_id, s);
                                     visualizer?.updateSession(s);
+                                    // Create source overlay for existing session
+                                    if (sourceOverlay) {
+                                        sourceOverlay.createSource(s);
+                                    }
                                 });
                                 updateUI();
                                 return;
@@ -1434,7 +1907,17 @@
 
                 // Initialize visualizer
                 const canvas = document.getElementById("visualizer");
+                const spatialContainer = document.getElementById("spatial-container");
                 visualizer = new Visualizer(canvas);
+
+                // Initialize source overlay
+                sourceOverlay = new SourceOverlay(
+                    spatialContainer,
+                    canvas,
+                    positionManager,
+                    audioEngine
+                );
+                visualizer.sourceOverlay = sourceOverlay;
 
                 // Connect button
                 DOM.connectBtn.addEventListener("click", () => {
@@ -1463,6 +1946,13 @@
                     e.target.textContent = muted ? "Unmute" : "Mute";
                     e.target.classList.toggle("muted", muted);
                     e.target.setAttribute("aria-pressed", muted);
+                });
+
+                // Reset layout button
+                document.getElementById("reset-layout-btn").addEventListener("click", () => {
+                    if (sourceOverlay) {
+                        sourceOverlay.resetLayout();
+                    }
                 });
             });
         </script>
