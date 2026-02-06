@@ -423,6 +423,9 @@
             }
 
             .event-item {
+                display: flex;
+                align-items: baseline;
+                gap: var(--space-xs);
                 padding: var(--space-xs);
                 border-bottom: 1px solid var(--color-bg-elevated);
                 animation: fadeIn var(--transition-base);
@@ -446,11 +449,13 @@
 
             .event-tool {
                 color: var(--color-tool);
+                margin-left: var(--space-xs);
             }
 
             .event-time {
                 color: var(--color-text-secondary);
                 font-size: var(--font-size-md);
+                margin-left: auto;
             }
 
             /* ============================================
