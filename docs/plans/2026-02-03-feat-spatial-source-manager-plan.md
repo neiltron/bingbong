@@ -588,16 +588,16 @@ addParticle(event, sessionKey) {
 
 ### Functional Requirements
 
-- [ ] Canvas displays radar grid with concentric circles and axis lines
-- [ ] Listener indicator visible at center
-- [ ] Each connected session appears as a draggable circle
-- [ ] Source circles show session color and truncated ID
-- [ ] Dragging a source updates its position in real-time
-- [ ] Audio positioning changes as source is dragged (audible difference)
-- [ ] Source positions persist across browser refresh
-- [ ] New sessions auto-position using spiral algorithm
-- [ ] Returning sessions restore their saved position
-- [ ] Disconnected sessions fade out and are removed
+- [x] Canvas displays radar grid with concentric circles and axis lines
+- [x] Listener indicator visible at center
+- [x] Each connected session appears as a draggable circle
+- [x] Source circles show session color and truncated ID
+- [x] Dragging a source updates its position in real-time
+- [x] Audio positioning changes as source is dragged (audible difference)
+- [x] Source positions persist across browser refresh
+- [x] New sessions auto-position using spiral algorithm
+- [x] Returning sessions restore their saved position
+- [x] Disconnected sessions fade out and are removed
 
 ### Non-Functional Requirements
 
