@@ -18,7 +18,7 @@ send_event() {
     local event_type="$1"
     local tool_name="$2"
 
-    local timestamp=$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ" 2>/dev/null || date -u +"%Y-%m-%dT%H:%M:%SZ")
+    local timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
     curl -s -X POST \
         -H "Content-Type: application/json" \
