@@ -209,17 +209,57 @@ export async function startServer(port: number) {
         });
       }
 
-      // GET / - serve client HTML
-      if (req.method === "GET" && url.pathname === "/") {
-        const clientPath = new URL("../client/index.html", import.meta.url)
-          .pathname;
-        const file = Bun.file(clientPath);
+      // Serve static assets from client/dist/assets/
+      if (req.method === "GET" && url.pathname.startsWith("/assets/")) {
+        const assetPath = new URL(
+          `../client/dist${url.pathname}`,
+          import.meta.url
+        ).pathname;
+        const file = Bun.file(assetPath);
         if (await file.exists()) {
+          // Determine content type from extension
+          const ext = url.pathname.split(".").pop();
+          const contentTypes: Record<string, string> = {
+            js: "application/javascript",
+            css: "text/css",
+            svg: "image/svg+xml",
+            png: "image/png",
+            jpg: "image/jpeg",
+            woff: "font/woff",
+            woff2: "font/woff2",
+          };
+          const contentType = contentTypes[ext || ""] || "application/octet-stream";
           return new Response(file, {
+            headers: { "Content-Type": contentType, ...corsHeaders },
+          });
+        }
+      }
+
+      // GET / - serve client HTML from dist (production build)
+      if (req.method === "GET" && url.pathname === "/") {
+        // Try production build first
+        const distPath = new URL(
+          "../client/dist/index.html",
+          import.meta.url
+        ).pathname;
+        const distFile = Bun.file(distPath);
+        if (await distFile.exists()) {
+          return new Response(distFile, {
             headers: { "Content-Type": "text/html", ...corsHeaders },
           });
         }
-        // Fallback to health check if client not found
+
+        // Fallback to dev index.html (for Vite dev server)
+        const devPath = new URL("../client/index.html", import.meta.url)
+          .pathname;
+        const devFile = Bun.file(devPath);
+        if (await devFile.exists()) {
+          return new Response(devFile, {
+            headers: { "Content-Type": "text/html", ...corsHeaders },
+          });
+        }
+
+        // Fallback to health check if neither found
         return new Response(
           JSON.stringify({
             name: "Bingbong Server",
