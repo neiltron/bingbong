@@ -343,17 +343,17 @@ if (pathname === "/") {
 ## Acceptance Criteria
 
 ### Functional Requirements
-- [ ] HMR works for CSS changes (hot injection)
-- [ ] Audio playback works (user gesture required)
-- [ ] Canvas visualization renders correctly
-- [ ] WebSocket connects and receives events
-- [ ] Spatial audio positioning works (drag sources)
-- [ ] Position persistence works (localStorage)
+- [x] HMR works for CSS changes (hot injection)
+- [x] Audio playback works (user gesture required)
+- [x] Canvas visualization renders correctly
+- [x] WebSocket connects and receives events
+- [x] Spatial audio positioning works (drag sources)
+- [x] Position persistence works (localStorage)
 
 ### Non-Functional Requirements
-- [ ] No visual regressions from CSS extraction
-- [ ] TypeScript strict mode passes with no errors
-- [ ] Production build generates valid assets
+- [x] No visual regressions from CSS extraction
+- [x] TypeScript strict mode passes with no errors
+- [x] Production build generates valid assets
 
 ## Test Plan (5 flows)
 
