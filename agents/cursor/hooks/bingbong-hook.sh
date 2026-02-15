@@ -8,14 +8,14 @@
 # Usage: Called automatically by Cursor via hooks.json
 #
 # Environment:
-#   BINGBONG_URL     - Backend server URL (default: http://localhost:3333)
+#   BINGBONG_URL     - Backend server URL (default: http://localhost:3334)
 #   BINGBONG_ENABLED - Set to "false" to disable (default: true)
 #
 
 set -euo pipefail
 
 # Configuration
-BINGBONG_URL="${BINGBONG_URL:-http://localhost:3333}"
+BINGBONG_URL="${BINGBONG_URL:-http://localhost:3334}"
 BINGBONG_ENABLED="${BINGBONG_ENABLED:-true}"
 
 # Exit early if disabled
