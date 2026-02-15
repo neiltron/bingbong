@@ -16,7 +16,14 @@ const AGENTS_DIR = join(ROOT_DIR, "agents");
 function getBingbongCommand(): string {
   try {
     const result = Bun.spawnSync(["which", "bingbong"]);
-    if (result.exitCode === 0 && result.stdout.toString().trim()) {
+    const resolved = result.stdout.toString().trim();
+    if (result.exitCode === 0 && resolved) {
+      // Reject npx temp paths — these won't exist after the npx session ends.
+      // When `npx bingbong install-hooks` runs, npx temporarily puts bingbong
+      // on PATH, so `which` finds it. But that path disappears after npx exits.
+      if (resolved.includes("/_npx/") || resolved.includes("/.npm/_npx")) {
+        return "npx -y bingbong";
+      }
       return "bingbong";
     }
   } catch {}
