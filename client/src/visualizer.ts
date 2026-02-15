@@ -326,7 +326,6 @@ export class Visualizer {
   private animationId: number | null = null
   private isAnimating = false
   private dpr = window.devicePixelRatio || 1
-  private resizeTimeout: ReturnType<typeof setTimeout> | null = null
   sourceOverlay: SourceOverlay | null = null
 
   // Cache canvas dimensions (set by resize())
@@ -340,16 +339,8 @@ export class Visualizer {
     this.canvas = canvas
     this.ctx = canvas.getContext('2d', { alpha: false })!
 
-    this.resize()
-    window.addEventListener('resize', () => this.throttledResize())
-  }
-
-  private throttledResize(): void {
-    if (this.resizeTimeout) return
-    this.resizeTimeout = setTimeout(() => {
-      this.resize()
-      this.resizeTimeout = null
-    }, 100)
+    // Use ResizeObserver to get accurate dimensions after layout settles.
+    new ResizeObserver(() => this.resize()).observe(this.canvas)
   }
 
   private resize(): void {
