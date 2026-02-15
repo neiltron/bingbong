@@ -62,6 +62,10 @@ function printHelp() {
 bingbong - Soundscapes for coding agents
 
 Usage: bingbong [options]
+       bingbong <command> [options]
+
+Commands:
+  install-hooks <agent>  Install bingbong hooks for a coding agent
 
 Options:
   -p, --port <number>  Port to run server on (default: 3334)
@@ -70,9 +74,9 @@ Options:
   -v, --version        Show version number
 
 Examples:
-  bingbong              Start server on port 3334
-  bingbong --open       Start and open browser
-  bingbong --port 8080  Use custom port
+  bingbong                        Start server on port 3334
+  bingbong --open                 Start and open browser
+  bingbong install-hooks cursor   Install Cursor hooks
 `);
 }
 
@@ -111,6 +115,14 @@ async function checkPortAvailable(port: number): Promise<boolean> {
 }
 
 async function main() {
+  // Subcommand detection — check before flag parsing
+  const firstArg = process.argv[2];
+  if (firstArg === "install-hooks") {
+    const { installHooks } = await import("../src/install-hooks");
+    await installHooks(process.argv.slice(3));
+    process.exit(0);
+  }
+
   const args = parseArgs(process.argv.slice(2));
 
   if (args.help) {
