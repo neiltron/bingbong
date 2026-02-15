@@ -65,6 +65,7 @@ Usage: bingbong [options]
        bingbong <command> [options]
 
 Commands:
+  emit <EventType>       Emit an event to the bingbong server (used by hooks)
   install-hooks <agent>  Install bingbong hooks for a coding agent
 
 Options:
@@ -117,6 +118,14 @@ async function checkPortAvailable(port: number): Promise<boolean> {
 async function main() {
   // Subcommand detection — check before flag parsing
   const firstArg = process.argv[2];
+  if (firstArg === "emit") {
+    try {
+      const { emit } = await import("../src/emit");
+      await emit(process.argv.slice(3));
+    } catch {}
+    process.exit(0);
+  }
+
   if (firstArg === "install-hooks") {
     const { installHooks } = await import("../src/install-hooks");
     await installHooks(process.argv.slice(3));

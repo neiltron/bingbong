@@ -13,6 +13,16 @@ import { join, resolve, dirname } from "node:path";
 const ROOT_DIR = resolve(import.meta.dir, "..");
 const AGENTS_DIR = join(ROOT_DIR, "agents");
 
+function getBingbongCommand(): string {
+  try {
+    const result = Bun.spawnSync(["which", "bingbong"]);
+    if (result.exitCode === 0 && result.stdout.toString().trim()) {
+      return "bingbong";
+    }
+  } catch {}
+  return "npx -y bingbong";
+}
+
 // Agent registry — known at compile time, no interface needed
 const AGENTS: Record<string, { display: string; configHint: string }> = {
   claude:   { display: "Claude Code", configHint: "~/.claude/settings.json" },
@@ -133,32 +143,35 @@ async function atomicWriteJson(filePath: string, data: object) {
   }
 }
 
-function verifyScriptExists(scriptPath: string, label: string) {
-  if (!existsSync(scriptPath)) {
-    console.error(`Warning: Hook script not found: ${scriptPath} (${label})`);
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Claude Code installer
 // ---------------------------------------------------------------------------
 
-const CLAUDE_EVENTS: Array<{ event: string; matcher: string; script: string }> = [
-  { event: "PreToolUse",        matcher: ".*", script: "pre-tool-use.sh" },
-  { event: "PostToolUse",       matcher: ".*", script: "post-tool-use.sh" },
-  { event: "SessionStart",      matcher: "",   script: "session-start.sh" },
-  { event: "SessionEnd",        matcher: "",   script: "session-end.sh" },
-  { event: "Stop",              matcher: "",   script: "stop.sh" },
-  { event: "SubagentStop",      matcher: "",   script: "subagent-stop.sh" },
-  { event: "PermissionRequest", matcher: "",   script: "permission-request.sh" },
-  { event: "Notification",      matcher: "",   script: "notification.sh" },
-  { event: "PreCompact",        matcher: "",   script: "pre-compact.sh" },
-  { event: "Setup",             matcher: "",   script: "setup.sh" },
-  { event: "UserPromptSubmit",  matcher: "",   script: "user-prompt-submit.sh" },
+const CLAUDE_EVENTS: Array<{ event: string; matcher: string }> = [
+  { event: "PreToolUse",        matcher: ".*" },
+  { event: "PostToolUse",       matcher: ".*" },
+  { event: "SessionStart",      matcher: "" },
+  { event: "SessionEnd",        matcher: "" },
+  { event: "Stop",              matcher: "" },
+  { event: "SubagentStop",      matcher: "" },
+  { event: "PermissionRequest", matcher: "" },
+  { event: "Notification",      matcher: "" },
+  { event: "PreCompact",        matcher: "" },
+  { event: "Setup",             matcher: "" },
+  { event: "UserPromptSubmit",  matcher: "" },
 ];
 
-async function installClaude(agentsDir: string): Promise<string> {
-  const hooksDir = join(agentsDir, "claude", "hooks");
+function isBingbongClaudeEntry(entry: any): boolean {
+  const hooks = entry?.hooks;
+  if (!Array.isArray(hooks)) return false;
+  return hooks.some((h: any) => {
+    const cmd = typeof h?.command === "string" ? h.command : "";
+    return cmd.includes("/agents/claude/hooks/") || cmd.includes("bingbong emit");
+  });
+}
+
+async function installClaude(_agentsDir: string): Promise<string> {
+  const bingbongCmd = getBingbongCommand();
   const configPath = join(homedir(), ".claude", "settings.json");
 
   ensureDir(dirname(configPath));
@@ -166,28 +179,18 @@ async function installClaude(agentsDir: string): Promise<string> {
   const settings = await readJsonFile(configPath, {});
   const existingHooks: Record<string, any[]> = settings.hooks || {};
 
-  // Strip old bingbong entries from each event (match on /agents/claude/hooks/ path)
+  // Strip old bingbong entries (both shell script paths and bingbong emit commands)
   const cleanedHooks: Record<string, any[]> = {};
   for (const [event, entries] of Object.entries(existingHooks)) {
     if (!Array.isArray(entries)) continue;
-    cleanedHooks[event] = entries.filter((entry: any) => {
-      const hooks = entry?.hooks;
-      if (!Array.isArray(hooks)) return true;
-      // Keep entry if none of its hooks reference bingbong's claude hooks dir
-      return !hooks.some((h: any) =>
-        typeof h?.command === "string" && h.command.includes("/agents/claude/hooks/")
-      );
-    });
+    cleanedHooks[event] = entries.filter((entry: any) => !isBingbongClaudeEntry(entry));
   }
 
-  // Add fresh bingbong entries
-  for (const { event, matcher, script } of CLAUDE_EVENTS) {
-    const scriptPath = join(hooksDir, script);
-    verifyScriptExists(scriptPath, event);
-
+  // Add fresh bingbong entries using `bingbong emit`
+  for (const { event, matcher } of CLAUDE_EVENTS) {
     const bingbongEntry = {
       matcher,
-      hooks: [{ type: "command", command: scriptPath }],
+      hooks: [{ type: "command", command: `${bingbongCmd} emit ${event}` }],
     };
 
     if (!cleanedHooks[event]) {
@@ -217,31 +220,33 @@ const CURSOR_EVENTS = [
   "stop",
 ];
 
-async function installCursor(agentsDir: string): Promise<string> {
-  const hookScript = join(agentsDir, "cursor", "hooks", "bingbong-hook.sh");
+function isBingbongCursorEntry(entry: any): boolean {
+  const cmd = typeof entry?.command === "string" ? entry.command : "";
+  return cmd.includes("bingbong-hook.sh") || cmd.includes("bingbong emit");
+}
+
+async function installCursor(_agentsDir: string): Promise<string> {
+  const bingbongCmd = getBingbongCommand();
   const configPath = join(homedir(), ".cursor", "hooks.json");
 
-  verifyScriptExists(hookScript, "cursor bingbong-hook.sh");
   ensureDir(dirname(configPath));
 
   const config = await readJsonFile(configPath, { version: 1, hooks: {} });
   config.version = config.version || 1;
   config.hooks = config.hooks || {};
 
-  // Strip old bingbong entries from all events (match on bingbong-hook.sh)
+  // Strip old bingbong entries (both bingbong-hook.sh and bingbong emit commands)
   for (const [event, entries] of Object.entries(config.hooks)) {
     if (!Array.isArray(entries)) continue;
-    config.hooks[event] = entries.filter(
-      (entry: any) => !(typeof entry?.command === "string" && entry.command.includes("bingbong-hook.sh"))
-    );
+    config.hooks[event] = entries.filter((entry: any) => !isBingbongCursorEntry(entry));
   }
 
-  // Add fresh bingbong entries
+  // Add fresh bingbong entries using `bingbong emit`
   for (const event of CURSOR_EVENTS) {
     if (!config.hooks[event]) {
       config.hooks[event] = [];
     }
-    config.hooks[event].push({ command: `${hookScript} ${event}` });
+    config.hooks[event].push({ command: `${bingbongCmd} emit ${event}` });
   }
 
   await atomicWriteJson(configPath, config);
