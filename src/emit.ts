@@ -19,14 +19,29 @@ export async function emit(argv: string[]): Promise<void> {
 
   const url = process.env.BINGBONG_URL || "http://localhost:3334";
 
-  // Read stdin: if TTY (no pipe), use {}. Otherwise read with a 1s timeout
-  // to handle edge case where stdin is not a TTY but no data is piped.
+  // Read stdin: if TTY (interactive terminal), skip — no data to read.
+  // Otherwise read piped data via Bun.stdin.text().
+  //
+  // The 1s timeout handles a Bun quirk: when a parent process spawns us
+  // without piping stdin (e.g. `bun run bin/cli.ts emit Foo` during local
+  // dev), process.stdin.isTTY is undefined — not false — so we enter this
+  // branch, but Bun.stdin.text() hangs forever waiting for EOF that never
+  // comes. The timeout lets us fall through with an empty payload instead.
+  //
+  // In production (Claude Code, Cursor), agents always pipe JSON on stdin,
+  // so Bun.stdin.text() resolves instantly and the timeout never fires.
+  // The timer is unref'd so it doesn't keep the process alive when stdin
+  // wins the race — without unref(), the process would block for 1s even
+  // after reading stdin successfully.
   let input: Record<string, unknown> = {};
   if (!process.stdin.isTTY) {
     try {
       const raw = await Promise.race([
         Bun.stdin.text(),
-        new Promise<string>((resolve) => setTimeout(() => resolve(""), 1000)),
+        new Promise<string>((resolve) => {
+          const t = setTimeout(() => resolve(""), 1000);
+          t.unref();
+        }),
       ]);
       if (raw.trim()) input = JSON.parse(raw);
     } catch {
