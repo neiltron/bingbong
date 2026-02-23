@@ -38,7 +38,7 @@ const AGENTS: Record<string, { display: string; configHint: string }> = {
   pi:       { display: "Pi",          configHint: "~/.pi/agent/extensions/" },
 };
 
-const INSTALLERS: Record<string, (agentsDir: string) => Promise<string>> = {
+const INSTALLERS: Record<string, (agentsDir: string, dryRun: boolean) => Promise<string>> = {
   claude: installClaude,
   cursor: installCursor,
   opencode: installOpencode,
@@ -47,7 +47,10 @@ const INSTALLERS: Record<string, (agentsDir: string) => Promise<string>> = {
 
 function printUsage() {
   console.log(`
-Usage: bingbong install-hooks <agent>
+Usage: bingbong install-hooks [--dry-run] <agent>
+
+Options:
+  --dry-run  Preview changes without writing any files
 
 Available agents:
   claude     Claude Code (${AGENTS.claude.configHint})
@@ -55,12 +58,16 @@ Available agents:
   opencode   OpenCode (${AGENTS.opencode.configHint})
   pi         Pi (${AGENTS.pi.configHint})
 
-Example: bingbong install-hooks cursor
+Examples:
+  bingbong install-hooks cursor
+  bingbong install-hooks --dry-run claude
 `);
 }
 
 export async function installHooks(argv: string[]) {
-  const agentName = argv[0];
+  const dryRun = argv.includes("--dry-run");
+  const args = argv.filter(a => a !== "--dry-run");
+  const agentName = args[0];
 
   if (!agentName || agentName === "--help" || agentName === "-h") {
     printUsage();
@@ -88,13 +95,37 @@ export async function installHooks(argv: string[]) {
     process.exit(1);
   }
 
-  const configPath = await installer(AGENTS_DIR);
-  console.log(`Installed hooks for ${AGENTS[agentName].display} in ${configPath}`);
+  const configPath = await installer(AGENTS_DIR, dryRun);
+  if (dryRun) {
+    console.log(`\nRun without --dry-run to apply these changes.`);
+  } else {
+    console.log(`Installed hooks for ${AGENTS[agentName].display} in ${configPath}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
+
+function printPreview(filePath: string, existingContent: string | null, proposedContent: string) {
+  const displayPath = filePath.replace(homedir(), "~");
+
+  if (existingContent !== null && existingContent === proposedContent) {
+    console.log(`No changes needed in ${displayPath}`);
+    return;
+  }
+
+  const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
+  const green = useColor ? "\x1b[32m" : "";
+  const cyan = useColor ? "\x1b[36m" : "";
+  const reset = useColor ? "\x1b[0m" : "";
+  const label = existingContent === null ? "create" : "update";
+
+  console.log(`${cyan}Would ${label}: ${displayPath}${reset}\n`);
+  for (const line of proposedContent.split("\n")) {
+    if (line) console.log(`${green}  ${line}${reset}`);
+  }
+}
 
 function ensureDir(dirPath: string) {
   if (!existsSync(dirPath)) {
@@ -177,11 +208,9 @@ function isBingbongClaudeEntry(entry: any): boolean {
   });
 }
 
-async function installClaude(_agentsDir: string): Promise<string> {
+async function installClaude(_agentsDir: string, dryRun: boolean): Promise<string> {
   const bingbongCmd = getBingbongCommand();
   const configPath = join(homedir(), ".claude", "settings.json");
-
-  ensureDir(dirname(configPath));
 
   const settings = await readJsonFile(configPath, {});
   const existingHooks: Record<string, any[]> = settings.hooks || {};
@@ -206,7 +235,16 @@ async function installClaude(_agentsDir: string): Promise<string> {
     cleanedHooks[event].push(bingbongEntry);
   }
 
-  await atomicWriteJson(configPath, { ...settings, hooks: cleanedHooks });
+  const proposed = { ...settings, hooks: cleanedHooks };
+
+  if (dryRun) {
+    const existingContent = existsSync(configPath) ? await readFile(configPath, "utf-8") : null;
+    printPreview(configPath, existingContent, JSON.stringify(proposed, null, 2) + "\n");
+    return configPath;
+  }
+
+  ensureDir(dirname(configPath));
+  await atomicWriteJson(configPath, proposed);
   return configPath;
 }
 
@@ -232,11 +270,9 @@ function isBingbongCursorEntry(entry: any): boolean {
   return cmd.includes("bingbong-hook.sh") || cmd.includes("bingbong emit");
 }
 
-async function installCursor(_agentsDir: string): Promise<string> {
+async function installCursor(_agentsDir: string, dryRun: boolean): Promise<string> {
   const bingbongCmd = getBingbongCommand();
   const configPath = join(homedir(), ".cursor", "hooks.json");
-
-  ensureDir(dirname(configPath));
 
   const config = await readJsonFile(configPath, { version: 1, hooks: {} });
   config.version = config.version || 1;
@@ -256,6 +292,13 @@ async function installCursor(_agentsDir: string): Promise<string> {
     config.hooks[event].push({ command: `${bingbongCmd} emit ${event}` });
   }
 
+  if (dryRun) {
+    const existingContent = existsSync(configPath) ? await readFile(configPath, "utf-8") : null;
+    printPreview(configPath, existingContent, JSON.stringify(config, null, 2) + "\n");
+    return configPath;
+  }
+
+  ensureDir(dirname(configPath));
   await atomicWriteJson(configPath, config);
   return configPath;
 }
@@ -264,7 +307,7 @@ async function installCursor(_agentsDir: string): Promise<string> {
 // OpenCode installer
 // ---------------------------------------------------------------------------
 
-async function installOpencode(agentsDir: string): Promise<string> {
+async function installOpencode(agentsDir: string, dryRun: boolean): Promise<string> {
   const sourcePath = join(agentsDir, "opencode", "plugins", "bingbong.js");
   const targetPath = join(homedir(), ".config", "opencode", "plugins", "bingbong.js");
 
@@ -273,9 +316,15 @@ async function installOpencode(agentsDir: string): Promise<string> {
     process.exit(1);
   }
 
-  ensureDir(dirname(targetPath));
-
   const content = await readFile(sourcePath, "utf-8");
+
+  if (dryRun) {
+    const existingContent = existsSync(targetPath) ? await readFile(targetPath, "utf-8") : null;
+    printPreview(targetPath, existingContent, content);
+    return targetPath;
+  }
+
+  ensureDir(dirname(targetPath));
   await writeFile(targetPath, content, "utf-8");
 
   return targetPath;
@@ -285,7 +334,7 @@ async function installOpencode(agentsDir: string): Promise<string> {
 // Pi installer
 // ---------------------------------------------------------------------------
 
-async function installPi(agentsDir: string): Promise<string> {
+async function installPi(agentsDir: string, dryRun: boolean): Promise<string> {
   const sourcePath = join(agentsDir, "pi", "extensions", "bingbong.ts");
   const extensionsDir = process.env.PI_EXTENSIONS_DIR || join(homedir(), ".pi", "agent", "extensions");
   const targetPath = join(extensionsDir, "bingbong.ts");
@@ -296,10 +345,16 @@ async function installPi(agentsDir: string): Promise<string> {
     process.exit(1);
   }
 
-  ensureDir(extensionsDir);
-
   const content = await readFile(sourcePath, "utf-8");
   const transformed = content.replace("__BINGBONG_URL__", bingbongUrl);
+
+  if (dryRun) {
+    const existingContent = existsSync(targetPath) ? await readFile(targetPath, "utf-8") : null;
+    printPreview(targetPath, existingContent, transformed);
+    return targetPath;
+  }
+
+  ensureDir(extensionsDir);
   await writeFile(targetPath, transformed, "utf-8");
 
   return targetPath;
