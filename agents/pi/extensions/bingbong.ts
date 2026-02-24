@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import os from "node:os";
 
-const DEFAULT_URL = "http://localhost:3333";
+const DEFAULT_URL = "http://localhost:3334";
 const BUILT_URL = "__BINGBONG_URL__";
 
 const envUrl = process.env.BINGBONG_URL;

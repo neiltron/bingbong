@@ -9,7 +9,8 @@
   "files": [
     "bin/",
     "src/",
-    "client/"
+    "client/",
+    "agents/"
   ],
   "scripts": {
     "start": "bun run bin/cli.ts",

@@ -3,7 +3,7 @@
 
 import os from "node:os";
 
-const DEFAULT_URL = "http://localhost:3333";
+const DEFAULT_URL = "http://localhost:3334";
 
 const BINGBONG_URL = Bun.env.BINGBONG_URL || DEFAULT_URL;
 const BINGBONG_ENABLED = (Bun.env.BINGBONG_ENABLED || "true").toLowerCase() !== "false";

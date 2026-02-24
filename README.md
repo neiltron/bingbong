@@ -94,9 +94,8 @@ BINGBONG_MACHINE_ID=my-laptop
 - Click anywhere on page (browsers require user interaction for audio)
 
 **Hooks not firing?**
-- Check scripts are executable: `chmod +x agents/*/hooks/*.sh`
-- Verify paths in agent config are absolute
-- Test manually: `echo '{"session_id":"test"}' | ./agents/claude/hooks/pre-tool-use.sh`
+- Re-run `bingbong install-hooks <agent>` to refresh config
+- Test manually: `echo '{"session_id":"test"}' | bingbong emit PreToolUse`
 
 **Server connection failed?**
 - Check nothing else is using port 3334
