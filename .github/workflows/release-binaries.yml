@@ -1,0 +1,76 @@
+name: Release Binaries
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag (for metadata only)"
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build client assets
+        run: bun run build:client
+
+      - name: Build standalone binaries
+        run: |
+          mkdir -p dist/release
+
+          bun build ./bin/cli.ts --compile --target=bun-darwin-x64 --outfile dist/release/bingbong-darwin-x64/bingbong
+          bun build ./bin/cli.ts --compile --target=bun-darwin-arm64 --outfile dist/release/bingbong-darwin-arm64/bingbong
+          bun build ./bin/cli.ts --compile --target=bun-linux-x64 --outfile dist/release/bingbong-linux-x64/bingbong
+
+      - name: Package release archives
+        run: |
+          set -euo pipefail
+
+          for target in bingbong-darwin-x64 bingbong-darwin-arm64 bingbong-linux-x64; do
+            stage="dist/release/${target}"
+
+            mkdir -p "${stage}/client"
+            cp -R client/dist "${stage}/client/dist"
+            chmod +x "${stage}/bingbong"
+
+            tar -C "${stage}" -czf "dist/release/${target}.tar.gz" bingbong client
+          done
+
+          (cd dist/release && shasum -a 256 bingbong-*.tar.gz > checksums.txt)
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bingbong-release-bundles
+          path: |
+            dist/release/bingbong-darwin-x64.tar.gz
+            dist/release/bingbong-darwin-arm64.tar.gz
+            dist/release/bingbong-linux-x64.tar.gz
+            dist/release/checksums.txt
+
+      - name: Publish GitHub Release assets
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/release/bingbong-darwin-x64.tar.gz
+            dist/release/bingbong-darwin-arm64.tar.gz
+            dist/release/bingbong-linux-x64.tar.gz
+            dist/release/checksums.txt

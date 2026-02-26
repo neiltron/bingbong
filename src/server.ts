@@ -5,7 +5,28 @@
  * to connected frontend clients for audio rendering.
  */
 
+import { existsSync } from "node:fs";
+import { homedir } from "node:os";
+import { join, resolve as resolvePath } from "node:path";
+
 const VERSION = "0.1.0";
+
+const SOURCE_CLIENT_DIST = new URL("../client/dist", import.meta.url).pathname;
+const SOURCE_CLIENT_DEV = new URL("../client/index.html", import.meta.url).pathname;
+
+function resolveClientDistPath(): string | null {
+  const candidates = [
+    process.env.BINGBONG_CLIENT_DIST,
+    join(homedir(), ".local", "share", "bingbong", "client", "dist"),
+    SOURCE_CLIENT_DIST,
+  ].filter(Boolean) as string[];
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate;
+  }
+
+  return null;
+}
 
 // Types
 interface BingbongEvent {
@@ -211,48 +232,51 @@ export async function startServer(port: number) {
 
       // Serve static assets from client/dist/assets/
       if (req.method === "GET" && url.pathname.startsWith("/assets/")) {
-        const assetPath = new URL(
-          `../client/dist${url.pathname}`,
-          import.meta.url
-        ).pathname;
-        const file = Bun.file(assetPath);
-        if (await file.exists()) {
-          // Determine content type from extension
-          const ext = url.pathname.split(".").pop();
-          const contentTypes: Record<string, string> = {
-            js: "application/javascript",
-            css: "text/css",
-            svg: "image/svg+xml",
-            png: "image/png",
-            jpg: "image/jpeg",
-            woff: "font/woff",
-            woff2: "font/woff2",
-          };
-          const contentType = contentTypes[ext || ""] || "application/octet-stream";
-          return new Response(file, {
-            headers: { "Content-Type": contentType, ...corsHeaders },
-          });
+        const clientDistPath = resolveClientDistPath();
+        if (clientDistPath) {
+          const relativePath = url.pathname.replace(/^\/+/, "");
+          const safeRoot = resolvePath(clientDistPath);
+          const assetPath = resolvePath(clientDistPath, relativePath);
+          if (!assetPath.startsWith(`${safeRoot}/`)) {
+            return new Response("Forbidden", { status: 403, headers: corsHeaders });
+          }
+
+          const file = Bun.file(assetPath);
+          if (await file.exists()) {
+            // Determine content type from extension
+            const ext = url.pathname.split(".").pop();
+            const contentTypes: Record<string, string> = {
+              js: "application/javascript",
+              css: "text/css",
+              svg: "image/svg+xml",
+              png: "image/png",
+              jpg: "image/jpeg",
+              woff: "font/woff",
+              woff2: "font/woff2",
+            };
+            const contentType = contentTypes[ext || ""] || "application/octet-stream";
+            return new Response(file, {
+              headers: { "Content-Type": contentType, ...corsHeaders },
+            });
+          }
         }
       }
 
       // GET / - serve client HTML from dist (production build)
       if (req.method === "GET" && url.pathname === "/") {
         // Try production build first
-        const distPath = new URL(
-          "../client/dist/index.html",
-          import.meta.url
-        ).pathname;
-        const distFile = Bun.file(distPath);
-        if (await distFile.exists()) {
-          return new Response(distFile, {
-            headers: { "Content-Type": "text/html", ...corsHeaders },
-          });
+        const clientDistPath = resolveClientDistPath();
+        if (clientDistPath) {
+          const distFile = Bun.file(join(clientDistPath, "index.html"));
+          if (await distFile.exists()) {
+            return new Response(distFile, {
+              headers: { "Content-Type": "text/html", ...corsHeaders },
+            });
+          }
         }
 
-        // Fallback to dev index.html (for Vite dev server)
-        const devPath = new URL("../client/index.html", import.meta.url)
-          .pathname;
-        const devFile = Bun.file(devPath);
+        // Fallback to dev index.html (for local source workflows)
+        const devFile = Bun.file(SOURCE_CLIENT_DEV);
         if (await devFile.exists()) {
           return new Response(devFile, {
             headers: { "Content-Type": "text/html", ...corsHeaders },

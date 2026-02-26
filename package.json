@@ -36,7 +36,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/bingbong"
+    "url": "https://github.com/neiltron/bingbong"
   },
   "engines": {
     "bun": ">=1.0.0"

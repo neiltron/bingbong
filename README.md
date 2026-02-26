@@ -10,57 +10,78 @@ Bingbong turns AI coding agent activity into spatial audio feedback. Each tool a
 
 ## Prerequisites
 
-- [Bun](https://bun.sh) runtime
-- At least one supported agent installed
+For binary install:
+- `curl`
+- `tar`
+
+For source fallback install:
+- [Bun](https://bun.sh)
+- `git`
 
 ## Quick Start
 
-**1. Run bingbong:**
+**1. Install bingbong (no npm):**
 
 ```bash
-# Install globally
-npm install -g bingbong
-bingbong
-
-# Or run directly with npx (requires Bun)
-npx bingbong
-
-# Or clone and run from source
-git clone https://github.com/yourusername/bingbong
-cd bingbong
-bun run start
+curl -fsSL https://raw.githubusercontent.com/neiltron/bingbong/main/scripts/install.sh | bash
 ```
 
-**2. Open in browser:**
+This installs:
+- `bingbong` to `~/.local/bin` (preferred) or `/usr/local/bin` when writable
+- client assets to `~/.local/share/bingbong/client/dist`
 
-The client is served automatically at `http://localhost:3334`. Click "Connect" to start.
+Then verify:
 
-Use `--open` to auto-launch your browser:
+```bash
+bingbong --help
+```
+
+**2. Run bingbong:**
+
 ```bash
 bingbong --open
 ```
+
+The client is served at `http://localhost:3334`. Click "Connect" to start.
 
 **3. Install agent hooks:**
 
 | Agent | Installation |
 |-------|-------------|
-| **Claude Code** | `./agents/claude/setup.sh` |
-| **Cursor** | `./agents/cursor/install-hooks.sh` |
-| **OpenCode** | `./agents/opencode/install.sh` |
-| **Pi** | `./agents/pi/install.sh` |
+| **Claude Code** | `bingbong install-hooks claude` |
+| **Cursor** | `bingbong install-hooks cursor` |
+| **OpenCode** | `bingbong install-hooks opencode` |
+| **Pi** | `bingbong install-hooks pi` |
 
-**4. Test it out** - every action and tool use should produce a sound.
-
-You can also test the events without burning any tokens with the test script:
+**4. Test it out** — every action and tool use should produce a sound.
 
 ```bash
 ./test-events.sh
+```
+
+## Source Install (Fallback)
+
+If no matching prebuilt binary is available, the installer falls back to source build automatically.
+
+You can also run from source directly:
+
+```bash
+git clone https://github.com/neiltron/bingbong
+cd bingbong
+bun install
+bun run build:client
+bun run start
 ```
 
 ## CLI Options
 
 ```
 bingbong [options]
+bingbong <command> [options]
+
+Commands:
+  emit <EventType>       Emit an event to the bingbong server (used by hooks)
+  install-hooks <agent>  Install bingbong hooks for a coding agent
 
 Options:
   -p, --port <number>  Port to run server on (default: 3334)
@@ -69,9 +90,9 @@ Options:
   -v, --version        Show version number
 
 Examples:
-  bingbong              Start server on port 3334
-  bingbong --open       Start and open browser
-  bingbong --port 8080  Use custom port
+  bingbong                        Start server on port 3334
+  bingbong --open                 Start and open browser
+  bingbong install-hooks cursor   Install Cursor hooks
 ```
 
 ## Configuration
@@ -82,6 +103,7 @@ Server defaults to `http://localhost:3334`. Configure agent hooks via environmen
 BINGBONG_URL=http://localhost:3334
 BINGBONG_ENABLED=true
 BINGBONG_MACHINE_ID=my-laptop
+BINGBONG_CLIENT_DIST=~/.local/share/bingbong/client/dist
 ```
 
 --- 
@@ -97,9 +119,15 @@ BINGBONG_MACHINE_ID=my-laptop
 - Re-run `bingbong install-hooks <agent>` to refresh config
 - Test manually: `echo '{"session_id":"test"}' | bingbong emit PreToolUse`
 
+**`bingbong` command not found?**
+- Add install dir to PATH (usually `~/.local/bin`):
+  - `export PATH="$HOME/.local/bin:$PATH"`
+- Restart your shell and run `bingbong --help`
+
 **Server connection failed?**
 - Check nothing else is using port 3334
 - Verify server is running: `curl http://localhost:3334/`
+- Verify assets were installed: `ls ~/.local/share/bingbong/client/dist`
 
 ## Architecture
 
@@ -144,7 +172,7 @@ Events are normalized across agents:
 ```
 bin/                     # CLI entry point
 src/                     # Server source code
-client/                  # Web Audio client (single HTML file)
+client/                  # Web Audio client (Vite build)
 agents/
   claude/hooks/          # Claude Code hook scripts
   cursor/                # Cursor hooks + installer
