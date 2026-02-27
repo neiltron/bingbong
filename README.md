@@ -28,7 +28,7 @@ curl -fsSL https://raw.githubusercontent.com/neiltron/bingbong/main/scripts/inst
 
 This installs:
 - `bingbong` to `~/.local/bin` (preferred) or `/usr/local/bin` when writable
-- client assets to `~/.local/share/bingbong/client/dist`
+- embedded client assets inside the standalone binary
 
 Then verify:
 
@@ -69,7 +69,6 @@ You can also run from source directly:
 git clone https://github.com/neiltron/bingbong
 cd bingbong
 bun install
-bun run build:client
 bun run start
 ```
 
@@ -103,7 +102,6 @@ Server defaults to `http://localhost:3334`. Configure agent hooks via environmen
 BINGBONG_URL=http://localhost:3334
 BINGBONG_ENABLED=true
 BINGBONG_MACHINE_ID=my-laptop
-BINGBONG_CLIENT_DIST=~/.local/share/bingbong/client/dist
 ```
 
 --- 
@@ -127,7 +125,6 @@ BINGBONG_CLIENT_DIST=~/.local/share/bingbong/client/dist
 **Server connection failed?**
 - Check nothing else is using port 3334
 - Verify server is running: `curl http://localhost:3334/`
-- Verify assets were installed: `ls ~/.local/share/bingbong/client/dist`
 
 ## Architecture
 

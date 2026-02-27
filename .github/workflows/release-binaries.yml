@@ -28,9 +28,6 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build client assets
-        run: bun run build:client
-
       - name: Build standalone binaries
         run: |
           mkdir -p dist/release
@@ -45,12 +42,8 @@ jobs:
 
           for target in bingbong-darwin-x64 bingbong-darwin-arm64 bingbong-linux-x64; do
             stage="dist/release/${target}"
-
-            mkdir -p "${stage}/client"
-            cp -R client/dist "${stage}/client/dist"
             chmod +x "${stage}/bingbong"
-
-            tar -C "${stage}" -czf "dist/release/${target}.tar.gz" bingbong client
+            tar -C "${stage}" -czf "dist/release/${target}.tar.gz" bingbong
           done
 
           (cd dist/release && shasum -a 256 bingbong-*.tar.gz > checksums.txt)

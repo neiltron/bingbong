@@ -3,7 +3,6 @@ set -euo pipefail
 
 REPO="neiltron/bingbong"
 VERSION="${BINGBONG_VERSION:-latest}"
-ASSETS_DIR="${BINGBONG_ASSETS_DIR:-$HOME/.local/share/bingbong/client/dist}"
 EXPLICIT_INSTALL_DIR="${BINGBONG_INSTALL_DIR:-}"
 WORKDIR=""
 
@@ -144,18 +143,6 @@ install_bundle() {
   cp "$workdir/bingbong" "$temp_bin"
   chmod +x "$temp_bin"
   mv -f "$temp_bin" "$install_dir/bingbong"
-
-  if [[ -d "$workdir/client/dist" ]]; then
-    local assets_parent
-    assets_parent="$(dirname "$ASSETS_DIR")"
-    mkdir -p "$assets_parent"
-    rm -rf "${ASSETS_DIR}.tmp.$$"
-    cp -R "$workdir/client/dist" "${ASSETS_DIR}.tmp.$$"
-    rm -rf "$ASSETS_DIR"
-    mv "${ASSETS_DIR}.tmp.$$" "$ASSETS_DIR"
-  else
-    warn "Archive did not include client/dist assets; UI may not load"
-  fi
 }
 
 build_from_source() {
@@ -178,7 +165,6 @@ build_from_source() {
   (
     cd "$workdir/src"
     bun install --frozen-lockfile || bun install
-    bun run build:client
     bun build ./bin/cli.ts --compile --outfile "$workdir/bingbong"
   )
 
@@ -187,9 +173,6 @@ build_from_source() {
   chmod +x "$temp_bin"
   mv -f "$temp_bin" "$install_dir/bingbong"
 
-  mkdir -p "$(dirname "$ASSETS_DIR")"
-  rm -rf "$ASSETS_DIR"
-  cp -R "$workdir/src/client/dist" "$ASSETS_DIR"
 }
 
 print_path_hint() {
@@ -209,7 +192,6 @@ main() {
   local install_dir
   install_dir="$(choose_install_dir)"
   log "Install directory: ${install_dir}"
-  log "Asset directory: ${ASSETS_DIR}"
 
   local target
   target="$(resolve_target)"
@@ -228,7 +210,6 @@ main() {
   fi
 
   log "Installed bingbong to ${install_dir}/bingbong"
-  log "Client assets installed to ${ASSETS_DIR}"
   print_path_hint "$install_dir"
 
   echo
