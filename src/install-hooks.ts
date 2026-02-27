@@ -18,16 +18,15 @@ function getBingbongCommand(): string {
     const result = Bun.spawnSync(["which", "bingbong"]);
     const resolved = result.stdout.toString().trim();
     if (result.exitCode === 0 && resolved) {
-      // Reject npx temp paths — these won't exist after the npx session ends.
-      // When `npx bingbong install-hooks` runs, npx temporarily puts bingbong
-      // on PATH, so `which` finds it. But that path disappears after npx exits.
-      if (resolved.includes("/_npx/") || resolved.includes("/.npm/_npx")) {
-        return "npx -y bingbong";
-      }
       return "bingbong";
     }
   } catch {}
-  return "npx -y bingbong";
+
+  console.error(
+    "Error: Could not find `bingbong` on PATH.\n" +
+    "Install it first (curl installer), then re-run `bingbong install-hooks <agent>`."
+  );
+  process.exit(1);
 }
 
 // Agent registry — known at compile time, no interface needed
@@ -90,7 +89,7 @@ export async function installHooks(argv: string[]) {
   if (!existsSync(AGENTS_DIR)) {
     console.error(
       `Error: Could not find agents directory at ${AGENTS_DIR}\n` +
-      `This can happen with bundled builds. Install from source or npm instead.`
+      `This can happen with bundled builds. Install from source checkout or binary release package.`
     );
     process.exit(1);
   }
