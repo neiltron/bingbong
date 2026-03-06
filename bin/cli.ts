@@ -8,7 +8,8 @@
 
 import { startServer } from "../src/server";
 
-const VERSION = "0.1.0";
+// Keep in sync with package.json version (release helper enforces parity for tags/package files).
+const VERSION = "0.1.1";
 
 interface Args {
   port: number;
