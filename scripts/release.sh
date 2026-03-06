@@ -77,6 +77,9 @@ fi
 new_version="$(node -p "require('./package.json').version")"
 tag="v${new_version}"
 
+echo "[release] verifying version parity"
+scripts/check-version-parity.sh "$tag"
+
 echo "[release] pushing main + tag $tag"
 git push origin main
 git push origin "$tag"
