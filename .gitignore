@@ -3,3 +3,8 @@ node_modules
 client/dist/
 .cursor
 docs
+
+# Local notes / QA artifacts
+*.local.md
+test-results/
+todos/
