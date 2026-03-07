@@ -44,12 +44,13 @@ export interface Position {
   y: number
 }
 
-export interface Particle {
+export interface PulseRing {
   x: number
   y: number
-  vx: number
-  vy: number
-  size: number
+  radius: number
+  growthRate: number
+  maxRadius: number
+  lineWidth: number
   color: string
   alpha: number
   lifetime: number

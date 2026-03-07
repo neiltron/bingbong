@@ -82,7 +82,9 @@ function updateUI(): void {
           'aria-hidden': 'true',
         }),
         createElement('div', { class: 'session-info' }, [
-          createElement('div', { class: 'session-id' }, [s.session_id.slice(0, 12) + '...']),
+          createElement('div', { class: 'session-id', title: s.session_id }, [
+            s.session_id.slice(0, 12) + '...',
+          ]),
           createElement('div', { class: 'session-meta' }, [
             `${s.machine_id || 'Unknown'} • ${s.event_count || 0} events`,
           ]),
