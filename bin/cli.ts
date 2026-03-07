@@ -6,9 +6,11 @@
  * Unified command to run the Bingbong server and client.
  */
 
-import { startServer } from "../src/server";
+import { startServer, type RuntimeLogger } from "../src/server";
 
 const VERSION = "0.1.3";
+
+let activeLogger: RuntimeLogger | null = null;
 
 interface Args {
   port: number;
@@ -163,17 +165,20 @@ async function main() {
   }
 
   // Start the server
-  const server = await startServer(args.port);
+  const { server, logger } = await startServer(args.port);
+  activeLogger = logger;
 
   // Handle graceful shutdown
   process.on("SIGINT", () => {
-    console.log("\nShutting down...");
+    logger.info("Shutting down...");
+    logger.dispose();
     server.stop();
     process.exit(0);
   });
 
   process.on("SIGTERM", () => {
-    console.log("\nShutting down...");
+    logger.info("Shutting down...");
+    logger.dispose();
     server.stop();
     process.exit(0);
   });
@@ -181,12 +186,18 @@ async function main() {
   // Open browser if requested
   if (args.open) {
     const url = `http://localhost:${args.port}`;
-    console.log(`Opening browser...`);
+    logger.info("Opening browser...");
     openBrowser(url);
   }
 }
 
 main().catch((err) => {
-  console.error("Fatal error:", err);
+  if (activeLogger) {
+    activeLogger.error("Fatal error:", err);
+    activeLogger.dispose();
+  } else {
+    console.error("Fatal error:", err);
+  }
+
   process.exit(1);
 });

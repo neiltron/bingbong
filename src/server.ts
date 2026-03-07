@@ -8,6 +8,15 @@
 import clientIndex from "../client/index.html";
 
 const VERSION = "0.1.3";
+const MAX_EVENT_LOG_LINES = 1000;
+
+interface RuntimeLogger {
+  info(message: string): void;
+  error(message: string, err?: unknown): void;
+  dispose(): void;
+}
+
+export type { RuntimeLogger };
 
 // Types
 interface BingbongEvent {
@@ -37,6 +46,206 @@ interface Session {
   pan: number;
   index: number;
   color: string;
+}
+
+interface StartServerResult {
+  server: Bun.Server;
+  logger: RuntimeLogger;
+}
+
+class PlainLogger implements RuntimeLogger {
+  info(message: string) {
+    console.log(message);
+  }
+
+  error(message: string, err?: unknown) {
+    if (err !== undefined) {
+      console.error(message, err);
+      return;
+    }
+
+    console.error(message);
+  }
+
+  dispose() {}
+}
+
+class TerminalLayoutLogger implements RuntimeLogger {
+  private readonly isInteractive: boolean;
+  private readonly maxLines: number;
+  private readonly headerLines: string[];
+  private readonly resizeHandler: (() => void) | null;
+  private logLines: string[] = [];
+  private plainMode: boolean;
+
+  constructor(headerLines: string[], maxLines = MAX_EVENT_LOG_LINES) {
+    this.headerLines = headerLines;
+    this.maxLines = maxLines;
+    this.isInteractive = Boolean(process.stdout.isTTY);
+    this.plainMode = !this.isInteractive;
+
+    if (this.plainMode) {
+      this.writePlainHeader();
+      this.resizeHandler = null;
+      return;
+    }
+
+    this.resizeHandler = () => {
+      this.render();
+    };
+
+    process.stdout.on("resize", this.resizeHandler);
+    this.render();
+  }
+
+  info(message: string) {
+    this.writeMessage(message, "stdout");
+  }
+
+  error(message: string, err?: unknown) {
+    const fullMessage =
+      err === undefined
+        ? message
+        : `${message} ${this.formatUnknownError(err)}`;
+
+    this.writeMessage(fullMessage, "stderr");
+  }
+
+  dispose() {
+    if (this.resizeHandler) {
+      process.stdout.removeListener("resize", this.resizeHandler);
+    }
+
+    if (this.isInteractive && !this.plainMode) {
+      process.stdout.write("\x1b[?25h");
+    }
+  }
+
+  private writeMessage(message: string, target: "stdout" | "stderr") {
+    const lines = this.normalizeMessageLines(message);
+
+    if (this.plainMode) {
+      this.writePlainLines(lines, target);
+      return;
+    }
+
+    this.logLines.push(...lines);
+    if (this.logLines.length > this.maxLines) {
+      this.logLines = this.logLines.slice(-this.maxLines);
+    }
+
+    this.render();
+  }
+
+  private render() {
+    if (this.plainMode) return;
+
+    const rows = process.stdout.rows ?? 24;
+    const cols = process.stdout.columns ?? 80;
+
+    // Very small terminal: degrade to plain append-only mode.
+    if (rows <= this.headerLines.length + 1) {
+      this.switchToPlainMode();
+      return;
+    }
+
+    const viewportRows = rows - this.headerLines.length;
+    const visibleLogs = this.logLines.slice(-viewportRows);
+    const paddingRows = Math.max(0, viewportRows - visibleLogs.length);
+
+    const lines: string[] = [];
+    lines.push(...this.headerLines.map((line) => this.fitToWidth(line, cols)));
+    lines.push(...visibleLogs.map((line) => this.fitToWidth(line, cols)));
+    for (let i = 0; i < paddingRows; i++) {
+      lines.push("");
+    }
+
+    let output = "\x1b[?25l\x1b[2J\x1b[H";
+    output += lines.join("\n");
+    output += "\x1b[?25h";
+
+    process.stdout.write(output);
+  }
+
+  private switchToPlainMode() {
+    this.plainMode = true;
+
+    if (this.resizeHandler) {
+      process.stdout.removeListener("resize", this.resizeHandler);
+    }
+
+    process.stdout.write("\x1b[?25h\x1b[2J\x1b[H");
+    this.writePlainHeader();
+    this.writePlainLines(this.logLines, "stdout");
+  }
+
+  private writePlainHeader() {
+    this.writePlainLines(this.headerLines, "stdout");
+  }
+
+  private writePlainLines(lines: string[], target: "stdout" | "stderr") {
+    const stream = target === "stderr" ? process.stderr : process.stdout;
+    for (const line of lines) {
+      stream.write(`${line}\n`);
+    }
+  }
+
+  private fitToWidth(line: string, width: number): string {
+    if (width <= 0) return "";
+    if (line.length <= width) return line;
+    if (width === 1) return "…";
+    return `${line.slice(0, width - 1)}…`;
+  }
+
+  private normalizeMessageLines(message: string): string[] {
+    const rawLines = message.split(/\r?\n/);
+    return rawLines.map((line) => this.sanitizeLine(line));
+  }
+
+  private sanitizeLine(line: string): string {
+    // Strip control characters to avoid terminal escape sequence injection in logs.
+    return line
+      .replace(/\x1B\[[0-9;?]*[A-Za-z]/g, "")
+      .replace(/[\x00-\x08\x0B-\x1F\x7F]/g, "");
+  }
+
+  private formatUnknownError(err: unknown): string {
+    if (err instanceof Error) {
+      return `${err.name}: ${err.message}`;
+    }
+
+    if (typeof err === "string") {
+      return err;
+    }
+
+    try {
+      return JSON.stringify(err);
+    } catch {
+      return String(err);
+    }
+  }
+}
+
+function createBannerLines(port: number): string[] {
+  return [
+    "╔═══════════════════════════════════════════════════╗",
+    `║               Bingbong v${VERSION}                   ║`,
+    "╠═══════════════════════════════════════════════════╣",
+    `║  Client:    http://localhost:${port.toString().padEnd(5)}               ║`,
+    `║  WebSocket: ws://localhost:${port.toString().padEnd(5)}/ws             ║`,
+    `║  Events:    POST http://localhost:${port.toString().padEnd(5)}/events  ║`,
+    "╚═══════════════════════════════════════════════════╝",
+  ];
+}
+
+let runtimeLogger: RuntimeLogger = new PlainLogger();
+
+function logInfo(message: string) {
+  runtimeLogger.info(message);
+}
+
+function logError(message: string, err?: unknown) {
+  runtimeLogger.error(message, err);
 }
 
 // Session registry
@@ -83,7 +292,7 @@ function getOrCreateSession(event: BingbongEvent): Session {
     };
     sessions.set(key, session);
 
-    console.log(
+    logInfo(
       `[Session] New session: ${key} (index=${index}, pan=${session.pan.toFixed(2)})`,
     );
   }
@@ -111,7 +320,7 @@ function broadcast(event: EnrichedEvent) {
     try {
       client.send(message);
     } catch (err) {
-      console.error("[WS] Failed to send:", err);
+      logError("[WS] Failed to send:", err);
       wsClients.delete(client);
     }
   }
@@ -124,25 +333,16 @@ setInterval(() => {
 
   for (const [key, session] of sessions) {
     if (now - session.last_seen.getTime() > staleThreshold) {
-      console.log(`[Session] Removing stale session: ${key}`);
+      logInfo(`[Session] Removing stale session: ${key}`);
       sessions.delete(key);
     }
   }
 }, 60 * 1000);
 
-function printBanner(port: number) {
-  console.log(`
-╔═══════════════════════════════════════════════════╗
-║               Bingbong v${VERSION}                   ║
-╠═══════════════════════════════════════════════════╣
-║  Client:    http://localhost:${port.toString().padEnd(5)}               ║
-║  WebSocket: ws://localhost:${port.toString().padEnd(5)}/ws             ║
-║  Events:    POST http://localhost:${port.toString().padEnd(5)}/events  ║
-╚═══════════════════════════════════════════════════╝
-`);
-}
+export async function startServer(port: number): Promise<StartServerResult> {
+  const logger = new TerminalLayoutLogger(createBannerLines(port));
+  runtimeLogger = logger;
 
-export async function startServer(port: number) {
   const server = Bun.serve({
     port,
     routes: {
@@ -179,7 +379,7 @@ export async function startServer(port: number) {
           const event = (await req.json()) as BingbongEvent;
           const enriched = enrichEvent(event);
 
-          console.log(
+          logInfo(
             `[Event] ${enriched.event_type} | session=${enriched.session_id.slice(0, 8)} | tool=${enriched.tool_name || "n/a"}`,
           );
 
@@ -189,7 +389,7 @@ export async function startServer(port: number) {
             headers: { "Content-Type": "application/json", ...corsHeaders },
           });
         } catch (err) {
-          console.error("[HTTP] Error processing event:", err);
+          logError("[HTTP] Error processing event:", err);
           return new Response(JSON.stringify({ error: "Invalid JSON" }), {
             status: 400,
             headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -235,7 +435,7 @@ export async function startServer(port: number) {
     websocket: {
       open(ws) {
         wsClients.add(ws);
-        console.log(`[WS] Client connected (total: ${wsClients.size})`);
+        logInfo(`[WS] Client connected (total: ${wsClients.size})`);
 
         // Send current sessions to new client
         const sessionList = Array.from(sessions.values());
@@ -249,17 +449,15 @@ export async function startServer(port: number) {
 
       close(ws) {
         wsClients.delete(ws);
-        console.log(`[WS] Client disconnected (total: ${wsClients.size})`);
+        logInfo(`[WS] Client disconnected (total: ${wsClients.size})`);
       },
 
-      message(ws, message) {
+      message(_ws, message) {
         // Handle any client messages if needed
-        console.log(`[WS] Received: ${message}`);
+        logInfo(`[WS] Received: ${String(message)}`);
       },
     },
   });
 
-  printBanner(port);
-
-  return server;
+  return { server, logger };
 }
