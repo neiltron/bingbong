@@ -58,6 +58,20 @@ function createElement<K extends keyof HTMLElementTagNameMap>(
   return el
 }
 
+function truncateMiddle(value: string, maxLength: number): string {
+  if (value.length <= maxLength) return value
+  if (maxLength <= 1) return '…'
+
+  const keepLeft = Math.ceil((maxLength - 1) / 2)
+  const keepRight = Math.floor((maxLength - 1) / 2)
+  return `${value.slice(0, keepLeft)}…${value.slice(-keepRight)}`
+}
+
+function eventSessionLabel(event: EnrichedEvent): string {
+  if (event.machine_id && event.session_id) return `${event.machine_id}:${event.session_id}`
+  return event.session_id || event.machine_id || 'unknown'
+}
+
 // ============================================
 // UI Updates
 // ============================================
@@ -82,7 +96,9 @@ function updateUI(): void {
           'aria-hidden': 'true',
         }),
         createElement('div', { class: 'session-info' }, [
-          createElement('div', { class: 'session-id' }, [s.session_id.slice(0, 12) + '...']),
+          createElement('div', { class: 'session-id', title: s.session_id }, [
+            truncateMiddle(s.session_id, 24),
+          ]),
           createElement('div', { class: 'session-meta' }, [
             `${s.machine_id || 'Unknown'} • ${s.event_count || 0} events`,
           ]),
@@ -114,23 +130,33 @@ function updateUI(): void {
 
   logEl.innerHTML = ''
 
+  logEl.appendChild(
+    createElement('div', { class: 'event-header', role: 'presentation' }, [
+      createElement('span', { class: 'event-col event-col-header' }, ['Event']),
+      createElement('span', { class: 'event-col event-col-header' }, ['Tool']),
+      createElement('span', { class: 'event-col event-col-header' }, ['Session']),
+    ])
+  )
+
   if (eventLog.length === 0) {
     logEl.appendChild(createElement('div', { class: 'empty-state' }, ['Waiting for events...']))
   } else {
     const recentEvents = eventLog.slice(-MAX_LOG_ITEMS).reverse()
     for (const e of recentEvents) {
-      const eventChildren: (Node | string)[] = [
-        createElement('span', { class: 'event-type' }, [e.event_type || 'Unknown']),
+      const fullSession = eventSessionLabel(e)
+      const rowChildren: (Node | string)[] = [
+        createElement('span', { class: 'event-col event-event', title: e.event_type || 'Unknown' }, [
+          e.event_type || 'Unknown',
+        ]),
+        createElement('span', { class: 'event-col event-tool', title: e.tool_name || 'n/a' }, [
+          e.tool_name || 'n/a',
+        ]),
+        createElement('span', { class: 'event-col event-session', title: fullSession }, [
+          truncateMiddle(fullSession, 44),
+        ]),
       ]
-      if (e.tool_name) {
-        eventChildren.push(createElement('span', { class: 'event-tool' }, [e.tool_name]))
-      }
-      eventChildren.push(
-        createElement('span', { class: 'event-time' }, [
-          e.timestamp ? new Date(e.timestamp).toLocaleTimeString() : '',
-        ])
-      )
-      logEl.appendChild(createElement('div', { class: 'event-item' }, eventChildren))
+
+      logEl.appendChild(createElement('div', { class: 'event-row' }, rowChildren))
     }
   }
 }

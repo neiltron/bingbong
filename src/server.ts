@@ -179,7 +179,7 @@ class OpenTuiLogger implements RuntimeLogger {
             border: true,
             borderStyle: "single",
             borderColor: "#374151",
-            title: " Event Log ",
+            title: " Events ",
             paddingX: 1,
             paddingY: 0,
             overflow: "hidden",
@@ -195,7 +195,11 @@ class OpenTuiLogger implements RuntimeLogger {
   }
 
   private pushLines(message: string) {
-    const lines = message.split(/\r?\n/).map(sanitizeForTerminal);
+    const lines = message
+      .split(/\r?\n/)
+      .map(sanitizeForTerminal)
+      .filter((line) => line.length > 0);
+
     this.logLines.push(...lines);
 
     if (this.logLines.length > MAX_EVENT_LOG_LINES) {
@@ -207,20 +211,101 @@ class OpenTuiLogger implements RuntimeLogger {
 
   private render() {
     const rows = process.stdout.rows ?? 24;
+    const cols = process.stdout.columns ?? 80;
     const chromeRows = this.headerLines.length + 4; // two panel borders + room for title.
-    const maxVisible = Math.max(1, rows - chromeRows);
+    const maxVisible = Math.max(1, rows - chromeRows - 2); // reserve header + divider rows.
     const visibleLines = this.logLines.slice(-maxVisible);
+
+    const { eventWidth, toolWidth, sessionWidth } = this.columnWidths(cols);
+    const header = `${this.padRight("Event", eventWidth)} | ${this.padRight("Tool", toolWidth)} | ${this.padRight("Session", sessionWidth)}`;
+    const divider = `${"-".repeat(eventWidth)}-+-${"-".repeat(toolWidth)}-+-${"-".repeat(sessionWidth)}`;
+
+    const body = visibleLines.length
+      ? visibleLines.map((line) => this.formatTableRow(line, eventWidth, toolWidth, sessionWidth))
+      : [this.padRight("Waiting for events...", eventWidth + toolWidth + sessionWidth + 6)];
 
     const logText = this.renderer.root.findDescendantById(
       "bingbong-tui-log-text"
     );
     if (logText instanceof TextRenderable) {
-      logText.content = visibleLines.length
-        ? visibleLines.join("\n")
-        : "Waiting for events...";
+      logText.content = [header, divider, ...body].join("\n");
     }
 
     this.renderer.requestRender();
+  }
+
+  private columnWidths(cols: number): {
+    eventWidth: number;
+    toolWidth: number;
+    sessionWidth: number;
+  } {
+    const minCols = Math.max(cols, 40);
+    const eventWidth = Math.max(10, Math.min(16, Math.floor(minCols * 0.22)));
+    const toolWidth = Math.max(8, Math.min(14, Math.floor(minCols * 0.16)));
+    const sessionWidth = Math.max(10, minCols - eventWidth - toolWidth - 6);
+    return { eventWidth, toolWidth, sessionWidth };
+  }
+
+  private formatTableRow(
+    line: string,
+    eventWidth: number,
+    toolWidth: number,
+    sessionWidth: number
+  ): string {
+    const parsed = this.parseLogLine(line);
+
+    return [
+      this.padRight(this.truncate(parsed.event, eventWidth), eventWidth),
+      this.padRight(this.truncate(parsed.tool, toolWidth), toolWidth),
+      this.padRight(this.truncateMiddle(parsed.session, sessionWidth), sessionWidth),
+    ].join(" | ");
+  }
+
+  private parseLogLine(line: string): {
+    event: string;
+    tool: string;
+    session: string;
+  } {
+    const eventMatch = line.match(/^\[Event\]\s+(.+?)\s+\|\s+session=(.+?)\s+\|\s+tool=(.+)$/);
+    if (eventMatch) {
+      return {
+        event: eventMatch[1].trim(),
+        tool: eventMatch[3].trim() || "n/a",
+        session: eventMatch[2].trim(),
+      };
+    }
+
+    const sessionNewMatch = line.match(/^\[Session\]\s+New session:\s+(.+?)\s+\(index=/);
+    if (sessionNewMatch) {
+      return { event: "SessionNew", tool: "-", session: sessionNewMatch[1].trim() };
+    }
+
+    const sessionDropMatch = line.match(/^\[Session\]\s+Removing stale session:\s+(.+)$/);
+    if (sessionDropMatch) {
+      return { event: "SessionDrop", tool: "-", session: sessionDropMatch[1].trim() };
+    }
+
+    return { event: "System", tool: "-", session: line };
+  }
+
+  private truncate(value: string, maxLength: number): string {
+    if (value.length <= maxLength) return value;
+    if (maxLength <= 1) return "…";
+    return `${value.slice(0, maxLength - 1)}…`;
+  }
+
+  private truncateMiddle(value: string, maxLength: number): string {
+    if (value.length <= maxLength) return value;
+    if (maxLength <= 1) return "…";
+
+    const keepLeft = Math.ceil((maxLength - 1) / 2);
+    const keepRight = Math.floor((maxLength - 1) / 2);
+    return `${value.slice(0, keepLeft)}…${value.slice(-keepRight)}`;
+  }
+
+  private padRight(value: string, width: number): string {
+    if (value.length >= width) return value;
+    return `${value}${" ".repeat(width - value.length)}`;
   }
 }
 
@@ -432,7 +517,7 @@ export async function startServer(port: number): Promise<StartServerResult> {
           const enriched = enrichEvent(event);
 
           logInfo(
-            `[Event] ${enriched.event_type} | session=${enriched.session_id.slice(0, 8)} | tool=${enriched.tool_name || "n/a"}`
+            `[Event] ${enriched.event_type} | session=${enriched.machine_id}:${enriched.session_id} | tool=${enriched.tool_name || "n/a"}`
           );
 
           broadcast(enriched);
