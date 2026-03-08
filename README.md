@@ -111,7 +111,9 @@ BINGBONG_MACHINE_ID=my-laptop
 **No sounds?**
 - Click "Connect" in browser
 - Verify server is running on port 3334
-- Click anywhere on page (browsers require user interaction for audio)
+- Verify your machine has a supported audio command:
+  - macOS: `afplay`
+  - Linux: `ffplay` or `aplay`
 
 **Hooks not firing?**
 - Re-run `bingbong install-hooks <agent>` to refresh config
@@ -130,9 +132,11 @@ BINGBONG_MACHINE_ID=my-laptop
 
 Simple three-tier design:
 
-**Agent Hooks** → emit events via HTTP → **Server** (session tracking, spatial assignment) → WebSocket → **Client** (Web Audio synthesis + visualization)
+**Agent Hooks** → emit events via HTTP → **Server** (session tracking + audio synthesis + parameter application) → WebSocket → **Client** (visualization + audio configurator)
 
-Each agent has hooks that fire on tool use, session start/stop, and other events. The server assigns each session a stereo position and broadcasts enriched events to connected clients, which render audio in real-time.
+Each agent has hooks that fire on tool use, session start/stop, and other events. The server assigns each session a stereo position, applies global/per-session audio parameters, renders audio, and broadcasts enriched events to connected clients. The browser stays visually unchanged and sends config updates (volume/reverb/mute + per-session 2D position).
+
+See [Node Audio Engine Configurator guide](docs/guides/NODE_AUDIO_ENGINE_CONFIGURATOR.md) for message contracts and runtime details.
 
 ## Event Types
 
@@ -168,8 +172,8 @@ Events are normalized across agents:
 
 ```
 bin/                     # CLI entry point
-src/                     # Server source code
-client/                  # Web Audio client (Vite build)
+src/                     # Server source code + node-owned audio engine
+client/                  # Browser visualizer + audio configurator UI
 agents/
   claude/hooks/          # Claude Code hook scripts
   cursor/                # Cursor hooks + installer
