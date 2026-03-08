@@ -1,6 +1,12 @@
 import './styles/main.css'
-import type { EnrichedEvent, Session } from './types'
-import { AudioEngine } from './audio-engine'
+import type {
+  ClientAudioControlMessage,
+  EnrichedEvent,
+  GlobalAudioConfig,
+  InitPayload,
+  Session,
+  SessionPosition,
+} from './types'
 import { createVisualization, type SourceOverlay, type Visualizer } from './visualizer'
 
 // ============================================
@@ -9,12 +15,15 @@ import { createVisualization, type SourceOverlay, type Visualizer } from './visu
 const sessions = new Map<string, Session>()
 const eventLog: EnrichedEvent[] = []
 const MAX_LOG_ITEMS = 50
+const AUDIO_CONFIG_STORAGE_KEY = 'bingbong:audio-config:v1'
 
 let ws: WebSocket | null = null
-let audioEngine: AudioEngine
 let visualizer: Visualizer
 let sourceOverlay: SourceOverlay
-let audioInitFailed = false
+
+const loadedAudioConfig = loadAudioConfig()
+let audioConfig = loadedAudioConfig.config
+const hasStoredAudioConfig = loadedAudioConfig.fromStorage
 
 // ============================================
 // DOM cache - populated once on DOMContentLoaded
@@ -56,6 +65,120 @@ function createElement<K extends keyof HTMLElementTagNameMap>(
     }
   }
   return el
+}
+
+function clampUnit(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  return Math.max(0, Math.min(1, value))
+}
+
+function loadAudioConfig(): { config: GlobalAudioConfig; fromStorage: boolean } {
+  const fallback: GlobalAudioConfig = {
+    volume: 0.7,
+    reverb: 0.3,
+    muted: false,
+  }
+
+  try {
+    const raw = localStorage.getItem(AUDIO_CONFIG_STORAGE_KEY)
+    if (!raw) return { config: fallback, fromStorage: false }
+
+    const parsed = JSON.parse(raw) as Partial<GlobalAudioConfig>
+    return {
+      config: {
+        volume: clampUnit(typeof parsed.volume === 'number' ? parsed.volume : fallback.volume),
+        reverb: clampUnit(typeof parsed.reverb === 'number' ? parsed.reverb : fallback.reverb),
+        muted: typeof parsed.muted === 'boolean' ? parsed.muted : fallback.muted,
+      },
+      fromStorage: true,
+    }
+  } catch {
+    return { config: fallback, fromStorage: false }
+  }
+}
+
+function saveAudioConfig(): void {
+  localStorage.setItem(AUDIO_CONFIG_STORAGE_KEY, JSON.stringify(audioConfig))
+}
+
+function renderAudioControls(): void {
+  if (DOM.volumeInput) {
+    const volumePct = Math.round(audioConfig.volume * 100)
+    DOM.volumeInput.value = String(volumePct)
+    DOM.volumeInput.setAttribute('aria-valuenow', String(volumePct))
+  }
+
+  if (DOM.reverbInput) {
+    const reverbPct = Math.round(audioConfig.reverb * 100)
+    DOM.reverbInput.value = String(reverbPct)
+    DOM.reverbInput.setAttribute('aria-valuenow', String(reverbPct))
+  }
+
+  if (DOM.muteBtn) {
+    DOM.muteBtn.textContent = audioConfig.muted ? 'Unmute' : 'Mute'
+    DOM.muteBtn.classList.toggle('muted', audioConfig.muted)
+    DOM.muteBtn.setAttribute('aria-pressed', String(audioConfig.muted))
+  }
+}
+
+function setServerAudioAvailability(enabled: boolean, reason: string | null = null): void {
+  const muteBtn = DOM.muteBtn
+  const statusText = DOM.statusText
+
+  if (!muteBtn || !statusText) return
+
+  if (!enabled) {
+    muteBtn.disabled = true
+    muteBtn.setAttribute('aria-disabled', 'true')
+    muteBtn.textContent = 'Audio unavailable'
+    muteBtn.title = reason || 'Server audio backend is unavailable'
+
+    if (DOM.statusDot?.classList.contains('connected')) {
+      statusText.textContent = 'Connected (server audio unavailable)'
+    }
+
+    return
+  }
+
+  muteBtn.disabled = false
+  muteBtn.removeAttribute('aria-disabled')
+  muteBtn.removeAttribute('title')
+
+  if (DOM.statusDot?.classList.contains('connected')) {
+    statusText.textContent = 'Connected'
+  }
+
+  renderAudioControls()
+}
+
+function sendControlMessage(message: ClientAudioControlMessage): void {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return
+  ws.send(JSON.stringify(message))
+}
+
+function pushGlobalAudioConfig(): void {
+  sendControlMessage({
+    type: 'audio_config:update',
+    config: {
+      volume: audioConfig.volume,
+      reverb: audioConfig.reverb,
+      muted: audioConfig.muted,
+    },
+  })
+}
+
+function pushSessionPosition(sessionKey: string, position: SessionPosition): void {
+  sendControlMessage({
+    type: 'session_config:update',
+    session_key: sessionKey,
+    position,
+  })
+}
+
+function pushAllSessionPositions(): void {
+  for (const [sessionKey, source] of sourceOverlay.sources) {
+    pushSessionPosition(sessionKey, source.pos)
+  }
 }
 
 // ============================================
@@ -169,10 +292,7 @@ function handleEvent(event: EnrichedEvent): void {
     eventLog.splice(0, MAX_LOG_ITEMS)
   }
 
-  // Play sound
-  audioEngine.playEvent(event)
-
-  // Visualize (pass sessionKey for particle positioning)
+  // Visualize (pass sessionKey for pulse positioning)
   visualizer?.addEvent(event, sessionKey)
 
   // Update UI
@@ -182,8 +302,8 @@ function handleEvent(event: EnrichedEvent): void {
 // ============================================
 // WebSocket Connection
 // ============================================
-async function connect(): Promise<void> {
-  const { connectBtn: btn, statusDot: dot, statusText: text, muteBtn } = DOM
+function connect(): void {
+  const { connectBtn: btn, statusDot: dot, statusText: text } = DOM
   if (!btn || !dot || !text) return
 
   btn.disabled = true
@@ -191,46 +311,52 @@ async function connect(): Promise<void> {
   dot.setAttribute('aria-label', 'Connection status: connecting')
 
   try {
-    // Initialize audio (requires user gesture)
-    try {
-      await audioEngine.init()
-      audioInitFailed = false
-    } catch {
-      audioInitFailed = true
-      // Continue without audio - show warning but don't block connection
-      if (muteBtn) {
-        muteBtn.textContent = 'Audio unavailable'
-        muteBtn.disabled = true
-        muteBtn.setAttribute('aria-disabled', 'true')
-      }
-    }
-
-    // Use protocol-aware WebSocket URL
     const protocol = location.protocol === 'https:' ? 'wss' : 'ws'
     ws = new WebSocket(`${protocol}://${location.host}/ws`)
 
     ws.onopen = () => {
       dot.classList.add('connected')
       dot.setAttribute('aria-label', 'Connection status: connected')
-      text.textContent = audioInitFailed ? 'Connected (no audio)' : 'Connected'
+      text.textContent = 'Connected'
       btn.textContent = 'Disconnect'
       btn.disabled = false
+
+      // Browser remains the configurator source of truth.
+      pushGlobalAudioConfig()
+      pushAllSessionPositions()
     }
 
     ws.onmessage = (msg) => {
       try {
         const data = JSON.parse(msg.data)
 
-        // Handle init message with existing sessions
+        // Handle init message with existing sessions and server audio status
         if (data.type === 'init' && data.sessions) {
-          data.sessions.forEach((s: Session) => {
+          const initData = data as InitPayload
+
+          if (!hasStoredAudioConfig && initData.audio_config) {
+            audioConfig = {
+              volume: clampUnit(initData.audio_config.volume),
+              reverb: clampUnit(initData.audio_config.reverb),
+              muted: Boolean(initData.audio_config.muted),
+            }
+            saveAudioConfig()
+            renderAudioControls()
+            pushGlobalAudioConfig()
+          }
+
+          if (initData.audio_engine) {
+            setServerAudioAvailability(initData.audio_engine.enabled, initData.audio_engine.reason)
+          }
+
+          initData.sessions.forEach((s: Session) => {
             sessions.set(s.session_id, s)
             visualizer?.updateSession(s)
-            // Create source overlay for existing session
             if (sourceOverlay) {
               sourceOverlay.createSource(s)
             }
           })
+
           updateUI()
           return
         }
@@ -286,14 +412,17 @@ document.addEventListener('DOMContentLoaded', () => {
   DOM.volumeInput = document.getElementById('volume') as HTMLInputElement
   DOM.reverbInput = document.getElementById('reverb') as HTMLInputElement
 
-  // Initialize audio engine
-  audioEngine = new AudioEngine()
+  renderAudioControls()
 
   // Initialize visualizer and source overlay
   const canvas = document.getElementById('visualizer') as HTMLCanvasElement
   const spatialContainer = document.getElementById('spatial-container') as HTMLElement
 
-  const viz = createVisualization(spatialContainer, canvas, audioEngine)
+  const viz = createVisualization(spatialContainer, canvas, {
+    onSourceReady: (sessionKey, position) => pushSessionPosition(sessionKey, position),
+    onSourceMoved: (sessionKey, position) => pushSessionPosition(sessionKey, position),
+  })
+
   visualizer = viz.visualizer
   sourceOverlay = viz.sourceOverlay
 
@@ -309,24 +438,30 @@ document.addEventListener('DOMContentLoaded', () => {
   // Volume control
   DOM.volumeInput?.addEventListener('input', (e) => {
     const target = e.target as HTMLInputElement
-    audioEngine.setVolume(parseInt(target.value) / 100)
+    audioConfig.volume = clampUnit(parseInt(target.value, 10) / 100)
+    saveAudioConfig()
     target.setAttribute('aria-valuenow', target.value)
+    sendControlMessage({ type: 'audio_config:update', config: { volume: audioConfig.volume } })
   })
 
   // Reverb control
   DOM.reverbInput?.addEventListener('input', (e) => {
     const target = e.target as HTMLInputElement
-    audioEngine.setReverb(parseInt(target.value) / 100)
+    audioConfig.reverb = clampUnit(parseInt(target.value, 10) / 100)
+    saveAudioConfig()
     target.setAttribute('aria-valuenow', target.value)
+    sendControlMessage({ type: 'audio_config:update', config: { reverb: audioConfig.reverb } })
   })
 
   // Mute button
   DOM.muteBtn?.addEventListener('click', (e) => {
     const target = e.target as HTMLButtonElement
-    const muted = audioEngine.toggleMute()
-    target.textContent = muted ? 'Unmute' : 'Mute'
-    target.classList.toggle('muted', muted)
-    target.setAttribute('aria-pressed', String(muted))
+    if (target.disabled) return
+
+    audioConfig.muted = !audioConfig.muted
+    saveAudioConfig()
+    renderAudioControls()
+    sendControlMessage({ type: 'audio_config:update', config: { muted: audioConfig.muted } })
   })
 
   // Reset layout button

@@ -1,5 +1,4 @@
 import type { EnrichedEvent, Session, PulseRing, Position } from './types'
-import type { AudioEngine } from './audio-engine'
 
 // ============================================
 // Position Manager - localStorage persistence
@@ -95,11 +94,17 @@ interface DragState {
   startPos: Position
 }
 
+export interface SourcePositionCallbacks {
+  onSourceReady?: (sessionKey: string, position: Position) => void
+  onSourceMoved?: (sessionKey: string, position: Position) => void
+  onSourceRemoved?: (sessionKey: string) => void
+}
+
 export class SourceOverlay {
   private container: HTMLElement
   private canvas: HTMLCanvasElement
   private positionManager: PositionManager
-  private audioEngine: AudioEngine
+  private callbacks: SourcePositionCallbacks
   sources = new Map<string, SourceData>()
   private selectedKey: string | null = null
   private dragState: DragState | null = null
@@ -109,12 +114,12 @@ export class SourceOverlay {
     container: HTMLElement,
     canvas: HTMLCanvasElement,
     positionManager: PositionManager,
-    audioEngine: AudioEngine
+    callbacks: SourcePositionCallbacks = {}
   ) {
     this.container = container
     this.canvas = canvas
     this.positionManager = positionManager
-    this.audioEngine = audioEngine
+    this.callbacks = callbacks
 
     // Global listeners for drag
     document.addEventListener('pointermove', (e) => this.onPointerMove(e))
@@ -170,10 +175,7 @@ export class SourceOverlay {
 
     this.container.appendChild(el)
     this.sources.set(key, { el, pos, session })
-
-    // Create panner and set initial position
-    this.audioEngine.createPannerForSession(key)
-    this.audioEngine.updatePannerPosition(key, pos.x, pos.y)
+    this.callbacks.onSourceReady?.(key, pos)
   }
 
   private setElementPosition(el: HTMLElement, normX: number, normY: number): void {
@@ -243,7 +245,7 @@ export class SourceOverlay {
     if (source) {
       source.pos = { x: normX, y: normY }
       this.setElementPosition(source.el, normX, normY)
-      this.audioEngine.updatePannerPosition(this.dragState.key, normX, normY)
+      this.callbacks.onSourceMoved?.(this.dragState.key, source.pos)
     }
   }
 
@@ -292,7 +294,7 @@ export class SourceOverlay {
     setTimeout(() => {
       source.el.remove()
       this.sources.delete(key)
-      this.audioEngine.removePannerForSession(key)
+      this.callbacks.onSourceRemoved?.(key)
     }, 1000)
 
     // Deselect if this was selected
@@ -310,7 +312,7 @@ export class SourceOverlay {
       const pos = this.positionManager.getPosition(key, this.sessionIndex++)
       source.pos = pos
       this.setElementPosition(source.el, pos.x, pos.y)
-      this.audioEngine.updatePannerPosition(key, pos.x, pos.y)
+      this.callbacks.onSourceMoved?.(key, pos)
       this.positionManager.savePosition(key, pos.x, pos.y)
     }
   }
@@ -555,11 +557,11 @@ export class Visualizer {
 export function createVisualization(
   container: HTMLElement,
   canvas: HTMLCanvasElement,
-  audioEngine: AudioEngine
+  callbacks: SourcePositionCallbacks = {}
 ): { visualizer: Visualizer; sourceOverlay: SourceOverlay } {
   const positionManager = new PositionManager()
   const visualizer = new Visualizer(canvas)
-  const sourceOverlay = new SourceOverlay(container, canvas, positionManager, audioEngine)
+  const sourceOverlay = new SourceOverlay(container, canvas, positionManager, callbacks)
   visualizer.sourceOverlay = sourceOverlay
 
   return { visualizer, sourceOverlay }

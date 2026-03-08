@@ -2,10 +2,14 @@
  * Bingbong Server
  *
  * Receives events from Claude Code hooks and broadcasts them
- * to connected frontend clients for audio rendering.
+ * to connected frontend clients for visualization.
+ *
+ * Audio rendering happens in this Node process.
  */
 
 import clientIndex from "../client/index.html";
+import { parseClientAudioControlMessage } from "./audio-control";
+import { ServerAudioEngine } from "./server-audio-engine";
 
 const VERSION = "0.1.0";
 
@@ -59,6 +63,7 @@ const SESSION_COLORS = [
 
 // WebSocket clients
 const wsClients = new Set<WebSocket>();
+const audioEngine = new ServerAudioEngine();
 
 function getOrCreateSession(event: BingbongEvent): Session {
   const key = `${event.machine_id}:${event.session_id}`;
@@ -117,6 +122,23 @@ function broadcast(event: EnrichedEvent) {
   }
 }
 
+function parseWsPayload(message: string | BufferSource): unknown {
+  if (typeof message === "string") {
+    return JSON.parse(message);
+  }
+
+  if (message instanceof ArrayBuffer) {
+    return JSON.parse(Buffer.from(message).toString("utf8"));
+  }
+
+  if (ArrayBuffer.isView(message)) {
+    const bytes = new Uint8Array(message.buffer, message.byteOffset, message.byteLength);
+    return JSON.parse(Buffer.from(bytes).toString("utf8"));
+  }
+
+  return null;
+}
+
 // Clean up stale sessions (no activity for 30 minutes)
 setInterval(() => {
   const now = Date.now();
@@ -126,6 +148,7 @@ setInterval(() => {
     if (now - session.last_seen.getTime() > staleThreshold) {
       console.log(`[Session] Removing stale session: ${key}`);
       sessions.delete(key);
+      audioEngine.removeSessionPosition(key);
     }
   }
 }, 60 * 1000);
@@ -143,6 +166,13 @@ function printBanner(port: number) {
 }
 
 export async function startServer(port: number) {
+  const audioStatus = audioEngine.getStatus();
+  if (audioStatus.enabled) {
+    console.log(`[Audio] Server audio engine enabled (${audioStatus.player})`);
+  } else {
+    console.warn(`[Audio] Disabled: ${audioStatus.reason}`);
+  }
+
   const server = Bun.serve({
     port,
     routes: {
@@ -183,6 +213,7 @@ export async function startServer(port: number) {
             `[Event] ${enriched.event_type} | session=${enriched.session_id.slice(0, 8)} | tool=${enriched.tool_name || "n/a"}`
           );
 
+          audioEngine.playEvent(enriched);
           broadcast(enriched);
 
           return new Response(JSON.stringify({ ok: true }), {
@@ -223,6 +254,7 @@ export async function startServer(port: number) {
             version: VERSION,
             sessions: sessions.size,
             clients: wsClients.size,
+            audio_engine: audioEngine.getStatus(),
           }),
           {
             headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -244,6 +276,9 @@ export async function startServer(port: number) {
           JSON.stringify({
             type: "init",
             sessions: sessionList,
+            audio_config: audioEngine.getGlobalConfig(),
+            session_positions: audioEngine.getSessionPositions(),
+            audio_engine: audioEngine.getStatus(),
           })
         );
       },
@@ -254,8 +289,25 @@ export async function startServer(port: number) {
       },
 
       message(ws, message) {
-        // Handle any client messages if needed
-        console.log(`[WS] Received: ${message}`);
+        try {
+          const payload = parseWsPayload(message);
+          const controlMessage = parseClientAudioControlMessage(payload);
+          if (!controlMessage) return;
+
+          if (controlMessage.type === "audio_config:update") {
+            audioEngine.applyGlobalConfigPatch(controlMessage.config);
+            return;
+          }
+
+          if (controlMessage.type === "session_config:update") {
+            audioEngine.upsertSessionPosition(
+              controlMessage.session_key,
+              controlMessage.position
+            );
+          }
+        } catch (error) {
+          console.warn("[WS] Ignoring malformed client control message:", error);
+        }
       },
     },
   });

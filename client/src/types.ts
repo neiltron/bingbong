@@ -17,6 +17,44 @@ export interface EnrichedEvent extends BingbongEvent {
   color: string
 }
 
+export interface GlobalAudioConfig {
+  volume: number
+  reverb: number
+  muted: boolean
+}
+
+export interface SessionPosition {
+  x: number
+  y: number
+}
+
+export interface AudioConfigUpdateMessage {
+  type: 'audio_config:update'
+  config: Partial<GlobalAudioConfig>
+}
+
+export interface SessionConfigUpdateMessage {
+  type: 'session_config:update'
+  session_key: string
+  position: SessionPosition
+}
+
+export type ClientAudioControlMessage = AudioConfigUpdateMessage | SessionConfigUpdateMessage
+
+export interface AudioEngineStatus {
+  enabled: boolean
+  reason: string | null
+  player: string | null
+}
+
+export interface InitPayload {
+  type: 'init'
+  sessions: Session[]
+  audio_config?: GlobalAudioConfig
+  session_positions?: Record<string, SessionPosition>
+  audio_engine?: AudioEngineStatus
+}
+
 export interface Session {
   session_id: string
   machine_id: string
