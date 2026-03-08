@@ -160,20 +160,31 @@ async function main() {
   const { server, logger } = await startServer(args.port);
   activeLogger = logger;
 
-  // Handle graceful shutdown
-  process.on("SIGINT", () => {
-    logger.info("Shutting down...");
-    logger.dispose();
-    server.stop();
-    process.exit(0);
-  });
+  let isShuttingDown = false;
+  const gracefulShutdown = (): void => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
 
-  process.on("SIGTERM", () => {
     logger.info("Shutting down...");
     logger.dispose();
     server.stop();
     process.exit(0);
-  });
+  };
+
+  // Handle graceful shutdown
+  process.on("SIGINT", gracefulShutdown);
+  process.on("SIGTERM", gracefulShutdown);
+
+  // In raw TTY mode (used by OpenTUI), Ctrl+C may be delivered as ETX byte
+  // rather than SIGINT. Handle both paths so Ctrl+C always exits.
+  if (process.stdin.isTTY) {
+    process.stdin.on("data", (chunk: Buffer | string) => {
+      const value = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+      if (value.includes("\u0003")) {
+        gracefulShutdown();
+      }
+    });
+  }
 
   // Open browser if requested
   if (args.open) {

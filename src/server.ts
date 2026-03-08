@@ -110,6 +110,17 @@ class OpenTuiLogger implements RuntimeLogger {
       useMouse: false,
       useAlternateScreen: false,
       useConsole: false,
+      // OpenTUI captures input in raw mode; manually forward Ctrl+C so CLI
+      // SIGINT handlers still run for graceful shutdown.
+      prependInputHandlers: [
+        (sequence: string) => {
+          if (sequence === "\u0003") {
+            process.kill(process.pid, "SIGINT");
+            return true;
+          }
+          return false;
+        },
+      ],
     });
 
     const logger = new OpenTuiLogger(renderer, headerLines);
