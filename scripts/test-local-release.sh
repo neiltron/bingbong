@@ -102,6 +102,9 @@ mkdir -p "$RELEASE_DOWNLOAD_DIR"
 PORT="$(pick_port)"
 
 echo "[test-local-release] workdir: $WORKDIR"
+echo "[test-local-release] installing deps for all target optional binaries..."
+bun install --frozen-lockfile --os='*' --cpu='*' >/dev/null || bun install --os='*' --cpu='*' >/dev/null
+
 echo "[test-local-release] building binaries..."
 
 TARGETS=(

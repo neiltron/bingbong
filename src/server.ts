@@ -6,8 +6,29 @@
  */
 
 import clientIndex from "../client/index.html";
+import {
+  Box,
+  Text,
+  TextRenderable,
+  createCliRenderer,
+  type CliRenderer,
+} from "@opentui/core";
 
 const VERSION = "0.1.0";
+const MAX_EVENT_LOG_LINES = 1000;
+
+interface RuntimeLogger {
+  info(message: string): void;
+  error(message: string, err?: unknown): void;
+  dispose(): void;
+}
+
+export type { RuntimeLogger };
+
+interface StartServerResult {
+  server: Bun.Server;
+  logger: RuntimeLogger;
+}
 
 // Types
 interface BingbongEvent {
@@ -37,6 +58,331 @@ interface Session {
   pan: number;
   index: number;
   color: string;
+}
+
+class PlainLogger implements RuntimeLogger {
+  constructor(private readonly headerLines: string[]) {
+    this.writeHeader();
+  }
+
+  info(message: string) {
+    console.log(this.sanitize(message));
+  }
+
+  error(message: string, err?: unknown) {
+    if (err !== undefined) {
+      console.error(this.sanitize(`${message} ${formatUnknownError(err)}`));
+      return;
+    }
+
+    console.error(this.sanitize(message));
+  }
+
+  dispose() {}
+
+  private writeHeader() {
+    for (const line of this.headerLines) {
+      console.log(line);
+    }
+  }
+
+  private sanitize(line: string): string {
+    return line
+      .replace(/\x1B\[[0-9;?]*[A-Za-z]/g, "")
+      .replace(/[\x00-\x08\x0B-\x1F\x7F]/g, "");
+  }
+}
+
+class OpenTuiLogger implements RuntimeLogger {
+  private readonly logLines: string[] = [];
+  private readonly resizeHandler: () => void;
+
+  private constructor(
+    private readonly renderer: CliRenderer,
+    private readonly headerLines: string[]
+  ) {
+    this.resizeHandler = () => this.render();
+  }
+
+  static async create(headerLines: string[]): Promise<OpenTuiLogger> {
+    const renderer = await createCliRenderer({
+      exitOnCtrlC: false,
+      useMouse: false,
+      useAlternateScreen: false,
+      useConsole: false,
+      // OpenTUI captures input in raw mode; manually forward Ctrl+C so CLI
+      // SIGINT handlers still run for graceful shutdown.
+      prependInputHandlers: [
+        (sequence: string) => {
+          if (sequence === "\u0003") {
+            process.kill(process.pid, "SIGINT");
+            return true;
+          }
+          return false;
+        },
+      ],
+    });
+
+    const logger = new OpenTuiLogger(renderer, headerLines);
+    logger.mountUi();
+    renderer.start();
+    process.stdout.on("resize", logger.resizeHandler);
+    logger.render();
+    return logger;
+  }
+
+  info(message: string) {
+    this.pushLines(message);
+  }
+
+  error(message: string, err?: unknown) {
+    const fullMessage =
+      err === undefined ? message : `${message} ${formatUnknownError(err)}`;
+    this.pushLines(fullMessage);
+  }
+
+  dispose() {
+    process.stdout.removeListener("resize", this.resizeHandler);
+    this.renderer.destroy();
+  }
+
+  private mountUi() {
+    this.renderer.root.add(
+      Box(
+        {
+          id: "bingbong-tui-root",
+          width: "100%",
+          height: "100%",
+          flexDirection: "column",
+        },
+        Box(
+          {
+            id: "bingbong-tui-header",
+            flexShrink: 0,
+            border: true,
+            borderStyle: "single",
+            borderColor: "#6b7280",
+            paddingX: 1,
+            paddingY: 0,
+          },
+          Text({
+            id: "bingbong-tui-header-text",
+            content: this.headerLines.join("\n"),
+            wrapMode: "none",
+          })
+        ),
+        Box(
+          {
+            id: "bingbong-tui-log-panel",
+            flexGrow: 1,
+            minHeight: 1,
+            border: true,
+            borderStyle: "single",
+            borderColor: "#374151",
+            title: " Events ",
+            paddingX: 1,
+            paddingY: 0,
+            overflow: "hidden",
+          },
+          Text({
+            id: "bingbong-tui-log-text",
+            content: "Waiting for events...",
+            wrapMode: "none",
+          })
+        )
+      )
+    );
+  }
+
+  private pushLines(message: string) {
+    const lines = message
+      .split(/\r?\n/)
+      .map(sanitizeForTerminal)
+      .filter((line) => line.length > 0);
+
+    this.logLines.push(...lines);
+
+    if (this.logLines.length > MAX_EVENT_LOG_LINES) {
+      this.logLines.splice(0, this.logLines.length - MAX_EVENT_LOG_LINES);
+    }
+
+    this.render();
+  }
+
+  private render() {
+    const rows = process.stdout.rows ?? 24;
+    const cols = process.stdout.columns ?? 80;
+    const chromeRows = this.headerLines.length + 4; // two panel borders + room for title.
+    const maxVisible = Math.max(1, rows - chromeRows - 2); // reserve header + divider rows.
+    const visibleLines = this.logLines.slice(-maxVisible);
+
+    const { eventWidth, toolWidth, sessionWidth } = this.columnWidths(cols);
+    const header = `${this.padRight("Event", eventWidth)} | ${this.padRight("Tool", toolWidth)} | ${this.padRight("Session", sessionWidth)}`;
+    const divider = `${"-".repeat(eventWidth)}-+-${"-".repeat(toolWidth)}-+-${"-".repeat(sessionWidth)}`;
+
+    const body = visibleLines.length
+      ? visibleLines.map((line) => this.formatTableRow(line, eventWidth, toolWidth, sessionWidth))
+      : [this.padRight("Waiting for events...", eventWidth + toolWidth + sessionWidth + 6)];
+
+    const logText = this.renderer.root.findDescendantById(
+      "bingbong-tui-log-text"
+    );
+    if (logText instanceof TextRenderable) {
+      logText.content = [header, divider, ...body].join("\n");
+    }
+
+    this.renderer.requestRender();
+  }
+
+  private columnWidths(cols: number): {
+    eventWidth: number;
+    toolWidth: number;
+    sessionWidth: number;
+  } {
+    const minCols = Math.max(cols, 40);
+    const eventWidth = Math.max(10, Math.min(16, Math.floor(minCols * 0.22)));
+    const toolWidth = Math.max(8, Math.min(14, Math.floor(minCols * 0.16)));
+    const sessionWidth = Math.max(10, minCols - eventWidth - toolWidth - 6);
+    return { eventWidth, toolWidth, sessionWidth };
+  }
+
+  private formatTableRow(
+    line: string,
+    eventWidth: number,
+    toolWidth: number,
+    sessionWidth: number
+  ): string {
+    const parsed = this.parseLogLine(line);
+
+    return [
+      this.padRight(this.truncate(parsed.event, eventWidth), eventWidth),
+      this.padRight(this.truncate(parsed.tool, toolWidth), toolWidth),
+      this.padRight(this.truncateMiddle(parsed.session, sessionWidth), sessionWidth),
+    ].join(" | ");
+  }
+
+  private parseLogLine(line: string): {
+    event: string;
+    tool: string;
+    session: string;
+  } {
+    const eventMatch = line.match(/^\[Event\]\s+(.+?)\s+\|\s+session=(.+?)\s+\|\s+tool=(.+)$/);
+    if (eventMatch) {
+      return {
+        event: eventMatch[1].trim(),
+        tool: eventMatch[3].trim() || "n/a",
+        session: eventMatch[2].trim(),
+      };
+    }
+
+    const sessionNewMatch = line.match(/^\[Session\]\s+New session:\s+(.+?)\s+\(index=/);
+    if (sessionNewMatch) {
+      return { event: "SessionNew", tool: "-", session: sessionNewMatch[1].trim() };
+    }
+
+    const sessionDropMatch = line.match(/^\[Session\]\s+Removing stale session:\s+(.+)$/);
+    if (sessionDropMatch) {
+      return { event: "SessionDrop", tool: "-", session: sessionDropMatch[1].trim() };
+    }
+
+    return { event: "System", tool: "-", session: line };
+  }
+
+  private truncate(value: string, maxLength: number): string {
+    if (value.length <= maxLength) return value;
+    if (maxLength <= 1) return "…";
+    return `${value.slice(0, maxLength - 1)}…`;
+  }
+
+  private truncateMiddle(value: string, maxLength: number): string {
+    if (value.length <= maxLength) return value;
+    if (maxLength <= 1) return "…";
+
+    const keepLeft = Math.ceil((maxLength - 1) / 2);
+    const keepRight = Math.floor((maxLength - 1) / 2);
+    return `${value.slice(0, keepLeft)}…${value.slice(-keepRight)}`;
+  }
+
+  private padRight(value: string, width: number): string {
+    if (value.length >= width) return value;
+    return `${value}${" ".repeat(width - value.length)}`;
+  }
+}
+
+function formatUnknownError(err: unknown): string {
+  if (err instanceof Error) {
+    return `${err.name}: ${err.message}`;
+  }
+
+  if (typeof err === "string") {
+    return err;
+  }
+
+  try {
+    return JSON.stringify(err);
+  } catch {
+    return String(err);
+  }
+}
+
+function sanitizeForTerminal(line: string): string {
+  return line
+    .replace(/\x1B\[[0-9;?]*[A-Za-z]/g, "")
+    .replace(/[\x00-\x08\x0B-\x1F\x7F]/g, "");
+}
+
+function createBannerLines(port: number): string[] {
+  return [
+    "╔═══════════════════════════════════════════════════╗",
+    `║               Bingbong v${VERSION}                   ║`,
+    "╠═══════════════════════════════════════════════════╣",
+    `║  Client:    http://localhost:${port.toString().padEnd(5)}               ║`,
+    `║  WebSocket: ws://localhost:${port.toString().padEnd(5)}/ws             ║`,
+    `║  Events:    POST http://localhost:${port.toString().padEnd(5)}/events  ║`,
+    "╚═══════════════════════════════════════════════════╝",
+  ];
+}
+
+async function createRuntimeLogger(port: number): Promise<RuntimeLogger> {
+  const banner = createBannerLines(port);
+  const rows = process.stdout.rows ?? 0;
+
+  // Keep fallback behavior for non-interactive and tiny terminals.
+  if (!process.stdout.isTTY || (rows > 0 && rows <= banner.length + 2)) {
+    return new PlainLogger(banner);
+  }
+
+  try {
+    return await OpenTuiLogger.create(banner);
+  } catch (err) {
+    const logger = new PlainLogger(banner);
+    logger.error("[TUI] OpenTUI unavailable, using plain logs:", err);
+    return logger;
+  }
+}
+
+let runtimeLogger: RuntimeLogger | null = null;
+
+function logInfo(message: string) {
+  if (runtimeLogger) {
+    runtimeLogger.info(message);
+  } else {
+    console.log(sanitizeForTerminal(message));
+  }
+}
+
+function logError(message: string, err?: unknown) {
+  if (runtimeLogger) {
+    runtimeLogger.error(message, err);
+    return;
+  }
+
+  if (err !== undefined) {
+    console.error(`${sanitizeForTerminal(message)} ${formatUnknownError(err)}`);
+    return;
+  }
+
+  console.error(sanitizeForTerminal(message));
 }
 
 // Session registry
@@ -83,7 +429,7 @@ function getOrCreateSession(event: BingbongEvent): Session {
     };
     sessions.set(key, session);
 
-    console.log(
+    logInfo(
       `[Session] New session: ${key} (index=${index}, pan=${session.pan.toFixed(2)})`
     );
   }
@@ -111,7 +457,7 @@ function broadcast(event: EnrichedEvent) {
     try {
       client.send(message);
     } catch (err) {
-      console.error("[WS] Failed to send:", err);
+      logError("[WS] Failed to send:", err);
       wsClients.delete(client);
     }
   }
@@ -124,25 +470,16 @@ setInterval(() => {
 
   for (const [key, session] of sessions) {
     if (now - session.last_seen.getTime() > staleThreshold) {
-      console.log(`[Session] Removing stale session: ${key}`);
+      logInfo(`[Session] Removing stale session: ${key}`);
       sessions.delete(key);
     }
   }
 }, 60 * 1000);
 
-function printBanner(port: number) {
-  console.log(`
-╔═══════════════════════════════════════════════════╗
-║               Bingbong v${VERSION}                   ║
-╠═══════════════════════════════════════════════════╣
-║  Client:    http://localhost:${port.toString().padEnd(5)}               ║
-║  WebSocket: ws://localhost:${port.toString().padEnd(5)}/ws             ║
-║  Events:    POST http://localhost:${port.toString().padEnd(5)}/events  ║
-╚═══════════════════════════════════════════════════╝
-`);
-}
+export async function startServer(port: number): Promise<StartServerResult> {
+  const logger = await createRuntimeLogger(port);
+  runtimeLogger = logger;
 
-export async function startServer(port: number) {
   const server = Bun.serve({
     port,
     routes: {
@@ -179,8 +516,8 @@ export async function startServer(port: number) {
           const event = (await req.json()) as BingbongEvent;
           const enriched = enrichEvent(event);
 
-          console.log(
-            `[Event] ${enriched.event_type} | session=${enriched.session_id.slice(0, 8)} | tool=${enriched.tool_name || "n/a"}`
+          logInfo(
+            `[Event] ${enriched.event_type} | session=${enriched.machine_id}:${enriched.session_id} | tool=${enriched.tool_name || "n/a"}`
           );
 
           broadcast(enriched);
@@ -189,7 +526,7 @@ export async function startServer(port: number) {
             headers: { "Content-Type": "application/json", ...corsHeaders },
           });
         } catch (err) {
-          console.error("[HTTP] Error processing event:", err);
+          logError("[HTTP] Error processing event:", err);
           return new Response(JSON.stringify({ error: "Invalid JSON" }), {
             status: 400,
             headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -214,7 +551,6 @@ export async function startServer(port: number) {
         });
       }
 
-
       // GET /health - health check / info
       if (req.method === "GET" && url.pathname === "/health") {
         return new Response(
@@ -236,7 +572,7 @@ export async function startServer(port: number) {
     websocket: {
       open(ws) {
         wsClients.add(ws);
-        console.log(`[WS] Client connected (total: ${wsClients.size})`);
+        logInfo(`[WS] Client connected (total: ${wsClients.size})`);
 
         // Send current sessions to new client
         const sessionList = Array.from(sessions.values());
@@ -250,17 +586,15 @@ export async function startServer(port: number) {
 
       close(ws) {
         wsClients.delete(ws);
-        console.log(`[WS] Client disconnected (total: ${wsClients.size})`);
+        logInfo(`[WS] Client disconnected (total: ${wsClients.size})`);
       },
 
-      message(ws, message) {
+      message(_ws, message) {
         // Handle any client messages if needed
-        console.log(`[WS] Received: ${message}`);
+        logInfo(`[WS] Received: ${String(message)}`);
       },
     },
   });
 
-  printBanner(port);
-
-  return server;
+  return { server, logger };
 }

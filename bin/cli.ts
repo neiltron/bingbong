@@ -6,10 +6,12 @@
  * Unified command to run the Bingbong server and client.
  */
 
-import { startServer } from "../src/server";
+import { startServer, type RuntimeLogger } from "../src/server";
 
 // Keep in sync with package.json version (release helper enforces parity for tags/package files).
 const VERSION = "0.1.1";
+
+let activeLogger: RuntimeLogger | null = null;
 
 interface Args {
   port: number;
@@ -155,30 +157,50 @@ async function main() {
   }
 
   // Start the server
-  const server = await startServer(args.port);
+  const { server, logger } = await startServer(args.port);
+  activeLogger = logger;
+
+  let isShuttingDown = false;
+  const gracefulShutdown = (): void => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+
+    logger.info("Shutting down...");
+    logger.dispose();
+    server.stop();
+    process.exit(0);
+  };
 
   // Handle graceful shutdown
-  process.on("SIGINT", () => {
-    console.log("\nShutting down...");
-    server.stop();
-    process.exit(0);
-  });
+  process.on("SIGINT", gracefulShutdown);
+  process.on("SIGTERM", gracefulShutdown);
 
-  process.on("SIGTERM", () => {
-    console.log("\nShutting down...");
-    server.stop();
-    process.exit(0);
-  });
+  // In raw TTY mode (used by OpenTUI), Ctrl+C may be delivered as ETX byte
+  // rather than SIGINT. Handle both paths so Ctrl+C always exits.
+  if (process.stdin.isTTY) {
+    process.stdin.on("data", (chunk: Buffer | string) => {
+      const value = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+      if (value.includes("\u0003")) {
+        gracefulShutdown();
+      }
+    });
+  }
 
   // Open browser if requested
   if (args.open) {
     const url = `http://localhost:${args.port}`;
-    console.log(`Opening browser...`);
+    logger.info("Opening browser...");
     openBrowser(url);
   }
 }
 
 main().catch((err) => {
-  console.error("Fatal error:", err);
+  if (activeLogger) {
+    activeLogger.error("Fatal error:", err);
+    activeLogger.dispose();
+  } else {
+    console.error("Fatal error:", err);
+  }
+
   process.exit(1);
 });

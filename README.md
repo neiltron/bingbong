@@ -126,6 +126,10 @@ BINGBONG_MACHINE_ID=my-laptop
 - Check nothing else is using port 3334
 - Verify server is running: `curl http://localhost:3334/`
 
+**Terminal layout looks different than expected?**
+- In interactive TTY terminals, bingbong uses OpenTUI to keep the startup banner pinned at top and stream event logs in the remaining space.
+- In non-interactive output (piped logs, CI, redirected stdout) or very small terminal heights, bingbong falls back to plain append-only logs.
+
 ## Architecture
 
 Simple three-tier design:
