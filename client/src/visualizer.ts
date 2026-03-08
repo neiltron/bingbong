@@ -1,4 +1,4 @@
-import type { EnrichedEvent, Session, Particle, Position } from './types'
+import type { EnrichedEvent, Session, PulseRing, Position } from './types'
 import type { AudioEngine } from './audio-engine'
 
 // ============================================
@@ -147,6 +147,7 @@ export class SourceOverlay {
     const el = document.createElement('div')
     el.className = 'source-circle'
     el.dataset.session = key
+    el.title = session.session_id || 'Unknown session'
     el.style.setProperty('--session-color', session.color)
 
     // Icon and label
@@ -321,7 +322,7 @@ export class SourceOverlay {
 export class Visualizer {
   private canvas: HTMLCanvasElement
   private ctx: CanvasRenderingContext2D
-  private particles: Particle[] = []
+  private pulses: PulseRing[] = []
   private sessions = new Map<string, Session>()
   private animationId: number | null = null
   private isAnimating = false
@@ -334,6 +335,7 @@ export class Visualizer {
 
   // Fixed font string to avoid CSS variable in canvas (which doesn't work)
   private readonly FONT = "10px 'SF Mono', Monaco, Inconsolata, 'Roboto Mono', monospace"
+  private readonly MAX_ACTIVE_PULSES = 180
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
@@ -414,7 +416,7 @@ export class Visualizer {
     const { color, event_type, tool_name } = event
     const { centerX, centerY, maxRadius } = this.getRadarGeometry()
 
-    // Get particle spawn position from source overlay or fallback to center
+    // Get pulse origin from source overlay or fallback to center
     let x = centerX
     let y = centerY
 
@@ -427,29 +429,49 @@ export class Visualizer {
       }
     }
 
-    // Particle properties based on event
-    let size = 20
-    let lifetime = 60
+    // Pulse properties based on event type
+    let baseRadius = 10
+    let growthRate = 2
+    let maxPulseRadius = 64
+    let lifetime = 36
+    let lineWidth = 2
+    let pulseCount = 1
 
     if (event_type === 'Stop') {
-      size = 50
-      lifetime = 120
+      baseRadius = 14
+      growthRate = 2.4
+      maxPulseRadius = 110
+      lifetime = 56
+      lineWidth = 3
+      pulseCount = 2
     } else if (event_type === 'PreToolUse' || event_type === 'PostToolUse') {
-      size = tool_name === 'Task' ? 35 : 15
-      lifetime = 45
+      baseRadius = tool_name === 'Task' ? 12 : 8
+      growthRate = tool_name === 'Task' ? 2.2 : 1.7
+      maxPulseRadius = tool_name === 'Task' ? 88 : 52
+      lifetime = tool_name === 'Task' ? 44 : 30
+      lineWidth = tool_name === 'Task' ? 2.6 : 1.8
     }
 
-    this.particles.push({
-      x,
-      y,
-      vx: (Math.random() - 0.5) * 2,
-      vy: (Math.random() - 0.5) * 2,
-      size,
-      color: color || '#4ECDC4',
-      alpha: 1,
-      lifetime,
-      maxLifetime: lifetime,
-    })
+    for (let i = 0; i < pulseCount; i++) {
+      const lifetimeOffset = i * 6
+      this.pulses.push({
+        x,
+        y,
+        radius: baseRadius + i * 4,
+        growthRate,
+        maxRadius: maxPulseRadius,
+        lineWidth,
+        color: color || '#4ECDC4',
+        alpha: 1,
+        lifetime: Math.max(8, lifetime - lifetimeOffset),
+        maxLifetime: Math.max(8, lifetime - lifetimeOffset),
+      })
+    }
+
+    // Avoid unbounded growth under bursty event streams
+    if (this.pulses.length > this.MAX_ACTIVE_PULSES) {
+      this.pulses = this.pulses.slice(-this.MAX_ACTIVE_PULSES)
+    }
 
     // Start animation if not running
     if (!this.isAnimating) {
@@ -485,50 +507,42 @@ export class Visualizer {
 
     const { ctx } = this
 
-    // Clear with fade effect
-    ctx.fillStyle = 'rgba(0, 20, 31, 0.15)'
-    ctx.fillRect(0, 0, this.width, this.height)
-
-    // Redraw radar grid (faint, under particles)
+    // Redraw static radar first, then animated pulse rings
     this.drawRadarGrid()
 
-    // Update and draw particles
-    let activeParticles = 0
-    this.particles = this.particles.filter((p) => {
+    let activePulses = 0
+    this.pulses = this.pulses.filter((p) => {
       p.lifetime--
       if (p.lifetime <= 0) return false
 
-      activeParticles++
+      p.radius += p.growthRate
+      if (p.radius > p.maxRadius) return false
+
       p.alpha = p.lifetime / p.maxLifetime
-      p.x += p.vx
-      p.y += p.vy
-      p.size *= 0.98
+      activePulses++
 
-      const alphaHex = Math.floor(p.alpha * 255)
-        .toString(16)
-        .padStart(2, '0')
-
-      // Glow effect (drawn first, behind main circle)
+      // Outer glow ring
+      ctx.save()
       ctx.beginPath()
-      ctx.arc(p.x, p.y, p.size * 1.5, 0, Math.PI * 2)
-      ctx.fillStyle =
-        p.color +
-        Math.floor(p.alpha * 50)
-          .toString(16)
-          .padStart(2, '0')
-      ctx.fill()
+      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2)
+      ctx.strokeStyle = p.color
+      ctx.lineWidth = p.lineWidth * 1.8
+      ctx.globalAlpha = p.alpha * 0.35
+      ctx.stroke()
 
-      // Main particle
+      // Primary ring
       ctx.beginPath()
-      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2)
-      ctx.fillStyle = p.color + alphaHex
-      ctx.fill()
+      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2)
+      ctx.lineWidth = p.lineWidth
+      ctx.globalAlpha = p.alpha
+      ctx.stroke()
+      ctx.restore()
 
       return true
     })
 
-    // Stop animation when no particles
-    if (activeParticles === 0) {
+    // Stop animation when no pulses
+    if (activePulses === 0) {
       this.stopAnimation()
       return
     }
