@@ -335,24 +335,44 @@ export class Visualizer {
   // Fixed font string to avoid CSS variable in canvas (which doesn't work)
   private readonly FONT = "10px 'SF Mono', Monaco, Inconsolata, 'Roboto Mono', monospace"
 
+  private resizeRaf: number | null = null
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
     this.ctx = canvas.getContext('2d', { alpha: false })!
 
-    // Use ResizeObserver to get accurate dimensions after layout settles.
-    new ResizeObserver(() => this.resize()).observe(this.canvas)
+    // Defer resize work to rAF to avoid ResizeObserver loop warnings.
+    new ResizeObserver(() => {
+      if (this.resizeRaf !== null) cancelAnimationFrame(this.resizeRaf)
+      this.resizeRaf = requestAnimationFrame(() => {
+        this.resizeRaf = null
+        this.resize()
+      })
+    }).observe(this.canvas)
   }
 
   private resize(): void {
     // Get the canvas's rendered dimensions (respects CSS flex layout)
     const rect = this.canvas.getBoundingClientRect()
-    this.width = rect.width
-    this.height = rect.height
-    this.dpr = window.devicePixelRatio || 1
+    const width = Math.max(0, Math.floor(rect.width))
+    const height = Math.max(0, Math.floor(rect.height))
+    if (width === 0 || height === 0) return
+
+    const dpr = window.devicePixelRatio || 1
+    const backingWidth = Math.floor(width * dpr)
+    const backingHeight = Math.floor(height * dpr)
+
+    // No-op when dimensions are unchanged (prevents ResizeObserver churn)
+    if (this.canvas.width === backingWidth && this.canvas.height === backingHeight) return
+
+    this.width = width
+    this.height = height
+    this.dpr = dpr
 
     // Scale canvas for retina displays
-    this.canvas.width = this.width * this.dpr
-    this.canvas.height = this.height * this.dpr
+    this.canvas.width = backingWidth
+    this.canvas.height = backingHeight
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0)
     this.ctx.scale(this.dpr, this.dpr)
 
     // Redraw static elements after resize

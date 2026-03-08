@@ -8,8 +8,6 @@
 import clientIndex from "../client/index.html";
 import {
   Box,
-  ScrollBox,
-  ScrollBoxRenderable,
   Text,
   TextRenderable,
   createCliRenderer,
@@ -97,11 +95,14 @@ class PlainLogger implements RuntimeLogger {
 
 class OpenTuiLogger implements RuntimeLogger {
   private readonly logLines: string[] = [];
+  private readonly resizeHandler: () => void;
 
   private constructor(
     private readonly renderer: CliRenderer,
     private readonly headerLines: string[]
-  ) {}
+  ) {
+    this.resizeHandler = () => this.render();
+  }
 
   static async create(headerLines: string[]): Promise<OpenTuiLogger> {
     const renderer = await createCliRenderer({
@@ -113,7 +114,8 @@ class OpenTuiLogger implements RuntimeLogger {
 
     const logger = new OpenTuiLogger(renderer, headerLines);
     logger.mountUi();
-    renderer.auto();
+    renderer.start();
+    process.stdout.on("resize", logger.resizeHandler);
     logger.render();
     return logger;
   }
@@ -129,6 +131,7 @@ class OpenTuiLogger implements RuntimeLogger {
   }
 
   dispose() {
+    process.stdout.removeListener("resize", this.resizeHandler);
     this.renderer.destroy();
   }
 
@@ -155,12 +158,11 @@ class OpenTuiLogger implements RuntimeLogger {
             id: "bingbong-tui-header-text",
             content: this.headerLines.join("\n"),
             wrapMode: "none",
-            truncate: true,
           })
         ),
-        ScrollBox(
+        Box(
           {
-            id: "bingbong-tui-log-scroll",
+            id: "bingbong-tui-log-panel",
             flexGrow: 1,
             minHeight: 1,
             border: true,
@@ -169,17 +171,12 @@ class OpenTuiLogger implements RuntimeLogger {
             title: " Event Log ",
             paddingX: 1,
             paddingY: 0,
-            scrollX: false,
-            scrollY: true,
-            stickyScroll: true,
-            stickyStart: "bottom",
-            viewportCulling: true,
+            overflow: "hidden",
           },
           Text({
             id: "bingbong-tui-log-text",
             content: "Waiting for events...",
             wrapMode: "none",
-            truncate: true,
           })
         )
       )
@@ -198,16 +195,18 @@ class OpenTuiLogger implements RuntimeLogger {
   }
 
   private render() {
-    const logText = this.renderer.root.getRenderable("bingbong-tui-log-text");
-    if (logText instanceof TextRenderable) {
-      logText.content = this.logLines.length
-        ? this.logLines.join("\n")
-        : "Waiting for events...";
-    }
+    const rows = process.stdout.rows ?? 24;
+    const chromeRows = this.headerLines.length + 4; // two panel borders + room for title.
+    const maxVisible = Math.max(1, rows - chromeRows);
+    const visibleLines = this.logLines.slice(-maxVisible);
 
-    const scroll = this.renderer.root.getRenderable("bingbong-tui-log-scroll");
-    if (scroll instanceof ScrollBoxRenderable) {
-      scroll.scrollTo({ x: 0, y: scroll.scrollHeight });
+    const logText = this.renderer.root.findDescendantById(
+      "bingbong-tui-log-text"
+    );
+    if (logText instanceof TextRenderable) {
+      logText.content = visibleLines.length
+        ? visibleLines.join("\n")
+        : "Waiting for events...";
     }
 
     this.renderer.requestRender();
