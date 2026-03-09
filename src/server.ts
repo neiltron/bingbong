@@ -142,7 +142,7 @@ class TerminalLayoutLogger implements RuntimeLogger {
 
     const rows = process.stdout.rows ?? 24;
     const cols = process.stdout.columns ?? 80;
-    const headerLines = createTitleBarLines(this.port, cols);
+    const headerLines = createHeaderLines(this.port, cols);
     const headerCount = headerLines.length;
 
     // Very small terminal: degrade to plain append-only mode.
@@ -151,20 +151,38 @@ class TerminalLayoutLogger implements RuntimeLogger {
       return;
     }
 
-    const viewportRows = rows - headerCount;
+    // Reserve 1 row for the cursor line at the bottom
+    const viewportRows = rows - headerCount - 1;
     const visibleLogs = this.logLines.slice(-viewportRows);
     const paddingRows = Math.max(0, viewportRows - visibleLogs.length);
+    const innerW = cols - 2;
 
     const lines: string[] = [];
     lines.push(...headerLines);
-    lines.push(...visibleLogs.map((line) => this.fitToWidth(line, cols)));
-    for (let i = 0; i < paddingRows; i++) {
-      lines.push("");
+
+    // Log lines with side borders
+    for (const line of visibleLogs) {
+      const fitted = this.fitToWidth(line, innerW);
+      const linePad = Math.max(0, innerW - fitted.length);
+      lines.push(
+        `${BG}${FG_DIM}${BOX.v}${RESET} ${FG_BRIGHT}${fitted}${" ".repeat(Math.max(0, linePad - 1))}${BG}${FG_DIM}${BOX.v}${RESET}`,
+      );
     }
+
+    // Empty padding rows with side borders
+    for (let i = 0; i < paddingRows; i++) {
+      lines.push(
+        `${BG}${FG_DIM}${BOX.v}${" ".repeat(innerW)}${BOX.v}${RESET}`,
+      );
+    }
+
+    // Bottom border + blinking cursor line
+    lines.push(
+      `${BG}${FG_DIM}${BOX.bl}${BOX.h.repeat(innerW)}${BOX.br}${RESET}`,
+    );
 
     let output = "\x1b[?25l\x1b[2J\x1b[H";
     output += lines.join("\n");
-    output += "\x1b[?25h";
 
     process.stdout.write(output);
   }
@@ -183,7 +201,7 @@ class TerminalLayoutLogger implements RuntimeLogger {
 
   private writePlainHeader() {
     const cols = process.stdout.columns ?? 80;
-    this.writePlainLines(createTitleBarLines(this.port, cols), "stdout");
+    this.writePlainLines(createHeaderLines(this.port, cols), "stdout");
   }
 
   private writePlainLines(lines: string[], target: "stdout" | "stderr") {
@@ -229,46 +247,102 @@ class TerminalLayoutLogger implements RuntimeLogger {
   }
 }
 
-// Title bar colors: dark navy background, muted steel-blue text
-const BG = "\x1b[48;2;13;27;42m"; // #0d1b2a
-const FG = "\x1b[38;2;42;80;112m"; // #2a5070
+// ANSI styling constants
+const BG = "\x1b[48;2;13;27;42m"; // #0d1b2a dark navy bg
+const FG = "\x1b[38;2;42;80;112m"; // #2a5070 steel-blue
+const FG_BRIGHT = "\x1b[38;2;120;160;190m"; // brighter steel-blue for values
+const FG_DIM = "\x1b[38;2;30;55;78m"; // dimmer for borders
+const FG_LABEL = "\x1b[38;2;80;120;150m"; // label color
+const FG_ACCENT = "\x1b[38;2;78;205;196m"; // #4ECDC4 teal accent
+const FG_GREEN = "\x1b[38;2;107;155;107m"; // #6b9b6b muted green
 const BOLD = "\x1b[1m";
 const RESET = "\x1b[0m";
 
-function createTitleBarLines(port: number, width: number): string[] {
-  const label = "bingbong";
-  const ver = `v${VERSION}`;
-  const leftText = ` ${label} ${ver}`;
-  const rightText = `http://localhost:${port} `;
-  const leftLen = leftText.length;
-  const rightLen = rightText.length;
+// Box-drawing characters
+const BOX = {
+  tl: "┌",
+  tr: "┐",
+  bl: "└",
+  br: "┘",
+  h: "─",
+  v: "│",
+  tj: "┬",
+  bj: "┴",
+  lj: "├",
+  rj: "┤",
+  x: "┼",
+};
 
-  const blankLine = `${BG}${" ".repeat(width)}${RESET}`;
+function createHeaderLines(port: number, width: number): string[] {
+  if (width < 20) return [`${BG}${FG}${BOLD} bingbong ${RESET}`];
 
-  let titleLine: string;
+  const url = `http://localhost:${port}`;
+  const innerW = width - 2; // account for border chars
 
-  const styledLeft = ` ${BG}${FG}${BOLD}${label}${RESET}${BG}${FG} ${ver}`;
+  const lines: string[] = [];
 
-  if (width >= leftLen + rightLen + 1) {
-    const gap = width - leftLen - rightLen;
-    titleLine = `${BG}${FG}${styledLeft}${" ".repeat(gap)}${rightText}${RESET}`;
-  } else if (width >= leftLen + 2) {
-    const remaining = width - leftLen - 1;
-    if (remaining >= 4) {
-      const visibleRight = rightText.slice(0, remaining - 1) + "…";
-      titleLine = `${BG}${FG}${styledLeft} ${visibleRight}${RESET}`;
-    } else {
-      const pad = width - leftLen;
-      titleLine = `${BG}${FG}${styledLeft}${" ".repeat(pad)}${RESET}`;
-    }
-  } else if (width >= 2) {
-    const clipped = label.slice(0, width - 2);
-    titleLine = `${BG}${FG}${BOLD} ${clipped} ${RESET}`;
-  } else {
-    titleLine = "";
-  }
+  // Top border
+  lines.push(`${BG}${FG_DIM}${BOX.tl}${BOX.h.repeat(innerW)}${BOX.tr}${RESET}`);
 
-  return [blankLine, titleLine, blankLine];
+  // Title line: "│ bingbong v0.1.4                    http://localhost:3334 │"
+  const titleLeft = `bingbong v${VERSION}`;
+  const titleRight = url;
+  const titleGap = Math.max(1, innerW - titleLeft.length - titleRight.length - 2);
+  const titleContent =
+    ` ${BG}${FG}${BOLD}bingbong${RESET}${BG}${FG} v${VERSION}` +
+    `${" ".repeat(titleGap)}${FG_BRIGHT}${titleRight} `;
+  lines.push(`${BG}${FG_DIM}${BOX.v}${titleContent}${FG_DIM}${BOX.v}${RESET}`);
+
+  // Separator
+  lines.push(`${BG}${FG_DIM}${BOX.lj}${BOX.h.repeat(innerW)}${BOX.rj}${RESET}`);
+
+  // Status line: "│ HOST: localhost  ESTABLISHED   TIME: HH:MM:SS UTC      │"
+  const now = new Date();
+  const timeStr = now.toISOString().slice(11, 19) + " UTC";
+  const connStatus = wsClients.size > 0 ? "ESTABLISHED" : "LISTENING";
+  const connColor = wsClients.size > 0 ? FG_GREEN : FG_DIM;
+  const hostVal = `localhost`;
+  const sessionCount = sessions.size;
+  const clientCount = wsClients.size;
+
+  // Build status content
+  const statusParts =
+    ` ${FG_LABEL}HOST:${RESET}${BG} ${FG_BRIGHT}${hostVal}${RESET}${BG}` +
+    `  ${connColor}${BOLD}${connStatus}${RESET}${BG}` +
+    `   ${FG_LABEL}TIME:${RESET}${BG} ${FG_BRIGHT}${timeStr}${RESET}${BG}`;
+
+  // Measure visible chars for padding
+  const visibleStatusLen =
+    1 + 5 + 1 + hostVal.length + 2 + connStatus.length + 3 + 5 + 1 + timeStr.length;
+  const statusPad = Math.max(1, innerW - visibleStatusLen - 1);
+  const statusLine = `${statusParts}${" ".repeat(statusPad)} `;
+
+  lines.push(`${BG}${FG_DIM}${BOX.v}${statusLine}${FG_DIM}${BOX.v}${RESET}`);
+
+  // Separator
+  lines.push(`${BG}${FG_DIM}${BOX.lj}${BOX.h.repeat(innerW)}${BOX.rj}${RESET}`);
+
+  // Sessions/clients line
+  const sessionsStr = sessionCount === 0 ? "none" : `${sessionCount}`;
+  const eventsStr = `${Array.from(sessions.values()).reduce((sum, s) => sum + s.event_count, 0)}`;
+  const clientsStr = `${clientCount}`;
+
+  const infoContent =
+    ` ${FG_LABEL}SESSIONS:${RESET}${BG} ${FG_ACCENT}${sessionsStr}${RESET}${BG}` +
+    `   ${FG_LABEL}CLIENTS:${RESET}${BG} ${FG_BRIGHT}${clientsStr}${RESET}${BG}` +
+    `   ${FG_LABEL}EVENTS:${RESET}${BG} ${FG_BRIGHT}${eventsStr}${RESET}${BG}`;
+
+  const visibleInfoLen =
+    1 + 9 + 1 + sessionsStr.length + 3 + 8 + 1 + clientsStr.length + 3 + 7 + 1 + eventsStr.length;
+  const infoPad = Math.max(1, innerW - visibleInfoLen - 1);
+  const infoLine = `${infoContent}${" ".repeat(infoPad)} `;
+
+  lines.push(`${BG}${FG_DIM}${BOX.v}${infoLine}${FG_DIM}${BOX.v}${RESET}`);
+
+  // Bottom border
+  lines.push(`${BG}${FG_DIM}${BOX.bl}${BOX.h.repeat(innerW)}${BOX.br}${RESET}`);
+
+  return lines;
 }
 
 let runtimeLogger: RuntimeLogger = new PlainLogger();
