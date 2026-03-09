@@ -1,6 +1,6 @@
 import './styles/main.css'
 import type { EnrichedEvent, Session } from './types'
-import { AudioEngine } from './audio-engine'
+import { AudioConfigurator } from './audio-configurator'
 import { createVisualization, type SourceOverlay, type Visualizer } from './visualizer'
 
 // ============================================
@@ -11,10 +11,9 @@ const eventLog: EnrichedEvent[] = []
 const MAX_LOG_ITEMS = 50
 
 let ws: WebSocket | null = null
-let audioEngine: AudioEngine
+let audioConfigurator: AudioConfigurator
 let visualizer: Visualizer
 let sourceOverlay: SourceOverlay
-let audioInitFailed = false
 
 // ============================================
 // DOM cache - populated once on DOMContentLoaded
@@ -169,9 +168,6 @@ function handleEvent(event: EnrichedEvent): void {
     eventLog.splice(0, MAX_LOG_ITEMS)
   }
 
-  // Play sound
-  audioEngine.playEvent(event)
-
   // Visualize (pass sessionKey for particle positioning)
   visualizer?.addEvent(event, sessionKey)
 
@@ -183,7 +179,7 @@ function handleEvent(event: EnrichedEvent): void {
 // WebSocket Connection
 // ============================================
 async function connect(): Promise<void> {
-  const { connectBtn: btn, statusDot: dot, statusText: text, muteBtn } = DOM
+  const { connectBtn: btn, statusDot: dot, statusText: text } = DOM
   if (!btn || !dot || !text) return
 
   btn.disabled = true
@@ -191,28 +187,15 @@ async function connect(): Promise<void> {
   dot.setAttribute('aria-label', 'Connection status: connecting')
 
   try {
-    // Initialize audio (requires user gesture)
-    try {
-      await audioEngine.init()
-      audioInitFailed = false
-    } catch {
-      audioInitFailed = true
-      // Continue without audio - show warning but don't block connection
-      if (muteBtn) {
-        muteBtn.textContent = 'Audio unavailable'
-        muteBtn.disabled = true
-        muteBtn.setAttribute('aria-disabled', 'true')
-      }
-    }
-
     // Use protocol-aware WebSocket URL
     const protocol = location.protocol === 'https:' ? 'wss' : 'ws'
     ws = new WebSocket(`${protocol}://${location.host}/ws`)
 
     ws.onopen = () => {
+      audioConfigurator.attachWebSocket(ws as WebSocket)
       dot.classList.add('connected')
       dot.setAttribute('aria-label', 'Connection status: connected')
-      text.textContent = audioInitFailed ? 'Connected (no audio)' : 'Connected'
+      text.textContent = 'Connected'
       btn.textContent = 'Disconnect'
       btn.disabled = false
     }
@@ -235,14 +218,21 @@ async function connect(): Promise<void> {
           return
         }
 
+        if (data.type === 'audio_config.ack') {
+          return
+        }
+
         // Handle regular event
-        handleEvent(data as EnrichedEvent)
+        if (typeof data.event_type === 'string') {
+          handleEvent(data as EnrichedEvent)
+        }
       } catch {
         // Silently handle parse errors for malformed messages
       }
     }
 
     ws.onclose = () => {
+      audioConfigurator.detachWebSocket(ws as WebSocket)
       dot.classList.remove('connected')
       dot.setAttribute('aria-label', 'Connection status: disconnected')
       text.textContent = 'Disconnected'
@@ -252,6 +242,7 @@ async function connect(): Promise<void> {
     }
 
     ws.onerror = () => {
+      audioConfigurator.detachWebSocket(ws as WebSocket)
       dot.setAttribute('aria-label', 'Connection status: error')
       text.textContent = 'Connection failed'
       btn.textContent = 'Retry'
@@ -267,6 +258,7 @@ async function connect(): Promise<void> {
 
 function disconnect(): void {
   if (ws) {
+    audioConfigurator.detachWebSocket(ws)
     ws.close()
     ws = null
   }
@@ -286,16 +278,34 @@ document.addEventListener('DOMContentLoaded', () => {
   DOM.volumeInput = document.getElementById('volume') as HTMLInputElement
   DOM.reverbInput = document.getElementById('reverb') as HTMLInputElement
 
-  // Initialize audio engine
-  audioEngine = new AudioEngine()
+  // Initialize audio configurator (browser-only controls + session positions)
+  audioConfigurator = new AudioConfigurator()
 
   // Initialize visualizer and source overlay
   const canvas = document.getElementById('visualizer') as HTMLCanvasElement
   const spatialContainer = document.getElementById('spatial-container') as HTMLElement
 
-  const viz = createVisualization(spatialContainer, canvas, audioEngine)
+  const viz = createVisualization(spatialContainer, canvas, audioConfigurator)
   visualizer = viz.visualizer
   sourceOverlay = viz.sourceOverlay
+
+  // Hydrate controls from saved browser config
+  if (DOM.volumeInput) {
+    const volume = Math.round(audioConfigurator.getVolume() * 100)
+    DOM.volumeInput.value = String(volume)
+    DOM.volumeInput.setAttribute('aria-valuenow', String(volume))
+  }
+  if (DOM.reverbInput) {
+    const reverb = Math.round(audioConfigurator.getReverb() * 100)
+    DOM.reverbInput.value = String(reverb)
+    DOM.reverbInput.setAttribute('aria-valuenow', String(reverb))
+  }
+  if (DOM.muteBtn) {
+    const muted = audioConfigurator.isMuted()
+    DOM.muteBtn.textContent = muted ? 'Unmute' : 'Mute'
+    DOM.muteBtn.classList.toggle('muted', muted)
+    DOM.muteBtn.setAttribute('aria-pressed', String(muted))
+  }
 
   // Connect button
   DOM.connectBtn?.addEventListener('click', () => {
@@ -309,21 +319,21 @@ document.addEventListener('DOMContentLoaded', () => {
   // Volume control
   DOM.volumeInput?.addEventListener('input', (e) => {
     const target = e.target as HTMLInputElement
-    audioEngine.setVolume(parseInt(target.value) / 100)
+    audioConfigurator.setVolume(parseInt(target.value) / 100)
     target.setAttribute('aria-valuenow', target.value)
   })
 
   // Reverb control
   DOM.reverbInput?.addEventListener('input', (e) => {
     const target = e.target as HTMLInputElement
-    audioEngine.setReverb(parseInt(target.value) / 100)
+    audioConfigurator.setReverb(parseInt(target.value) / 100)
     target.setAttribute('aria-valuenow', target.value)
   })
 
   // Mute button
   DOM.muteBtn?.addEventListener('click', (e) => {
     const target = e.target as HTMLButtonElement
-    const muted = audioEngine.toggleMute()
+    const muted = audioConfigurator.toggleMute()
     target.textContent = muted ? 'Unmute' : 'Mute'
     target.classList.toggle('muted', muted)
     target.setAttribute('aria-pressed', String(muted))

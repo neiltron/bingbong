@@ -12,6 +12,7 @@ export default defineConfig({
       },
       '/events': 'http://localhost:3334',
       '/sessions': 'http://localhost:3334',
+      '/audio-config': 'http://localhost:3334',
       '/health': 'http://localhost:3334',
     },
   },

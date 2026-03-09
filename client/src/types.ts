@@ -27,17 +27,40 @@ export interface Session {
   last_seen?: string
 }
 
-export interface SoundParams {
-  note?: string
-  notes?: string[]
-  duration: number
-  type: OscillatorType
-  gain: number
+export interface AudioGlobalConfig {
+  volume: number
+  reverb: number
+  muted: boolean
 }
 
-export interface SoundConfig {
-  [key: string]: SoundParams | { [toolName: string]: SoundParams }
+export interface SessionPosition {
+  x: number
+  y: number
 }
+
+export interface AudioConfigSnapshot {
+  global: AudioGlobalConfig
+  session_positions: Record<string, SessionPosition>
+}
+
+export interface AudioConfigPatch {
+  global?: Partial<AudioGlobalConfig>
+  session_positions?: Record<string, SessionPosition | null>
+}
+
+export interface AudioConfigReplaceMessage {
+  type: 'audio_config.replace'
+  version: 1
+  payload: AudioConfigSnapshot
+}
+
+export interface AudioConfigPatchMessage {
+  type: 'audio_config.patch'
+  version: 1
+  payload: AudioConfigPatch
+}
+
+export type AudioConfigMessage = AudioConfigReplaceMessage | AudioConfigPatchMessage
 
 export interface Position {
   x: number

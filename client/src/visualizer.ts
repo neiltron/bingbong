@@ -1,5 +1,5 @@
 import type { EnrichedEvent, Session, PulseRing, Position } from './types'
-import type { AudioEngine } from './audio-engine'
+import type { AudioConfigurator } from './audio-configurator'
 
 // ============================================
 // Position Manager - localStorage persistence
@@ -99,7 +99,7 @@ export class SourceOverlay {
   private container: HTMLElement
   private canvas: HTMLCanvasElement
   private positionManager: PositionManager
-  private audioEngine: AudioEngine
+  private audioConfigurator: AudioConfigurator
   sources = new Map<string, SourceData>()
   private selectedKey: string | null = null
   private dragState: DragState | null = null
@@ -109,12 +109,12 @@ export class SourceOverlay {
     container: HTMLElement,
     canvas: HTMLCanvasElement,
     positionManager: PositionManager,
-    audioEngine: AudioEngine
+    audioConfigurator: AudioConfigurator
   ) {
     this.container = container
     this.canvas = canvas
     this.positionManager = positionManager
-    this.audioEngine = audioEngine
+    this.audioConfigurator = audioConfigurator
 
     // Global listeners for drag
     document.addEventListener('pointermove', (e) => this.onPointerMove(e))
@@ -171,9 +171,9 @@ export class SourceOverlay {
     this.container.appendChild(el)
     this.sources.set(key, { el, pos, session })
 
-    // Create panner and set initial position
-    this.audioEngine.createPannerForSession(key)
-    this.audioEngine.updatePannerPosition(key, pos.x, pos.y)
+    // Register with audio configurator and send initial position
+    this.audioConfigurator.registerSession(key)
+    this.audioConfigurator.updateSessionPosition(key, pos.x, pos.y)
   }
 
   private setElementPosition(el: HTMLElement, normX: number, normY: number): void {
@@ -243,7 +243,7 @@ export class SourceOverlay {
     if (source) {
       source.pos = { x: normX, y: normY }
       this.setElementPosition(source.el, normX, normY)
-      this.audioEngine.updatePannerPosition(this.dragState.key, normX, normY)
+      this.audioConfigurator.updateSessionPosition(this.dragState.key, normX, normY)
     }
   }
 
@@ -288,12 +288,12 @@ export class SourceOverlay {
     if (!source) return
 
     // Fade out then remove
-    source.el.classList.add('disconnected')
-    setTimeout(() => {
-      source.el.remove()
-      this.sources.delete(key)
-      this.audioEngine.removePannerForSession(key)
-    }, 1000)
+      source.el.classList.add('disconnected')
+      setTimeout(() => {
+        source.el.remove()
+        this.sources.delete(key)
+        this.audioConfigurator.removeSession(key)
+      }, 1000)
 
     // Deselect if this was selected
     if (this.selectedKey === key) {
@@ -310,7 +310,7 @@ export class SourceOverlay {
       const pos = this.positionManager.getPosition(key, this.sessionIndex++)
       source.pos = pos
       this.setElementPosition(source.el, pos.x, pos.y)
-      this.audioEngine.updatePannerPosition(key, pos.x, pos.y)
+      this.audioConfigurator.updateSessionPosition(key, pos.x, pos.y)
       this.positionManager.savePosition(key, pos.x, pos.y)
     }
   }
@@ -555,11 +555,11 @@ export class Visualizer {
 export function createVisualization(
   container: HTMLElement,
   canvas: HTMLCanvasElement,
-  audioEngine: AudioEngine
+  audioConfigurator: AudioConfigurator
 ): { visualizer: Visualizer; sourceOverlay: SourceOverlay } {
   const positionManager = new PositionManager()
   const visualizer = new Visualizer(canvas)
-  const sourceOverlay = new SourceOverlay(container, canvas, positionManager, audioEngine)
+  const sourceOverlay = new SourceOverlay(container, canvas, positionManager, audioConfigurator)
   visualizer.sourceOverlay = sourceOverlay
 
   return { visualizer, sourceOverlay }
