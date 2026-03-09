@@ -6,6 +6,8 @@
  */
 
 import clientIndex from "../client/index.html";
+import { parseClientAudioConfigMessage } from "./audio-protocol";
+import { ServerAudioEngine } from "./server-audio-engine";
 
 const VERSION = "0.1.0";
 
@@ -59,6 +61,7 @@ const SESSION_COLORS = [
 
 // WebSocket clients
 const wsClients = new Set<WebSocket>();
+const audioEngine = new ServerAudioEngine();
 
 function getOrCreateSession(event: BingbongEvent): Session {
   const key = `${event.machine_id}:${event.session_id}`;
@@ -126,6 +129,7 @@ setInterval(() => {
     if (now - session.last_seen.getTime() > staleThreshold) {
       console.log(`[Session] Removing stale session: ${key}`);
       sessions.delete(key);
+      audioEngine.removeSession(key);
     }
   }
 }, 60 * 1000);
@@ -143,6 +147,11 @@ function printBanner(port: number) {
 }
 
 export async function startServer(port: number) {
+  await audioEngine.init();
+  process.once("exit", () => {
+    void audioEngine.stop();
+  });
+
   const server = Bun.serve({
     port,
     routes: {
@@ -183,6 +192,7 @@ export async function startServer(port: number) {
             `[Event] ${enriched.event_type} | session=${enriched.session_id.slice(0, 8)} | tool=${enriched.tool_name || "n/a"}`
           );
 
+          audioEngine.playEvent(enriched);
           broadcast(enriched);
 
           return new Response(JSON.stringify({ ok: true }), {
@@ -214,6 +224,13 @@ export async function startServer(port: number) {
         });
       }
 
+      // GET /audio-config - current server-side audio config snapshot
+      if (req.method === "GET" && url.pathname === "/audio-config") {
+        return new Response(JSON.stringify(audioEngine.getConfigSnapshot()), {
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        });
+      }
+
 
       // GET /health - health check / info
       if (req.method === "GET" && url.pathname === "/health") {
@@ -223,6 +240,7 @@ export async function startServer(port: number) {
             version: VERSION,
             sessions: sessions.size,
             clients: wsClients.size,
+            audio_enabled: audioEngine.isEnabled(),
           }),
           {
             headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -244,6 +262,7 @@ export async function startServer(port: number) {
           JSON.stringify({
             type: "init",
             sessions: sessionList,
+            audio_config: audioEngine.getConfigSnapshot(),
           })
         );
       },
@@ -254,8 +273,23 @@ export async function startServer(port: number) {
       },
 
       message(ws, message) {
-        // Handle any client messages if needed
-        console.log(`[WS] Received: ${message}`);
+        const rawMessage =
+          typeof message === "string" ? message : Buffer.from(message).toString("utf8");
+        const parsed = parseClientAudioConfigMessage(rawMessage);
+        if (!parsed) return;
+
+        if (parsed.type === "replace") {
+          audioEngine.replaceConfig(parsed.payload);
+        } else {
+          audioEngine.patchConfig(parsed.payload);
+        }
+
+        ws.send(
+          JSON.stringify({
+            type: "audio_config.ack",
+            version: 1,
+          })
+        );
       },
     },
   });
