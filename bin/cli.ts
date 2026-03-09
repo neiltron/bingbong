@@ -69,6 +69,7 @@ Usage: bingbong [options]
 Commands:
   emit <EventType>       Emit an event to the bingbong server (used by hooks)
   install-hooks <agent>  Install bingbong hooks for a coding agent
+  test                   Smoke-test a running bingbong server
 
 Options:
   -p, --port <number>  Port to run server on (default: 3334)
@@ -131,6 +132,12 @@ async function main() {
   if (firstArg === "install-hooks") {
     const { installHooks } = await import("../src/install-hooks");
     await installHooks(process.argv.slice(3));
+    process.exit(0);
+  }
+
+  if (firstArg === "test") {
+    const { test } = await import("../src/test");
+    await test(process.argv.slice(3));
     process.exit(0);
   }
 

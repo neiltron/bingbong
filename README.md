@@ -53,10 +53,10 @@ The client is served at `http://localhost:3334`. Click "Connect" to start.
 | **OpenCode** | `bingbong install-hooks opencode` |
 | **Pi** | `bingbong install-hooks pi` |
 
-**4. Test it out** — every action and tool use should produce a sound.
+**4. Test it out** — sends a burst of events so you hear sounds and see the UI react.
 
 ```bash
-./test-events.sh
+bingbong test
 ```
 
 ## Source Install (Fallback)
@@ -81,6 +81,7 @@ bingbong <command> [options]
 Commands:
   emit <EventType>       Emit an event to the bingbong server (used by hooks)
   install-hooks <agent>  Install bingbong hooks for a coding agent
+  test                   Smoke-test a running bingbong server
 
 Options:
   -p, --port <number>  Port to run server on (default: 3334)
