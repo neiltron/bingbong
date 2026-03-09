@@ -288,12 +288,12 @@ export class SourceOverlay {
     if (!source) return
 
     // Fade out then remove
-      source.el.classList.add('disconnected')
-      setTimeout(() => {
-        source.el.remove()
-        this.sources.delete(key)
-        this.audioConfigurator.removeSession(key)
-      }, 1000)
+    source.el.classList.add('disconnected')
+    setTimeout(() => {
+      source.el.remove()
+      this.sources.delete(key)
+      this.audioConfigurator.removeSession(key)
+    }, 1000)
 
     // Deselect if this was selected
     if (this.selectedKey === key) {
