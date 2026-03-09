@@ -128,7 +128,7 @@ BINGBONG_MACHINE_ID=my-laptop
 - Verify server is running: `curl http://localhost:3334/`
 
 **Terminal layout looks different than expected?**
-- In interactive TTY terminals, bingbong keeps the startup banner pinned at top and streams event logs in the remaining space.
+- In interactive TTY terminals, bingbong keeps a one-line title bar pinned at top and streams event logs in the remaining space.
 - In non-interactive output (piped logs, CI, redirected stdout) or very small terminal heights, bingbong falls back to plain append-only logs.
 
 ## Architecture

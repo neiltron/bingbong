@@ -73,13 +73,13 @@ class PlainLogger implements RuntimeLogger {
 class TerminalLayoutLogger implements RuntimeLogger {
   private readonly isInteractive: boolean;
   private readonly maxLines: number;
-  private readonly headerLines: string[];
+  private readonly port: number;
   private readonly resizeHandler: (() => void) | null;
   private logLines: string[] = [];
   private plainMode: boolean;
 
-  constructor(headerLines: string[], maxLines = MAX_EVENT_LOG_LINES) {
-    this.headerLines = headerLines;
+  constructor(port: number, maxLines = MAX_EVENT_LOG_LINES) {
+    this.port = port;
     this.maxLines = maxLines;
     this.isInteractive = Boolean(process.stdout.isTTY);
     this.plainMode = !this.isInteractive;
@@ -142,19 +142,21 @@ class TerminalLayoutLogger implements RuntimeLogger {
 
     const rows = process.stdout.rows ?? 24;
     const cols = process.stdout.columns ?? 80;
+    const headerLines = createTitleBarLines(this.port, cols);
+    const headerCount = headerLines.length;
 
     // Very small terminal: degrade to plain append-only mode.
-    if (rows <= this.headerLines.length + 1) {
+    if (rows <= headerCount + 1) {
       this.switchToPlainMode();
       return;
     }
 
-    const viewportRows = rows - this.headerLines.length;
+    const viewportRows = rows - headerCount;
     const visibleLogs = this.logLines.slice(-viewportRows);
     const paddingRows = Math.max(0, viewportRows - visibleLogs.length);
 
     const lines: string[] = [];
-    lines.push(...this.headerLines.map((line) => this.fitToWidth(line, cols)));
+    lines.push(...headerLines);
     lines.push(...visibleLogs.map((line) => this.fitToWidth(line, cols)));
     for (let i = 0; i < paddingRows; i++) {
       lines.push("");
@@ -180,7 +182,8 @@ class TerminalLayoutLogger implements RuntimeLogger {
   }
 
   private writePlainHeader() {
-    this.writePlainLines(this.headerLines, "stdout");
+    const cols = process.stdout.columns ?? 80;
+    this.writePlainLines(createTitleBarLines(this.port, cols), "stdout");
   }
 
   private writePlainLines(lines: string[], target: "stdout" | "stderr") {
@@ -226,16 +229,33 @@ class TerminalLayoutLogger implements RuntimeLogger {
   }
 }
 
-function createBannerLines(port: number): string[] {
-  return [
-    "╔═══════════════════════════════════════════════════╗",
-    `║               Bingbong v${VERSION}                   ║`,
-    "╠═══════════════════════════════════════════════════╣",
-    `║  Client:    http://localhost:${port.toString().padEnd(5)}               ║`,
-    `║  WebSocket: ws://localhost:${port.toString().padEnd(5)}/ws             ║`,
-    `║  Events:    POST http://localhost:${port.toString().padEnd(5)}/events  ║`,
-    "╚═══════════════════════════════════════════════════╝",
-  ];
+function createTitleBarLines(port: number, width: number): string[] {
+  const left = " \x1b[1mbingbong\x1b[0m";
+  const right = `http://localhost:${port} `;
+  const leftLen = " bingbong".length;
+  const rightLen = right.length;
+
+  let titleLine: string;
+
+  if (width >= leftLen + rightLen + 1) {
+    // Enough room: left-align label, right-align URL
+    const gap = width - leftLen - rightLen;
+    titleLine = left + " ".repeat(gap) + right;
+  } else if (width >= leftLen + 2) {
+    // Truncate or drop the right side
+    const remaining = width - leftLen - 1;
+    if (remaining >= 4) {
+      titleLine = left + " " + right.slice(0, remaining - 1) + "…";
+    } else {
+      titleLine = left + " ".repeat(width - leftLen);
+    }
+  } else if (width >= 2) {
+    titleLine = " \x1b[1m" + "bingbong".slice(0, width - 2) + "\x1b[0m ";
+  } else {
+    titleLine = "";
+  }
+
+  return ["", titleLine, ""];
 }
 
 let runtimeLogger: RuntimeLogger = new PlainLogger();
@@ -340,7 +360,7 @@ setInterval(() => {
 }, 60 * 1000);
 
 export async function startServer(port: number): Promise<StartServerResult> {
-  const logger = new TerminalLayoutLogger(createBannerLines(port));
+  const logger = new TerminalLayoutLogger(port);
   runtimeLogger = logger;
 
   const server = Bun.serve({
