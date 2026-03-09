@@ -229,33 +229,41 @@ class TerminalLayoutLogger implements RuntimeLogger {
   }
 }
 
+// Title bar colors: dark navy background, muted steel-blue text
+const BG = "\x1b[48;2;13;27;42m"; // #0d1b2a
+const FG = "\x1b[38;2;42;80;112m"; // #2a5070
+const RESET = "\x1b[0m";
+
 function createTitleBarLines(port: number, width: number): string[] {
-  const left = " \x1b[1mbingbong\x1b[0m";
-  const right = `http://localhost:${port} `;
-  const leftLen = " bingbong".length;
-  const rightLen = right.length;
+  const leftText = " bingbong";
+  const rightText = `http://localhost:${port} `;
+  const leftLen = leftText.length;
+  const rightLen = rightText.length;
+
+  const blankLine = `${BG}${" ".repeat(width)}${RESET}`;
 
   let titleLine: string;
 
   if (width >= leftLen + rightLen + 1) {
-    // Enough room: left-align label, right-align URL
     const gap = width - leftLen - rightLen;
-    titleLine = left + " ".repeat(gap) + right;
+    titleLine = `${BG}${FG}${leftText}${" ".repeat(gap)}${rightText}${RESET}`;
   } else if (width >= leftLen + 2) {
-    // Truncate or drop the right side
     const remaining = width - leftLen - 1;
     if (remaining >= 4) {
-      titleLine = left + " " + right.slice(0, remaining - 1) + "…";
+      const visibleRight = rightText.slice(0, remaining - 1) + "…";
+      titleLine = `${BG}${FG}${leftText} ${visibleRight}${RESET}`;
     } else {
-      titleLine = left + " ".repeat(width - leftLen);
+      const pad = width - leftLen;
+      titleLine = `${BG}${FG}${leftText}${" ".repeat(pad)}${RESET}`;
     }
   } else if (width >= 2) {
-    titleLine = " \x1b[1m" + "bingbong".slice(0, width - 2) + "\x1b[0m ";
+    const clipped = "bingbong".slice(0, width - 2);
+    titleLine = `${BG}${FG} ${clipped} ${RESET}`;
   } else {
     titleLine = "";
   }
 
-  return ["", titleLine, ""];
+  return [blankLine, titleLine, blankLine];
 }
 
 let runtimeLogger: RuntimeLogger = new PlainLogger();
