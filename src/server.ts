@@ -7,7 +7,7 @@
 
 import clientIndex from "../client/index.html";
 
-const VERSION = "0.1.0";
+const VERSION = "0.1.3";
 
 // Types
 interface BingbongEvent {
@@ -84,7 +84,7 @@ function getOrCreateSession(event: BingbongEvent): Session {
     sessions.set(key, session);
 
     console.log(
-      `[Session] New session: ${key} (index=${index}, pan=${session.pan.toFixed(2)})`
+      `[Session] New session: ${key} (index=${index}, pan=${session.pan.toFixed(2)})`,
     );
   }
 
@@ -180,7 +180,7 @@ export async function startServer(port: number) {
           const enriched = enrichEvent(event);
 
           console.log(
-            `[Event] ${enriched.event_type} | session=${enriched.session_id.slice(0, 8)} | tool=${enriched.tool_name || "n/a"}`
+            `[Event] ${enriched.event_type} | session=${enriched.session_id.slice(0, 8)} | tool=${enriched.tool_name || "n/a"}`,
           );
 
           broadcast(enriched);
@@ -214,7 +214,6 @@ export async function startServer(port: number) {
         });
       }
 
-
       // GET /health - health check / info
       if (req.method === "GET" && url.pathname === "/health") {
         return new Response(
@@ -226,7 +225,7 @@ export async function startServer(port: number) {
           }),
           {
             headers: { "Content-Type": "application/json", ...corsHeaders },
-          }
+          },
         );
       }
 
@@ -244,7 +243,7 @@ export async function startServer(port: number) {
           JSON.stringify({
             type: "init",
             sessions: sessionList,
-          })
+          }),
         );
       },
 

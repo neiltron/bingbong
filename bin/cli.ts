@@ -8,8 +8,7 @@
 
 import { startServer } from "../src/server";
 
-// Keep in sync with package.json version (release helper enforces parity for tags/package files).
-const VERSION = "0.1.1";
+const VERSION = "0.1.3";
 
 interface Args {
   port: number;
@@ -44,13 +43,15 @@ function parseArgs(argv: string[]): Args {
       const port = parseInt(portStr, 10);
       if (isNaN(port) || port < 1 || port > 65535) {
         console.error(
-          `Error: Invalid port "${portStr}". Must be a number between 1 and 65535.`
+          `Error: Invalid port "${portStr}". Must be a number between 1 and 65535.`,
         );
         process.exit(1);
       }
       args.port = port;
     } else if (arg.startsWith("-")) {
-      console.error(`Error: Unknown option "${arg}". Run bingbong --help for usage.`);
+      console.error(
+        `Error: Unknown option "${arg}". Run bingbong --help for usage.`,
+      );
       process.exit(1);
     }
   }
@@ -149,7 +150,7 @@ async function main() {
   const portAvailable = await checkPortAvailable(args.port);
   if (!portAvailable) {
     console.error(
-      `Error: Port ${args.port} is already in use. Try: bingbong --port ${args.port + 1}`
+      `Error: Port ${args.port} is already in use. Try: bingbong --port ${args.port + 1}`,
     );
     process.exit(1);
   }
