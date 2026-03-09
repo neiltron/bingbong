@@ -102,6 +102,7 @@ Server defaults to `http://localhost:3334`. Configure agent hooks via environmen
 BINGBONG_URL=http://localhost:3334
 BINGBONG_ENABLED=true
 BINGBONG_MACHINE_ID=my-laptop
+BINGBONG_SERVER_AUDIO=true
 ```
 
 --- 
@@ -111,7 +112,8 @@ BINGBONG_MACHINE_ID=my-laptop
 **No sounds?**
 - Click "Connect" in browser
 - Verify server is running on port 3334
-- Click anywhere on page (browsers require user interaction for audio)
+- Check server logs for `[Audio] Server audio enabled (...)`
+- Ensure your machine has a supported playback command (`afplay` on macOS, `aplay` on Linux)
 
 **Hooks not firing?**
 - Re-run `bingbong install-hooks <agent>` to refresh config
@@ -130,9 +132,37 @@ BINGBONG_MACHINE_ID=my-laptop
 
 Simple three-tier design:
 
-**Agent Hooks** → emit events via HTTP → **Server** (session tracking, spatial assignment) → WebSocket → **Client** (Web Audio synthesis + visualization)
+**Agent Hooks** → emit events via HTTP → **Server** (session tracking, spatial assignment, audio synthesis/playback) → WebSocket → **Client** (visualizer + audio config transport)
 
-Each agent has hooks that fire on tool use, session start/stop, and other events. The server assigns each session a stereo position and broadcasts enriched events to connected clients, which render audio in real-time.
+Each agent has hooks that fire on tool use, session start/stop, and other events. The browser remains a visual configurator (radar UI and controls), while the server owns audio rendering and playback.
+
+### Audio Config Protocol
+
+Browser-to-server updates are sent over the existing WebSocket connection using versioned message types:
+
+- `audio_config.replace` - full snapshot on connect
+- `audio_config.patch` - incremental updates for volume/reverb/mute and session positions
+
+Payload shape:
+
+```json
+{
+  "type": "audio_config.patch",
+  "version": 1,
+  "payload": {
+    "global": { "volume": 0.7, "reverb": 0.3, "muted": false },
+    "session_positions": {
+      "machine-a:session-123": { "x": 0.42, "y": 0.61 }
+    }
+  }
+}
+```
+
+Inspect current server-side state:
+
+```bash
+curl http://localhost:3334/audio-config
+```
 
 ## Event Types
 

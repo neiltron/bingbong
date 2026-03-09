@@ -16,7 +16,8 @@
     "start": "bun run bin/cli.ts",
     "dev": "bun --watch run bin/cli.ts",
     "dev:client": "cd client && bunx vite",
-    "build:client": "cd client && bunx vite build"
+    "build:client": "cd client && bunx vite build",
+    "test": "bun test"
   },
   "devDependencies": {
     "vite": "^6.0.0",
