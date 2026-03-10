@@ -2,21 +2,13 @@
 
 Soundscapes for coding agents. Transform AI agent sessions into spatial audio feedback.
 
+<img width="2560" height="1413" alt="Screenshot 2026-03-09 at 11 30 07 PM" src="https://github.com/user-attachments/assets/f7d205e2-7f9f-47e5-8116-0a1328219c7e" />
+
 ## What is this?
 
 Bingbong turns AI coding agent activity into spatial audio feedback. Each tool and action produces distinct sounds, sessions are positioned in stereo space, and you can monitor agent activity without visual attention.
 
 **Supported agents:** Claude Code, Cursor, OpenCode, Pi
-
-## Prerequisites
-
-For binary install:
-- `curl`
-- `tar`
-
-For source fallback install:
-- [Bun](https://bun.sh)
-- `git`
 
 ## Quick Start
 
@@ -26,9 +18,7 @@ For source fallback install:
 curl -fsSL https://raw.githubusercontent.com/neiltron/bingbong/main/scripts/install.sh | bash
 ```
 
-This installs:
-- `bingbong` to `~/.local/bin` (preferred) or `/usr/local/bin` when writable
-- embedded client assets inside the standalone binary
+This installs `bingbong` to `~/.local/bin` (preferred) or `/usr/local/bin` when writable
 
 Then verify:
 
