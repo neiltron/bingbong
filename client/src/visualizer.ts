@@ -301,6 +301,16 @@ export class SourceOverlay {
     }
   }
 
+  clearSources(): void {
+    for (const [key, source] of this.sources) {
+      source.el.remove()
+      this.audioEngine.removePannerForSession(key)
+    }
+    this.sources.clear()
+    this.selectedKey = null
+    this.sessionIndex = 0
+  }
+
   resetLayout(): void {
     this.positionManager.clearAll()
     this.sessionIndex = 0
@@ -482,6 +492,14 @@ export class Visualizer {
   updateSession(session: Session): void {
     this.sessions.set(session.session_id, session)
     // Redraw static elements to show new session
+    if (!this.isAnimating) {
+      this.drawStatic()
+    }
+  }
+
+  clearSessions(): void {
+    this.sessions.clear()
+    this.pulses = []
     if (!this.isAnimating) {
       this.drawStatic()
     }

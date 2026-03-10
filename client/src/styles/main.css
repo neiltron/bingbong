@@ -95,6 +95,44 @@ body {
 }
 
 /* ============================================
+   Components - Audio Banner
+   ============================================ */
+.audio-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-md);
+    background: var(--color-bg-elevated);
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+    user-select: none;
+    transition: background var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.audio-banner:hover {
+    background: var(--color-accent);
+    color: var(--color-text-inverse);
+}
+
+.audio-banner:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: -2px;
+}
+
+.audio-banner[hidden] {
+    display: none;
+}
+
+.audio-banner-icon {
+    font-size: 14px;
+}
+
+/* ============================================
    Accessibility
    ============================================ */
 .skip-link {
