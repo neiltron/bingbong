@@ -18,8 +18,8 @@
     --color-text-bright: #fff;
 
     /* Colors - Accent */
-    --color-accent: #003d5c;
-    --color-accent-hover: #003652;
+    --color-accent: #1a7a9e;
+    --color-accent-hover: #15678a;
 
     /* Colors - Semantic */
     --color-success: #6b9b6b;
@@ -40,6 +40,7 @@
     --space-sm: 10px;
     --space-md: 15px;
     --space-lg: 20px;
+    --space-xl: 24px;
 
     /* Radii */
     --radius-sm: 4px;
@@ -146,7 +147,7 @@ header {
 .sidebar {
     display: flex;
     flex-direction: column;
-    gap: var(--space-lg);
+    gap: var(--space-xl);
     height: 100%;
     min-height: 0;
 }
@@ -194,7 +195,7 @@ header {
    ============================================ */
 h1 {
     font-size: var(--font-size-lg);
-    font-weight: 400;
+    font-weight: 600;
     color: var(--color-text-bright);
 }
 
@@ -281,6 +282,12 @@ h1 span {
     font-family: inherit;
     font-size: 12px;
     transition: all var(--transition-fast);
+    flex: 1;
+}
+
+.button-row {
+    display: flex;
+    gap: var(--space-sm);
 }
 
 .mute-btn:hover {
@@ -355,7 +362,7 @@ h1 span {
 
 .session-item {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: var(--space-sm);
     padding: var(--space-sm);
     background: var(--color-bg-elevated);
@@ -367,11 +374,13 @@ h1 span {
     height: 12px;
     border-radius: var(--radius-full);
     flex-shrink: 0;
+    margin-top: 3px;
 }
 
 .session-info {
     flex: 1;
     min-width: 0;
+    margin-right: var(--space-xs);
 }
 
 .session-id {
@@ -474,6 +483,36 @@ h1 span {
 input[type="range"] {
     width: 100px;
     accent-color: var(--color-accent);
+}
+
+/* ============================================
+   Components - Scrollbar
+   ============================================ */
+.sessions-list,
+.event-log {
+    scrollbar-width: thin;
+    scrollbar-color: #2d3748 transparent;
+}
+
+.sessions-list::-webkit-scrollbar,
+.event-log::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sessions-list::-webkit-scrollbar-track,
+.event-log::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sessions-list::-webkit-scrollbar-thumb,
+.event-log::-webkit-scrollbar-thumb {
+    background: #2d3748;
+    border-radius: 3px;
+}
+
+.sessions-list::-webkit-scrollbar-thumb:hover,
+.event-log::-webkit-scrollbar-thumb:hover {
+    background: #4a5568;
 }
 
 /* ============================================
