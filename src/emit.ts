@@ -1,22 +1,23 @@
 /**
  * bingbong emit
  *
- * Reads hook payload JSON from stdin, spreads it into the POST body
- * with event_type/timestamp/machine_id overlaid, and sends it to
- * the bingbong server's /events endpoint.
+ * Reads hook payload JSON from stdin, normalizes event names where needed,
+ * overlays required fields, and sends the event to /events.
  *
  * Always exits 0. Completely silent (no stdout, no stderr).
  */
 
 import os from "node:os";
+import { inferDefaultToolName, normalizeEventType, toRecord, toString } from "./events";
 
 export async function emit(argv: string[]): Promise<void> {
   const enabled = (process.env.BINGBONG_ENABLED || "true").toLowerCase() !== "false";
   if (!enabled) return;
 
-  const eventType = argv[0];
-  if (!eventType) return;
+  const rawEventType = argv[0];
+  if (!rawEventType) return;
 
+  const { eventType, originalEventType } = normalizeEventType(rawEventType);
   const url = process.env.BINGBONG_URL || "http://localhost:3334";
 
   // Read stdin: if TTY (interactive terminal), skip — no data to read.
@@ -43,22 +44,42 @@ export async function emit(argv: string[]): Promise<void> {
           t.unref();
         }),
       ]);
-      if (raw.trim()) input = JSON.parse(raw);
+
+      if (raw.trim()) {
+        input = toRecord(JSON.parse(raw));
+      }
     } catch {
       // Malformed JSON — proceed with empty input
     }
   }
 
-  // Normalize session_id — agents use different field names
-  const sessionId = (input.session_id ?? input.conversation_id ?? input.generation_id ?? "unknown") as string;
+  const sessionId = toString(
+    input.session_id ?? input.conversation_id ?? input.generation_id,
+    "unknown",
+  );
 
-  // Spread stdin payload, overlay our fields
+  const toolInput = toRecord(input.tool_input ?? input.toolInput);
+  const toolOutput = toRecord(input.tool_output ?? input.toolOutput);
+
+  if (originalEventType && toolOutput.original_event_type === undefined) {
+    toolOutput.original_event_type = originalEventType;
+  }
+
+  const toolName = toString(
+    input.tool_name ?? input.toolName,
+    inferDefaultToolName(originalEventType || rawEventType),
+  );
+
   const payload = {
     ...input,
     event_type: eventType,
     session_id: sessionId,
     machine_id: process.env.BINGBONG_MACHINE_ID || os.hostname(),
     timestamp: new Date().toISOString(),
+    cwd: toString(input.cwd ?? input.directory, ""),
+    tool_name: toolName,
+    tool_input: toolInput,
+    tool_output: toolOutput,
   };
 
   try {

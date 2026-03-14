@@ -129,18 +129,13 @@ Simple three-tier design:
 
 Each agent has hooks that fire on tool use, session start/stop, and other events. The server assigns each session a stereo position and broadcasts enriched events to connected clients, which render audio in real-time.
 
-## Event Types
+## Event Coverage
 
-Events are normalized across agents:
+Claude Code is bingbong's baseline harness. `install-hooks claude` installs the full current official Claude hook event set.
 
-| Event | Description | Priority |
-|-------|-------------|----------|
-| `SessionStart` | New agent session | High |
-| `SessionEnd` | Agent session ends | High |
-| `Stop` | Agent completes task | High |
-| `PreToolUse` / `PostToolUse` | Before/after tool execution | Medium |
-| `PermissionRequest` | User approval needed | Critical |
-| `PreCompact` | Context compression | Low |
+For the authoritative event coverage matrix (installed Claude events, matcher behavior, and Cursor/OpenCode/Pi mapping status), see [EVENTS.md](./EVENTS.md).
+
+Cross-harness parity varies today; non-Claude harnesses may emit native event names or mapped subsets.
 
 ## Sound Design
 
@@ -166,10 +161,9 @@ bin/                     # CLI entry point
 src/                     # Server source code
 client/                  # Web Audio client (Vite build)
 agents/
-  claude/hooks/          # Claude Code hook scripts
-  cursor/                # Cursor hooks + installer
   opencode/plugins/      # OpenCode plugin
   pi/extensions/         # Pi extension
+src/install-hooks.ts     # Claude/Cursor install logic + hook config writers
 ```
 
 ## Future Work

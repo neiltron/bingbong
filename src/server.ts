@@ -6,6 +6,7 @@
  */
 
 import clientIndex from "../client/index.html";
+import { inferDefaultToolName, normalizeEventType, toRecord, toString } from "./events";
 
 const VERSION = "0.1.5";
 const MAX_EVENT_LOG_LINES = 1000;
@@ -376,6 +377,35 @@ const SESSION_COLORS = [
 // WebSocket clients
 const wsClients = new Set<WebSocket>();
 
+function normalizeIncomingEvent(raw: unknown): BingbongEvent {
+  const input = toRecord(raw);
+  const rawEventType = toString(input.event_type ?? input.hook_event_name, "UnknownEvent");
+  const { eventType, originalEventType } = normalizeEventType(rawEventType);
+
+  const toolOutput = toRecord(input.tool_output ?? input.toolOutput);
+  if (originalEventType && toolOutput.original_event_type === undefined) {
+    toolOutput.original_event_type = originalEventType;
+  }
+
+  return {
+    ...input,
+    event_type: eventType,
+    session_id: toString(
+      input.session_id ?? input.conversation_id ?? input.generation_id,
+      "unknown",
+    ),
+    machine_id: toString(input.machine_id, "unknown-machine"),
+    timestamp: toString(input.timestamp, new Date().toISOString()),
+    cwd: toString(input.cwd ?? input.directory, ""),
+    tool_name: toString(
+      input.tool_name ?? input.toolName,
+      inferDefaultToolName(originalEventType || rawEventType),
+    ),
+    tool_input: toRecord(input.tool_input ?? input.toolInput),
+    tool_output: toolOutput,
+  } as BingbongEvent;
+}
+
 function getOrCreateSession(event: BingbongEvent): Session {
   const key = `${event.machine_id}:${event.session_id}`;
 
@@ -483,11 +513,17 @@ export async function startServer(port: number): Promise<StartServerResult> {
       // HTTP POST for events from hooks
       if (req.method === "POST" && url.pathname === "/events") {
         try {
-          const event = (await req.json()) as BingbongEvent;
+          const event = normalizeIncomingEvent(await req.json());
           const enriched = enrichEvent(event);
 
+          const originalEventType = toString(enriched.tool_output.original_event_type, "");
+          const eventLabel =
+            originalEventType && originalEventType !== enriched.event_type
+              ? `${enriched.event_type} (from ${originalEventType})`
+              : enriched.event_type;
+
           logInfo(
-            `[Event] ${enriched.event_type} | session=${enriched.session_id.slice(0, 8)} | tool=${enriched.tool_name || "n/a"}`,
+            `[Event] ${eventLabel} | session=${enriched.session_id.slice(0, 8)} | tool=${enriched.tool_name || "n/a"}`,
           );
 
           broadcast(enriched);

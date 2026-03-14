@@ -15,11 +15,35 @@ export const SOUND_CONFIG: Record<string, SoundParams | Record<string, SoundPara
     type: 'sine',
     gain: 0.3,
   },
+  UserPromptSubmit: {
+    note: 'B3',
+    duration: 0.18,
+    type: 'triangle',
+    gain: 0.2,
+  },
   Stop: {
     notes: ['C5', 'E5', 'G5'],
     duration: 0.6,
     type: 'sine',
     gain: 0.5,
+  },
+  PermissionRequest: {
+    note: 'A5',
+    duration: 0.35,
+    type: 'square',
+    gain: 0.42,
+  },
+  Notification: {
+    note: 'E5',
+    duration: 0.2,
+    type: 'triangle',
+    gain: 0.22,
+  },
+  SubagentStart: {
+    note: 'G4',
+    duration: 0.26,
+    type: 'sine',
+    gain: 0.3,
   },
   SubagentStop: {
     note: 'E5',
@@ -27,11 +51,65 @@ export const SOUND_CONFIG: Record<string, SoundParams | Record<string, SoundPara
     type: 'triangle',
     gain: 0.35,
   },
+  TeammateIdle: {
+    note: 'E3',
+    duration: 0.28,
+    type: 'sine',
+    gain: 0.15,
+  },
+  TaskCompleted: {
+    notes: ['G4', 'B4', 'D5'],
+    duration: 0.38,
+    type: 'sine',
+    gain: 0.32,
+  },
+  InstructionsLoaded: {
+    note: 'D5',
+    duration: 0.18,
+    type: 'triangle',
+    gain: 0.2,
+  },
+  ConfigChange: {
+    note: 'F4',
+    duration: 0.2,
+    type: 'sawtooth',
+    gain: 0.2,
+  },
+  WorktreeCreate: {
+    note: 'A4',
+    duration: 0.22,
+    type: 'triangle',
+    gain: 0.22,
+  },
+  WorktreeRemove: {
+    note: 'D3',
+    duration: 0.24,
+    type: 'triangle',
+    gain: 0.2,
+  },
   PreCompact: {
     note: 'D4',
     duration: 0.2,
     type: 'sawtooth',
     gain: 0.15,
+  },
+  PostCompact: {
+    note: 'C4',
+    duration: 0.22,
+    type: 'triangle',
+    gain: 0.17,
+  },
+  Elicitation: {
+    note: 'F5',
+    duration: 0.26,
+    type: 'square',
+    gain: 0.3,
+  },
+  ElicitationResult: {
+    note: 'A4',
+    duration: 0.24,
+    type: 'triangle',
+    gain: 0.24,
   },
 
   // Tool-specific sounds (for PreToolUse/PostToolUse)
