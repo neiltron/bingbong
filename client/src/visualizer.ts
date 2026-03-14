@@ -462,12 +462,26 @@ export class Visualizer {
       lifetime = 56
       lineWidth = 3
       pulseCount = 2
-    } else if (event_type === 'PreToolUse' || event_type === 'PostToolUse') {
-      baseRadius = tool_name === 'Task' ? 12 : 8
-      growthRate = tool_name === 'Task' ? 2.2 : 1.7
-      maxPulseRadius = tool_name === 'Task' ? 88 : 52
-      lifetime = tool_name === 'Task' ? 44 : 30
-      lineWidth = tool_name === 'Task' ? 2.6 : 1.8
+    } else if (event_type === 'PermissionRequest' || event_type === 'Elicitation') {
+      baseRadius = 12
+      growthRate = 2.1
+      maxPulseRadius = 96
+      lifetime = 48
+      lineWidth = 2.8
+      pulseCount = 2
+    } else if (
+      event_type === 'PreToolUse' ||
+      event_type === 'PostToolUse' ||
+      event_type === 'PostToolUseFailure'
+    ) {
+      const isTask = tool_name === 'Task'
+      const isFailure = event_type === 'PostToolUseFailure'
+      baseRadius = isTask ? 12 : isFailure ? 10 : 8
+      growthRate = isTask ? 2.2 : isFailure ? 1.9 : 1.7
+      maxPulseRadius = isTask ? 88 : isFailure ? 68 : 52
+      lifetime = isTask ? 44 : isFailure ? 36 : 30
+      lineWidth = isTask ? 2.6 : isFailure ? 2.2 : 1.8
+      pulseCount = isFailure ? 2 : 1
     }
 
     for (let i = 0; i < pulseCount; i++) {

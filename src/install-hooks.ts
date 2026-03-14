@@ -9,6 +9,7 @@ import { existsSync, mkdirSync, renameSync, unlinkSync, chmodSync, statSync } fr
 import { readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve, dirname } from "node:path";
+import { CLAUDE_HOOK_INSTALL_EVENTS } from "./events";
 
 const ROOT_DIR = resolve(import.meta.dir, "..");
 const AGENTS_DIR = join(ROOT_DIR, "agents");
@@ -184,20 +185,6 @@ async function atomicWriteJson(filePath: string, data: object) {
 // Claude Code installer
 // ---------------------------------------------------------------------------
 
-const CLAUDE_EVENTS: Array<{ event: string; matcher: string }> = [
-  { event: "PreToolUse",        matcher: ".*" },
-  { event: "PostToolUse",       matcher: ".*" },
-  { event: "SessionStart",      matcher: "" },
-  { event: "SessionEnd",        matcher: "" },
-  { event: "Stop",              matcher: "" },
-  { event: "SubagentStop",      matcher: "" },
-  { event: "PermissionRequest", matcher: "" },
-  { event: "Notification",      matcher: "" },
-  { event: "PreCompact",        matcher: "" },
-  { event: "Setup",             matcher: "" },
-  { event: "UserPromptSubmit",  matcher: "" },
-];
-
 function isBingbongClaudeEntry(entry: any): boolean {
   const hooks = entry?.hooks;
   if (!Array.isArray(hooks)) return false;
@@ -218,15 +205,22 @@ async function installClaude(_agentsDir: string, dryRun: boolean): Promise<strin
   const cleanedHooks: Record<string, any[]> = {};
   for (const [event, entries] of Object.entries(existingHooks)) {
     if (!Array.isArray(entries)) continue;
-    cleanedHooks[event] = entries.filter((entry: any) => !isBingbongClaudeEntry(entry));
+
+    const filtered = entries.filter((entry: any) => !isBingbongClaudeEntry(entry));
+    if (filtered.length > 0) {
+      cleanedHooks[event] = filtered;
+    }
   }
 
   // Add fresh bingbong entries using `bingbong emit`
-  for (const { event, matcher } of CLAUDE_EVENTS) {
-    const bingbongEntry = {
-      matcher,
+  for (const { event, matcher } of CLAUDE_HOOK_INSTALL_EVENTS) {
+    const bingbongEntry: { matcher?: string; hooks: Array<{ type: "command"; command: string }> } = {
       hooks: [{ type: "command", command: `${bingbongCmd} emit ${event}` }],
     };
+
+    if (matcher) {
+      bingbongEntry.matcher = matcher;
+    }
 
     if (!cleanedHooks[event]) {
       cleanedHooks[event] = [];

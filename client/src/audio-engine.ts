@@ -205,12 +205,17 @@ export class AudioEngine {
     // Get sound config based on event type
     let config: SoundParams
 
-    if (event_type === 'PreToolUse' || event_type === 'PostToolUse') {
+    const isToolEvent =
+      event_type === 'PreToolUse' ||
+      event_type === 'PostToolUse' ||
+      event_type === 'PostToolUseFailure'
+
+    if (isToolEvent) {
       // Use tool-specific sound
       const tools = SOUND_CONFIG.tools as Record<string, SoundParams>
       config = tools[tool_name] || tools.default
 
-      // Make PostToolUse slightly different (higher pitch)
+      // Make PostToolUse slightly brighter (higher pitch)
       if (event_type === 'PostToolUse' && config.note) {
         const noteKeys = Object.keys(NOTE_FREQ)
         const noteIndex = noteKeys.indexOf(config.note)
@@ -219,6 +224,16 @@ export class AudioEngine {
             ...config,
             note: noteKeys[noteIndex + 1],
           }
+        }
+      }
+
+      // Tool failures get a darker, sharper timbre.
+      if (event_type === 'PostToolUseFailure') {
+        config = {
+          ...config,
+          type: 'square',
+          gain: Math.min(0.45, (config.gain || 0.2) + 0.08),
+          duration: Math.max(config.duration, 0.16),
         }
       }
     } else {

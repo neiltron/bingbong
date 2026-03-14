@@ -131,9 +131,9 @@ Each agent has hooks that fire on tool use, session start/stop, and other events
 
 ## Event Coverage
 
-Claude Code is bingbong's baseline hook event source.
+Claude Code is bingbong's baseline harness. `install-hooks claude` installs the full current official Claude hook event set.
 
-For the authoritative event coverage matrix (installed Claude events, known TODO gaps, Cursor/OpenCode/Pi mapping status, and matcher caveats), see [EVENTS.md](./EVENTS.md).
+For the authoritative event coverage matrix (installed Claude events, matcher behavior, and Cursor/OpenCode/Pi mapping status), see [EVENTS.md](./EVENTS.md).
 
 Cross-harness parity varies today; non-Claude harnesses may emit native event names or mapped subsets.
 
@@ -161,10 +161,9 @@ bin/                     # CLI entry point
 src/                     # Server source code
 client/                  # Web Audio client (Vite build)
 agents/
-  claude/hooks/          # Claude Code hook scripts
-  cursor/                # Cursor hooks + installer
   opencode/plugins/      # OpenCode plugin
   pi/extensions/         # Pi extension
+src/install-hooks.ts     # Claude/Cursor install logic + hook config writers
 ```
 
 ## Future Work
