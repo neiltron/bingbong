@@ -181,7 +181,7 @@ agents/
 
 ## References
 
-- [Claude Code hooks](https://docs.anthropic.com/claude-code/hooks)
+- [Claude Code hooks](https://code.claude.com/docs/en/hooks)
 - [Cursor hooks](https://docs.cursor.com/advanced/hooks)
 - [Pi extensions](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent#extensions)
 - [OpenCode events](https://opencode.ai/docs/plugins/#events)
