@@ -129,18 +129,13 @@ Simple three-tier design:
 
 Each agent has hooks that fire on tool use, session start/stop, and other events. The server assigns each session a stereo position and broadcasts enriched events to connected clients, which render audio in real-time.
 
-## Event Types
+## Event Coverage
 
-Events are normalized across agents:
+Claude Code is bingbong's baseline hook event source.
 
-| Event | Description | Priority |
-|-------|-------------|----------|
-| `SessionStart` | New agent session | High |
-| `SessionEnd` | Agent session ends | High |
-| `Stop` | Agent completes task | High |
-| `PreToolUse` / `PostToolUse` | Before/after tool execution | Medium |
-| `PermissionRequest` | User approval needed | Critical |
-| `PreCompact` | Context compression | Low |
+For the authoritative event coverage matrix (installed Claude events, known TODO gaps, Cursor/OpenCode/Pi mapping status, and matcher caveats), see [EVENTS.md](./EVENTS.md).
+
+Cross-harness parity varies today; non-Claude harnesses may emit native event names or mapped subsets.
 
 ## Sound Design
 
