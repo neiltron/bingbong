@@ -301,6 +301,16 @@ export class SourceOverlay {
     }
   }
 
+  clearSources(): void {
+    for (const [key, source] of this.sources) {
+      source.el.remove()
+      this.audioEngine.removePannerForSession(key)
+    }
+    this.sources.clear()
+    this.selectedKey = null
+    this.sessionIndex = 0
+  }
+
   resetLayout(): void {
     this.positionManager.clearAll()
     this.sessionIndex = 0
@@ -337,12 +347,20 @@ export class Visualizer {
   private readonly FONT = "10px 'SF Mono', Monaco, Inconsolata, 'Roboto Mono', monospace"
   private readonly MAX_ACTIVE_PULSES = 180
 
+  private resizeRafId: number | null = null
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
     this.ctx = canvas.getContext('2d', { alpha: false })!
 
-    // Use ResizeObserver to get accurate dimensions after layout settles.
-    new ResizeObserver(() => this.resize()).observe(this.canvas)
+    // Use ResizeObserver with rAF to avoid "loop completed with undelivered notifications"
+    new ResizeObserver(() => {
+      if (this.resizeRafId) cancelAnimationFrame(this.resizeRafId)
+      this.resizeRafId = requestAnimationFrame(() => {
+        this.resizeRafId = null
+        this.resize()
+      })
+    }).observe(this.canvas)
   }
 
   private resize(): void {
@@ -482,6 +500,14 @@ export class Visualizer {
   updateSession(session: Session): void {
     this.sessions.set(session.session_id, session)
     // Redraw static elements to show new session
+    if (!this.isAnimating) {
+      this.drawStatic()
+    }
+  }
+
+  clearSessions(): void {
+    this.sessions.clear()
+    this.pulses = []
     if (!this.isAnimating) {
       this.drawStatic()
     }

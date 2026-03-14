@@ -1,6 +1,7 @@
 import './styles/main.css'
 import type { EnrichedEvent, Session } from './types'
 import { AudioEngine } from './audio-engine'
+import { Connection } from './connection'
 import { createVisualization, type SourceOverlay, type Visualizer } from './visualizer'
 
 // ============================================
@@ -10,11 +11,10 @@ const sessions = new Map<string, Session>()
 const eventLog: EnrichedEvent[] = []
 const MAX_LOG_ITEMS = 50
 
-let ws: WebSocket | null = null
 let audioEngine: AudioEngine
 let visualizer: Visualizer
 let sourceOverlay: SourceOverlay
-let audioInitFailed = false
+let connection: Connection
 
 // ============================================
 // DOM cache - populated once on DOMContentLoaded
@@ -28,6 +28,7 @@ const DOM = {
   muteBtn: null as HTMLButtonElement | null,
   volumeInput: null as HTMLInputElement | null,
   reverbInput: null as HTMLInputElement | null,
+  audioBanner: null as HTMLElement | null,
 }
 
 // ============================================
@@ -138,6 +139,72 @@ function updateUI(): void {
 }
 
 // ============================================
+// Connection Status UI
+// ============================================
+function setConnected(): void {
+  const { statusDot: dot, statusText: text, connectBtn: btn } = DOM
+  if (dot) {
+    dot.classList.add('connected')
+    dot.setAttribute('aria-label', 'Connection status: connected')
+  }
+  if (text) text.textContent = 'Connected'
+  if (btn) {
+    btn.textContent = 'Disconnect'
+    btn.disabled = false
+  }
+}
+
+function setDisconnected(): void {
+  const { statusDot: dot, statusText: text, connectBtn: btn } = DOM
+  if (dot) {
+    dot.classList.remove('connected')
+    dot.setAttribute('aria-label', 'Connection status: disconnected')
+  }
+  if (text) text.textContent = 'Disconnected'
+  if (btn) {
+    btn.textContent = 'Connect'
+    btn.disabled = false
+  }
+}
+
+function setReconnecting(): void {
+  const { statusDot: dot, statusText: text, connectBtn: btn } = DOM
+  if (dot) {
+    dot.classList.remove('connected')
+    dot.setAttribute('aria-label', 'Connection status: reconnecting')
+  }
+  if (text) text.textContent = 'Reconnecting...'
+  if (btn) {
+    btn.textContent = 'Disconnect'
+    btn.disabled = false
+  }
+}
+
+// ============================================
+// Audio Banner
+// ============================================
+function showAudioBanner(): void {
+  if (DOM.audioBanner) {
+    DOM.audioBanner.hidden = false
+  }
+}
+
+function hideAudioBanner(): void {
+  if (DOM.audioBanner) {
+    DOM.audioBanner.hidden = true
+  }
+}
+
+function onAudioBannerClick(): void {
+  try {
+    audioEngine.init()
+    hideAudioBanner()
+  } catch {
+    // AudioContext failed — leave banner visible
+  }
+}
+
+// ============================================
 // Event Handling
 // ============================================
 function handleEvent(event: EnrichedEvent): void {
@@ -179,97 +246,29 @@ function handleEvent(event: EnrichedEvent): void {
   updateUI()
 }
 
-// ============================================
-// WebSocket Connection
-// ============================================
-async function connect(): Promise<void> {
-  const { connectBtn: btn, statusDot: dot, statusText: text, muteBtn } = DOM
-  if (!btn || !dot || !text) return
+function handleMessage(data: unknown): void {
+  const msg = data as Record<string, unknown>
 
-  btn.disabled = true
-  btn.textContent = 'Connecting...'
-  dot.setAttribute('aria-label', 'Connection status: connecting')
+  // Handle init message with existing sessions
+  if (msg.type === 'init' && Array.isArray(msg.sessions)) {
+    // Full cleanup chain on reconnect
+    sessions.clear()
+    sourceOverlay?.clearSources()
+    visualizer?.clearSessions()
 
-  try {
-    // Initialize audio (requires user gesture)
-    try {
-      await audioEngine.init()
-      audioInitFailed = false
-    } catch {
-      audioInitFailed = true
-      // Continue without audio - show warning but don't block connection
-      if (muteBtn) {
-        muteBtn.textContent = 'Audio unavailable'
-        muteBtn.disabled = true
-        muteBtn.setAttribute('aria-disabled', 'true')
+    ;(msg.sessions as Session[]).forEach((s: Session) => {
+      sessions.set(s.session_id, s)
+      visualizer?.updateSession(s)
+      if (sourceOverlay) {
+        sourceOverlay.createSource(s)
       }
-    }
-
-    // Use protocol-aware WebSocket URL
-    const protocol = location.protocol === 'https:' ? 'wss' : 'ws'
-    ws = new WebSocket(`${protocol}://${location.host}/ws`)
-
-    ws.onopen = () => {
-      dot.classList.add('connected')
-      dot.setAttribute('aria-label', 'Connection status: connected')
-      text.textContent = audioInitFailed ? 'Connected (no audio)' : 'Connected'
-      btn.textContent = 'Disconnect'
-      btn.disabled = false
-    }
-
-    ws.onmessage = (msg) => {
-      try {
-        const data = JSON.parse(msg.data)
-
-        // Handle init message with existing sessions
-        if (data.type === 'init' && data.sessions) {
-          data.sessions.forEach((s: Session) => {
-            sessions.set(s.session_id, s)
-            visualizer?.updateSession(s)
-            // Create source overlay for existing session
-            if (sourceOverlay) {
-              sourceOverlay.createSource(s)
-            }
-          })
-          updateUI()
-          return
-        }
-
-        // Handle regular event
-        handleEvent(data as EnrichedEvent)
-      } catch {
-        // Silently handle parse errors for malformed messages
-      }
-    }
-
-    ws.onclose = () => {
-      dot.classList.remove('connected')
-      dot.setAttribute('aria-label', 'Connection status: disconnected')
-      text.textContent = 'Disconnected'
-      btn.textContent = 'Connect'
-      btn.disabled = false
-      ws = null
-    }
-
-    ws.onerror = () => {
-      dot.setAttribute('aria-label', 'Connection status: error')
-      text.textContent = 'Connection failed'
-      btn.textContent = 'Retry'
-      btn.disabled = false
-    }
-  } catch {
-    dot.setAttribute('aria-label', 'Connection status: error')
-    text.textContent = 'Connection failed'
-    btn.textContent = 'Retry'
-    btn.disabled = false
+    })
+    updateUI()
+    return
   }
-}
 
-function disconnect(): void {
-  if (ws) {
-    ws.close()
-    ws = null
-  }
+  // Handle regular event
+  handleEvent(msg as unknown as EnrichedEvent)
 }
 
 // ============================================
@@ -285,6 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
   DOM.muteBtn = document.getElementById('mute-btn') as HTMLButtonElement
   DOM.volumeInput = document.getElementById('volume') as HTMLInputElement
   DOM.reverbInput = document.getElementById('reverb') as HTMLInputElement
+  DOM.audioBanner = document.getElementById('audio-banner')
 
   // Initialize audio engine
   audioEngine = new AudioEngine()
@@ -297,14 +297,36 @@ document.addEventListener('DOMContentLoaded', () => {
   visualizer = viz.visualizer
   sourceOverlay = viz.sourceOverlay
 
-  // Connect button
+  // Initialize connection with auto-connect
+  connection = new Connection({
+    onConnected: setConnected,
+    onDisconnected: setDisconnected,
+    onMessage: handleMessage,
+    onReconnecting: setReconnecting,
+  })
+  connection.connect()
+
+  // Connect/Disconnect button
   DOM.connectBtn?.addEventListener('click', () => {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      disconnect()
+    if (connection.connected) {
+      connection.disconnect()
+      setDisconnected()
     } else {
-      connect()
+      connection.connect()
     }
   })
+
+  // Audio banner (click and keyboard)
+  DOM.audioBanner?.addEventListener('click', onAudioBannerClick)
+  DOM.audioBanner?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onAudioBannerClick()
+    }
+  })
+
+  // Show audio banner on load (audio requires user gesture)
+  showAudioBanner()
 
   // Volume control
   DOM.volumeInput?.addEventListener('input', (e) => {

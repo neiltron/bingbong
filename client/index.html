@@ -7,6 +7,10 @@
         <title>Bingbong</title>
     </head>
     <body>
+        <div class="audio-banner" id="audio-banner" role="button" tabindex="0" aria-label="Click to enable audio" hidden>
+            <span class="audio-banner-icon" aria-hidden="true">&#x1f507;</span>
+            <span>Click to enable audio</span>
+        </div>
         <a href="#main-content" class="skip-link">Skip to main content</a>
         <div class="container">
             <header>
@@ -18,8 +22,8 @@
                         role="status"
                         aria-label="Connection status: disconnected"
                     ></div>
-                    <span id="status-text">Disconnected</span>
-                    <button id="connect-btn">Connect</button>
+                    <span id="status-text">Connecting...</span>
+                    <button id="connect-btn">Disconnect</button>
                 </div>
             </header>
 

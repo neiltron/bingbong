@@ -12,7 +12,14 @@ export class AudioEngine {
   private reverbAmount = 0.3
   private sessionPanners = new Map<string, PannerNode>()
 
-  async init(): Promise<void> {
+  get initialized(): boolean {
+    return !!this.ctx
+  }
+
+  // Must be called from a user gesture handler.
+  // AudioContext creation is synchronous to satisfy browser gesture requirements.
+  // Reverb impulse generation happens async afterward.
+  init(): void {
     if (this.ctx) return
 
     this.ctx = new AudioContext()
@@ -28,9 +35,6 @@ export class AudioEngine {
 
     this.dryGain = this.ctx.createGain()
     this.dryGain.gain.value = 1 - this.reverbAmount
-
-    // Generate impulse response for reverb
-    await this.createReverbImpulse()
 
     // Connect: source -> [dry + reverb] -> master -> output
     this.convolver.connect(this.reverbGain)
@@ -51,9 +55,12 @@ export class AudioEngine {
       listener.upY.setValueAtTime(1, this.ctx.currentTime)
       listener.upZ.setValueAtTime(0, this.ctx.currentTime)
     }
+
+    // Generate reverb impulse async (non-blocking)
+    this.createReverbImpulse()
   }
 
-  private async createReverbImpulse(): Promise<void> {
+  private createReverbImpulse(): void {
     if (!this.ctx || !this.convolver) return
 
     const duration = 2
