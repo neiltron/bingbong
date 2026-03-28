@@ -3,7 +3,7 @@ title: "Standalone Bun Binary Broke `install-hooks` with `/$bunfs/agents`"
 category: integration-issues
 problem_type: integration_issue
 component: tooling
-root_cause: config_error
+root_cause: wrong_api
 resolution_type: code_fix
 severity: high
 tags:
@@ -20,6 +20,7 @@ symptoms:
   - "`bingbong install-hooks --dry-run claude` failed in compiled binaries with `Error: Could not find agents directory at /$bunfs/agents`"
   - "Fresh-machine installs via the curl installer could not complete hook setup"
   - "The failure happened before the Claude and Cursor installers ran"
+  - "Standalone binaries could not load OpenCode or Pi assets from a repo-local `agents/` directory"
 date: 2026-03-27
 ---
 
@@ -33,7 +34,7 @@ Error: Could not find agents directory at /$bunfs/agents
 This can happen with bundled builds. Install from source checkout or binary release package.
 ```
 
-The bug only appeared in compiled/install flows. Source checkouts still worked because the repo actually had an `agents/` directory on disk.
+That message was misleading for the actual distribution model. The standalone release binary was supposed to support `bingbong install-hooks <agent>` directly, but `install-hooks` still assumed it was running from a source checkout with a real `agents/` directory on disk.
 
 ## Investigation
 
@@ -58,7 +59,7 @@ HOME=/tmp/bingbong-home PATH=/tmp/bingbong-build:$PATH \
    A Bun/package config change to try to ship `agents/` would not solve the stale Claude/Cursor preflight check, and it would still leave OpenCode/Pi dependent on runtime filesystem layout.
 
 ## Root Cause
-`install-hooks` still assumed it was running from a source checkout with a real `agents/` directory on disk. In a Bun standalone binary, `import.meta.dir` resolves under Bun's virtual filesystem (`/$bunfs/...`), so `AGENTS_DIR` became `/$bunfs/agents`.
+`install-hooks` used the wrong runtime boundary for a compiled Bun executable. In source runs, `import.meta.dir` points at the real repo and `agents/` exists beside the code. In `bun build --compile` output, `import.meta.dir` resolves under Bun's virtual filesystem (`/$bunfs/...`), so `AGENTS_DIR` became `/$bunfs/agents`.
 
 That caused two separate problems:
 
@@ -100,6 +101,11 @@ import piExtensionSource from "../agents/pi/extensions/bingbong.ts" with { type:
 - Run `install-hooks --dry-run` for `claude`, `cursor`, `opencode`, and `pi`
 - Keep the existing UI asset smoke checks
 
+## Why This Works
+The root problem was not missing files in the repo. It was assuming a compiled Bun binary could still discover install-time assets through `import.meta.dir` like a source checkout.
+
+By importing the OpenCode and Pi assets as raw text, the binary carries the payloads it needs. By removing the unconditional `agents/` directory check, Claude and Cursor no longer fail on a filesystem path they do not use. The result is that all four `install-hooks` flows work from the shipped standalone binary instead of only from a source checkout.
+
 ## Verification That Fixed It
 
 - Reproduced the original `/$bunfs/agents` failure with a compiled standalone binary before the patch.
@@ -115,6 +121,7 @@ import piExtensionSource from "../agents/pi/extensions/bingbong.ts" with { type:
 - Treat `bun build --compile` as a different runtime, not just a packaging step.
 - Do not gate one installer on filesystem assets needed only by other installers.
 - For assets that must ship with the standalone binary, embed them at build time or install them explicitly alongside the binary.
+- Do not use `import.meta.dir` as a proxy for an installed resource directory in Bun standalone builds.
 - Require `scripts/test-local-release.sh` for release/distribution changes.
 - Treat any `/$bunfs` path leakage in user-facing errors as release-blocking.
 
