@@ -165,6 +165,19 @@ fi
 echo "[test-local-release] smoke test: bingbong --help"
 "$INSTALL_DIR/bingbong" --help >/dev/null
 
+echo "[test-local-release] smoke test: install-hooks in standalone binary"
+TEST_HOME="$WORKDIR/test-home"
+mkdir -p "$TEST_HOME"
+
+for agent in claude cursor opencode pi; do
+  log_path="$WORKDIR/install-hooks-$agent.log"
+  if ! HOME="$TEST_HOME" PATH="$INSTALL_DIR:$PATH" "$INSTALL_DIR/bingbong" install-hooks --dry-run "$agent" >"$log_path" 2>&1; then
+    echo "[test-local-release] FAIL: install-hooks --dry-run $agent failed" >&2
+    sed -n '1,120p' "$log_path" >&2 || true
+    exit 1
+  fi
+done
+
 echo "[test-local-release] smoke test: serve UI on :$APP_PORT"
 "$INSTALL_DIR/bingbong" --port "$APP_PORT" >"$APP_LOG" 2>&1 &
 APP_PID=$!
@@ -198,5 +211,6 @@ fi
 echo "[test-local-release] PASS"
 echo "  - installer used prebuilt artifacts"
 echo "  - checksum verification path executed"
+echo "  - install-hooks works from the standalone binary"
 echo "  - installed binary served embedded UI assets"
 echo "  - install log: $INSTALL_LOG"

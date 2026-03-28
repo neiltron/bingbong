@@ -8,10 +8,10 @@
 import { existsSync, mkdirSync, renameSync, unlinkSync, chmodSync, statSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join, resolve, dirname } from "node:path";
+import { join, dirname } from "node:path";
 
-const ROOT_DIR = resolve(import.meta.dir, "..");
-const AGENTS_DIR = join(ROOT_DIR, "agents");
+import opencodePluginSource from "../agents/opencode/plugins/bingbong.js" with { type: "text" };
+import piExtensionSource from "../agents/pi/extensions/bingbong.ts" with { type: "text" };
 
 function getBingbongCommand(): string {
   try {
@@ -37,7 +37,7 @@ const AGENTS: Record<string, { display: string; configHint: string }> = {
   pi:       { display: "Pi",          configHint: "~/.pi/agent/extensions/" },
 };
 
-const INSTALLERS: Record<string, (agentsDir: string, dryRun: boolean) => Promise<string>> = {
+const INSTALLERS: Record<string, (dryRun: boolean) => Promise<string>> = {
   claude: installClaude,
   cursor: installCursor,
   opencode: installOpencode,
@@ -86,15 +86,7 @@ export async function installHooks(argv: string[]) {
     process.exit(1);
   }
 
-  if (!existsSync(AGENTS_DIR)) {
-    console.error(
-      `Error: Could not find agents directory at ${AGENTS_DIR}\n` +
-      `This can happen with bundled builds. Install from source checkout or binary release package.`
-    );
-    process.exit(1);
-  }
-
-  const configPath = await installer(AGENTS_DIR, dryRun);
+  const configPath = await installer(dryRun);
   if (dryRun) {
     console.log(`\nRun without --dry-run to apply these changes.`);
   } else {
@@ -207,7 +199,7 @@ function isBingbongClaudeEntry(entry: any): boolean {
   });
 }
 
-async function installClaude(_agentsDir: string, dryRun: boolean): Promise<string> {
+async function installClaude(dryRun: boolean): Promise<string> {
   const bingbongCmd = getBingbongCommand();
   const configPath = join(homedir(), ".claude", "settings.json");
 
@@ -269,7 +261,7 @@ function isBingbongCursorEntry(entry: any): boolean {
   return cmd.includes("bingbong-hook.sh") || cmd.includes("bingbong emit");
 }
 
-async function installCursor(_agentsDir: string, dryRun: boolean): Promise<string> {
+async function installCursor(dryRun: boolean): Promise<string> {
   const bingbongCmd = getBingbongCommand();
   const configPath = join(homedir(), ".cursor", "hooks.json");
 
@@ -306,25 +298,17 @@ async function installCursor(_agentsDir: string, dryRun: boolean): Promise<strin
 // OpenCode installer
 // ---------------------------------------------------------------------------
 
-async function installOpencode(agentsDir: string, dryRun: boolean): Promise<string> {
-  const sourcePath = join(agentsDir, "opencode", "plugins", "bingbong.js");
+async function installOpencode(dryRun: boolean): Promise<string> {
   const targetPath = join(homedir(), ".config", "opencode", "plugins", "bingbong.js");
-
-  if (!existsSync(sourcePath)) {
-    console.error(`Error: Source plugin not found: ${sourcePath}`);
-    process.exit(1);
-  }
-
-  const content = await readFile(sourcePath, "utf-8");
 
   if (dryRun) {
     const existingContent = existsSync(targetPath) ? await readFile(targetPath, "utf-8") : null;
-    printPreview(targetPath, existingContent, content);
+    printPreview(targetPath, existingContent, opencodePluginSource);
     return targetPath;
   }
 
   ensureDir(dirname(targetPath));
-  await writeFile(targetPath, content, "utf-8");
+  await writeFile(targetPath, opencodePluginSource, "utf-8");
 
   return targetPath;
 }
@@ -333,19 +317,11 @@ async function installOpencode(agentsDir: string, dryRun: boolean): Promise<stri
 // Pi installer
 // ---------------------------------------------------------------------------
 
-async function installPi(agentsDir: string, dryRun: boolean): Promise<string> {
-  const sourcePath = join(agentsDir, "pi", "extensions", "bingbong.ts");
+async function installPi(dryRun: boolean): Promise<string> {
   const extensionsDir = process.env.PI_EXTENSIONS_DIR || join(homedir(), ".pi", "agent", "extensions");
   const targetPath = join(extensionsDir, "bingbong.ts");
   const bingbongUrl = process.env.BINGBONG_URL || "http://localhost:3334";
-
-  if (!existsSync(sourcePath)) {
-    console.error(`Error: Source extension not found: ${sourcePath}`);
-    process.exit(1);
-  }
-
-  const content = await readFile(sourcePath, "utf-8");
-  const transformed = content.replace("__BINGBONG_URL__", bingbongUrl);
+  const transformed = piExtensionSource.replace("__BINGBONG_URL__", bingbongUrl);
 
   if (dryRun) {
     const existingContent = existsSync(targetPath) ? await readFile(targetPath, "utf-8") : null;
