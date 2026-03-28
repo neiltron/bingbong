@@ -7,7 +7,7 @@
 
 import clientIndex from "../client/index.html";
 
-const VERSION = "0.1.7";
+const VERSION = "0.1.8";
 const MAX_EVENT_LOG_LINES = 1000;
 
 interface RuntimeLogger {
