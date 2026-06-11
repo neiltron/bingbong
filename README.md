@@ -69,9 +69,10 @@ bingbong [options]
 bingbong <command> [options]
 
 Commands:
-  emit <EventType>       Emit an event to the bingbong server (used by hooks)
-  install-hooks <agent>  Install bingbong hooks for a coding agent
-  test                   Smoke-test a running bingbong server
+  emit <EventType>         Emit an event to the bingbong server (used by hooks)
+  install-hooks <agent>    Install bingbong hooks for a coding agent
+  uninstall-hooks <agent>  Remove bingbong hooks for a coding agent
+  test                     Smoke-test a running bingbong server
 
 Options:
   -p, --port <number>  Port to run server on (default: 3334)
