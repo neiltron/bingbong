@@ -344,14 +344,30 @@ export class Visualizer {
   private height = 0
 
   // Fixed font string to avoid CSS variable in canvas (which doesn't work)
-  private readonly FONT = "10px 'SF Mono', Monaco, Inconsolata, 'Roboto Mono', monospace"
+  private readonly FONT = "10px 'Geist Mono', 'SF Mono', Monaco, monospace"
   private readonly MAX_ACTIVE_PULSES = 180
 
   private resizeRafId: number | null = null
 
+  // Theme palette cached from CSS custom properties (canvas can't resolve var())
+  private palette = {
+    bg: '#052b2b',
+    grid: 'rgba(250, 243, 227, 0.15)',
+    listener: '#FAF3E3',
+    label: 'rgba(250, 243, 227, 0.55)',
+  }
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
     this.ctx = canvas.getContext('2d', { alpha: false })!
+
+    this.readPalette()
+
+    // Re-read palette when the theme attribute flips
+    new MutationObserver(() => {
+      this.readPalette()
+      this.drawStatic()
+    }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
 
     // Use ResizeObserver with rAF to avoid "loop completed with undelivered notifications"
     new ResizeObserver(() => {
@@ -361,6 +377,17 @@ export class Visualizer {
         this.resize()
       })
     }).observe(this.canvas)
+  }
+
+  private readPalette(): void {
+    const styles = getComputedStyle(document.documentElement)
+    const read = (name: string, fallback: string) => styles.getPropertyValue(name).trim() || fallback
+    this.palette = {
+      bg: read('--viz-bg', this.palette.bg),
+      grid: read('--viz-grid', this.palette.grid),
+      listener: read('--viz-listener', this.palette.listener),
+      label: read('--viz-label', this.palette.label),
+    }
   }
 
   private resize(): void {
@@ -397,11 +424,11 @@ export class Visualizer {
     const { centerX, centerY, maxRadius } = this.getRadarGeometry()
 
     // Clear canvas
-    ctx.fillStyle = '#00141f'
+    ctx.fillStyle = this.palette.bg
     ctx.fillRect(0, 0, this.width, this.height)
 
     // Draw concentric circles (distance zones)
-    ctx.strokeStyle = 'rgba(42, 42, 58, 0.5)'
+    ctx.strokeStyle = this.palette.grid
     ctx.lineWidth = 1
     ;[0.25, 0.5, 0.75, 1].forEach((pct) => {
       ctx.beginPath()
@@ -418,13 +445,13 @@ export class Visualizer {
     ctx.stroke()
 
     // Draw listener indicator at center
-    ctx.fillStyle = '#fff'
+    ctx.fillStyle = this.palette.listener
     ctx.beginPath()
     ctx.arc(centerX, centerY, 6, 0, Math.PI * 2)
     ctx.fill()
 
     // Listener label - use literal font string, not CSS variable
-    ctx.fillStyle = 'rgba(136, 136, 136, 0.7)'
+    ctx.fillStyle = this.palette.label
     ctx.font = this.FONT
     ctx.textAlign = 'center'
     ctx.fillText('LISTENER', centerX, centerY + 22)

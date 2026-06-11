@@ -1,0 +1,571 @@
+/* ============================================
+   Bingbong Design System
+   Based on Component Library A variations
+   ============================================ */
+
+/* ============================================
+   Theme: Light (Cream) - Default
+   Font pairing: Geist Mono (interface) + Inter (display)
+   ============================================ */
+:root,
+[data-theme="light"] {
+    /* Colors - Core Palette */
+    --color-teal: #0D5E5E;
+    --color-marigold: #E8A832;
+    --color-rose: #E88FA0;
+    --color-cream: #FAF3E3;
+    --color-sand: #F5ECD7;
+
+    /* Colors - Semantic */
+    --color-bg-base: var(--color-cream);
+    --color-bg-surface: #FFFFFF;
+    --color-bg-elevated: var(--color-sand);
+    --color-bg-accent: var(--color-teal);
+    --color-bg-accent-secondary: var(--color-marigold);
+
+    /* Colors - Border */
+    --color-border: var(--color-teal);
+    --color-border-subtle: rgba(13, 94, 94, 0.2);
+
+    /* Colors - Text */
+    --color-text-primary: var(--color-teal);
+    --color-text-secondary: rgba(13, 94, 94, 0.7);
+    --color-text-muted: rgba(13, 94, 94, 0.5);
+    --color-text-inverse: var(--color-cream);
+    --color-text-on-accent: var(--color-cream);
+    --color-text-on-marigold: var(--color-teal);
+
+    /* Colors - State */
+    --color-success: #6b9b6b;
+    --color-error: #ff4444;
+    --color-disabled-bg: var(--color-sand);
+    --color-disabled-text: rgba(13, 94, 94, 0.5);
+}
+
+/* ============================================
+   Theme: Dark (Deep Teal)
+   ============================================ */
+[data-theme="dark"] {
+    /* Colors - Core Palette (same hues, dark context) */
+    --color-teal: #0D5E5E;
+    --color-deep-teal: #073838;
+    --color-marigold: #E8A832;
+    --color-rose: #E88FA0;
+    --color-cream: #FAF3E3;
+
+    /* Colors - Semantic */
+    --color-bg-base: var(--color-deep-teal);
+    --color-bg-surface: rgba(250, 243, 227, 0.05);
+    --color-bg-elevated: rgba(250, 243, 227, 0.08);
+    --color-bg-accent: var(--color-teal);
+    --color-bg-accent-secondary: var(--color-marigold);
+
+    /* Colors - Border */
+    --color-border: rgba(250, 243, 227, 0.15);
+    --color-border-subtle: rgba(250, 243, 227, 0.08);
+
+    /* Colors - Text */
+    --color-text-primary: var(--color-cream);
+    --color-text-secondary: rgba(250, 243, 227, 0.7);
+    --color-text-muted: rgba(250, 243, 227, 0.5);
+    --color-text-inverse: var(--color-deep-teal);
+    --color-text-on-accent: var(--color-cream);
+    --color-text-on-marigold: var(--color-deep-teal);
+
+    /* Colors - State */
+    --color-success: #6b9b6b;
+    --color-error: #ff4444;
+    --color-disabled-bg: rgba(250, 243, 227, 0.1);
+    --color-disabled-text: rgba(250, 243, 227, 0.4);
+}
+
+/* ============================================
+   Typography
+   ============================================ */
+:root {
+    /* Font Families */
+    --font-display: "Inter", system-ui, sans-serif;
+    --font-interface: "Geist Mono", "SF Mono", "Monaco", monospace;
+
+    /* Font Sizes */
+    --font-size-display: 40px;
+    --font-size-heading: 28px;
+    --font-size-subheading: 18px;
+    --font-size-body: 14px;
+    --font-size-caption: 12px;
+    --font-size-label: 11px;
+
+    /* Line Heights */
+    --line-height-display: 48px;
+    --line-height-heading: 34px;
+    --line-height-subheading: 22px;
+    --line-height-body: 18px;
+    --line-height-caption: 16px;
+
+    /* Font Weights */
+    --font-weight-bold: 700;
+    --font-weight-semibold: 600;
+    --font-weight-medium: 500;
+    --font-weight-regular: 400;
+
+    /* Letter Spacing */
+    --letter-spacing-label: 0.1em;
+}
+
+/* ============================================
+   Spacing
+   ============================================ */
+:root {
+    --space-xs: 8px;
+    --space-sm: 12px;
+    --space-md: 16px;
+    --space-lg: 20px;
+    --space-xl: 24px;
+    --space-2xl: 32px;
+    --space-3xl: 48px;
+}
+
+/* ============================================
+   Radii
+   ============================================ */
+:root {
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-full: 50%;
+}
+
+/* ============================================
+   Shadows
+   ============================================ */
+:root {
+    --shadow-node: 0 4px 16px rgba(13, 94, 94, 0.3);
+    --shadow-node-dark: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================
+   Visualizer Canvas
+   Read from JS at draw time — canvas can't resolve var()
+   ============================================ */
+:root,
+[data-theme="light"] {
+    --viz-bg: var(--color-sand);
+    --viz-grid: rgba(13, 94, 94, 0.2);
+    --viz-listener: var(--color-teal);
+    --viz-label: rgba(13, 94, 94, 0.6);
+}
+
+[data-theme="dark"] {
+    --viz-bg: #052b2b;
+    --viz-grid: rgba(250, 243, 227, 0.15);
+    --viz-listener: var(--color-cream);
+    --viz-label: rgba(250, 243, 227, 0.55);
+}
+
+/* ============================================
+   Transitions
+   ============================================ */
+:root {
+    --transition-fast: 0.15s ease;
+    --transition-base: 0.2s ease;
+    --transition-slow: 0.3s ease;
+}
+
+/* ============================================
+   Component Styles - Buttons
+   ============================================ */
+.btn {
+    font-family: var(--font-interface);
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-medium);
+    padding: 12px 24px;
+    border-radius: var(--radius-md);
+    border: none;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.btn-primary {
+    background: var(--color-bg-accent);
+    color: var(--color-text-on-accent);
+}
+
+.btn-primary:hover {
+    filter: brightness(1.1);
+}
+
+.btn-accent {
+    background: var(--color-marigold);
+    color: var(--color-text-on-marigold);
+}
+
+.btn-accent:hover {
+    filter: brightness(1.05);
+}
+
+.btn-outline {
+    background: transparent;
+    border: 2px solid var(--color-border);
+    color: var(--color-text-primary);
+}
+
+.btn-outline:hover {
+    background: var(--color-bg-accent);
+    color: var(--color-text-on-accent);
+}
+
+.btn-disabled,
+.btn:disabled {
+    background: var(--color-disabled-bg);
+    color: var(--color-disabled-text);
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+/* Dark theme button adjustments */
+[data-theme="dark"] .btn-primary {
+    background: var(--color-cream);
+    color: var(--color-deep-teal);
+}
+
+[data-theme="dark"] .btn-outline {
+    border-color: rgba(250, 243, 227, 0.4);
+    color: var(--color-cream);
+}
+
+[data-theme="dark"] .btn-outline:hover {
+    background: var(--color-cream);
+    color: var(--color-deep-teal);
+}
+
+/* ============================================
+   Component Styles - Agent Session Cards
+   ============================================ */
+.agent-session {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+    background: var(--color-bg-surface);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    min-width: 280px;
+}
+
+.agent-session-indicator {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.agent-session-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.agent-session-name {
+    font-family: var(--font-interface);
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text-primary);
+}
+
+.agent-session-meta {
+    font-family: var(--font-interface);
+    font-size: var(--font-size-caption);
+    color: var(--color-text-muted);
+}
+
+/* Dark theme agent session */
+[data-theme="dark"] .agent-session {
+    background: var(--color-bg-elevated);
+    border-color: transparent;
+}
+
+/* ============================================
+   Component Styles - Source Nodes
+   ============================================ */
+.source-node {
+    width: 72px;
+    height: 72px;
+    border-radius: var(--radius-full);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    transition: all var(--transition-fast);
+    box-shadow: var(--shadow-node);
+}
+
+.source-node-icon {
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-weight: var(--font-weight-bold);
+}
+
+.source-node-label {
+    font-family: var(--font-interface);
+    font-size: var(--font-size-label);
+    color: var(--color-text-inverse);
+    opacity: 0.8;
+}
+
+.source-node--default {
+    background: var(--color-teal);
+    border: 2px solid var(--color-teal);
+}
+
+.source-node--default .source-node-icon {
+    color: var(--color-cream);
+}
+
+.source-node--active {
+    background: var(--color-marigold);
+    border: 2px solid var(--color-marigold);
+}
+
+.source-node--active .source-node-icon {
+    color: var(--color-teal);
+}
+
+.source-node--idle {
+    background: var(--color-sand);
+    border: 2px solid var(--color-border-subtle);
+    opacity: 0.6;
+}
+
+.source-node--idle .source-node-icon {
+    color: var(--color-text-muted);
+}
+
+.source-node--disconnected {
+    background: transparent;
+    border: 2px dashed var(--color-border-subtle);
+    opacity: 0.4;
+    box-shadow: none;
+}
+
+.source-node--disconnected .source-node-icon {
+    color: var(--color-text-muted);
+}
+
+/* Dark theme source nodes */
+[data-theme="dark"] .source-node {
+    box-shadow: var(--shadow-node-dark);
+}
+
+[data-theme="dark"] .source-node--default {
+    background: rgba(232, 168, 50, 0.15);
+    border-color: var(--color-marigold);
+}
+
+[data-theme="dark"] .source-node--default .source-node-icon {
+    color: var(--color-marigold);
+}
+
+[data-theme="dark"] .source-node--active {
+    background: rgba(232, 143, 160, 0.15);
+    border-color: var(--color-rose);
+}
+
+[data-theme="dark"] .source-node--active .source-node-icon {
+    color: var(--color-rose);
+}
+
+[data-theme="dark"] .source-node--idle {
+    background: rgba(13, 94, 94, 0.3);
+    border-color: var(--color-teal);
+}
+
+[data-theme="dark"] .source-node--idle .source-node-icon {
+    color: var(--color-teal);
+}
+
+[data-theme="dark"] .source-node--disconnected {
+    background: rgba(250, 243, 227, 0.03);
+    border-color: rgba(250, 243, 227, 0.2);
+}
+
+/* ============================================
+   Component Styles - Tool Events
+   ============================================ */
+.tool-event {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: 10px 14px;
+    background: var(--color-bg-surface);
+    border-radius: var(--radius-sm);
+}
+
+.tool-event-badge {
+    font-family: var(--font-interface);
+    font-size: var(--font-size-caption);
+    font-weight: var(--font-weight-medium);
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    background: var(--color-bg-accent);
+    color: var(--color-text-on-accent);
+}
+
+.tool-event-name {
+    font-family: var(--font-interface);
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text-primary);
+}
+
+.tool-event-agent {
+    font-family: var(--font-interface);
+    font-size: var(--font-size-body);
+    color: var(--color-text-muted);
+}
+
+.tool-event-time {
+    font-family: var(--font-interface);
+    font-size: var(--font-size-body);
+    color: var(--color-text-muted);
+    margin-left: auto;
+}
+
+/* Dark theme tool events */
+[data-theme="dark"] .tool-event {
+    background: var(--color-bg-surface);
+}
+
+[data-theme="dark"] .tool-event-name {
+    color: var(--color-marigold);
+}
+
+/* ============================================
+   Component Styles - Panels
+   ============================================ */
+.panel {
+    padding: var(--space-lg);
+    border-radius: var(--radius-xl);
+}
+
+.panel--default {
+    background: var(--color-bg-surface);
+    border: 2px solid var(--color-border);
+}
+
+.panel--accent {
+    background: var(--color-bg-accent);
+    color: var(--color-text-on-accent);
+}
+
+.panel-title {
+    font-family: var(--font-interface);
+    font-size: var(--font-size-caption);
+    font-weight: var(--font-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: var(--letter-spacing-label);
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-sm);
+}
+
+.panel--accent .panel-title {
+    color: rgba(250, 243, 227, 0.7);
+}
+
+.panel-content {
+    font-family: var(--font-interface);
+    font-size: var(--font-size-body);
+}
+
+/* Dark theme panels */
+[data-theme="dark"] .panel--default {
+    background: var(--color-bg-surface);
+    border-color: var(--color-border-subtle);
+}
+
+[data-theme="dark"] .panel--inverted {
+    background: var(--color-cream);
+    color: var(--color-deep-teal);
+}
+
+[data-theme="dark"] .panel--inverted .panel-title {
+    color: rgba(7, 56, 56, 0.6);
+}
+
+[data-theme="dark"] .panel--inverted .panel-content {
+    color: var(--color-deep-teal);
+}
+
+/* ============================================
+   Typography Utilities
+   ============================================ */
+.text-display {
+    font-family: var(--font-display);
+    font-size: var(--font-size-display);
+    font-weight: var(--font-weight-bold);
+    line-height: var(--line-height-display);
+    color: var(--color-text-primary);
+}
+
+.text-heading {
+    font-family: var(--font-display);
+    font-size: var(--font-size-heading);
+    font-weight: var(--font-weight-bold);
+    line-height: var(--line-height-heading);
+    color: var(--color-text-primary);
+}
+
+.text-subheading {
+    font-family: var(--font-display);
+    font-size: var(--font-size-subheading);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-subheading);
+    color: var(--color-text-primary);
+}
+
+.text-body {
+    font-family: var(--font-interface);
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-regular);
+    line-height: var(--line-height-body);
+    color: var(--color-text-primary);
+}
+
+.text-caption {
+    font-family: var(--font-interface);
+    font-size: var(--font-size-caption);
+    font-weight: var(--font-weight-regular);
+    line-height: var(--line-height-caption);
+    color: var(--color-text-secondary);
+}
+
+.text-label {
+    font-family: var(--font-interface);
+    font-size: var(--font-size-label);
+    font-weight: var(--font-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: var(--letter-spacing-label);
+    color: var(--color-text-muted);
+}
+
+/* ============================================
+   Color Utilities
+   ============================================ */
+.bg-teal { background-color: var(--color-teal); }
+.bg-marigold { background-color: var(--color-marigold); }
+.bg-rose { background-color: var(--color-rose); }
+.bg-cream { background-color: var(--color-cream); }
+.bg-sand { background-color: var(--color-sand); }
+
+.text-teal { color: var(--color-teal); }
+.text-marigold { color: var(--color-marigold); }
+.text-rose { color: var(--color-rose); }
+.text-cream { color: var(--color-cream); }
+
+.border-teal { border-color: var(--color-teal); }
+.border-marigold { border-color: var(--color-marigold); }
+.border-rose { border-color: var(--color-rose); }
