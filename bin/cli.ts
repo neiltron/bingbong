@@ -8,7 +8,7 @@
 
 import { startServer, type RuntimeLogger } from "../src/server";
 
-const VERSION = "0.1.8";
+const VERSION = "0.1.9";
 
 let activeLogger: RuntimeLogger | null = null;
 
