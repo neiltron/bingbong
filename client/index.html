@@ -5,6 +5,18 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <base href="/" />
         <title>Bingbong</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+        <script>
+            // Set theme from system preference before first paint
+            const themeQuery = window.matchMedia("(prefers-color-scheme: dark)");
+            const applyTheme = () => {
+                document.documentElement.dataset.theme = themeQuery.matches ? "dark" : "light";
+            };
+            applyTheme();
+            themeQuery.addEventListener("change", applyTheme);
+        </script>
     </head>
     <body>
         <div class="audio-banner" id="audio-banner" role="button" tabindex="0" aria-label="Click to enable audio" hidden>

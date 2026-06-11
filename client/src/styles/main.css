@@ -1,59 +1,37 @@
 /* ============================================
-   Design Tokens
+   Import Design System
+   ============================================ */
+@import url('./design-system.css');
+
+/* ============================================
+   Legacy Design Tokens (being migrated)
    ============================================ */
 :root {
-    /* Colors - Background */
-    --color-bg-base: #000e14;
-    --color-bg-surface: #00111a;
-    --color-bg-elevated: #00141f;
-
-    /* Colors - Border */
-    --color-border: #2a2a3a;
-
-    /* Colors - Text */
-    --color-text-primary: #e0e0e0;
-    --color-text-secondary: #999;
-    --color-text-muted: #888;
-    --color-text-inverse: #0a0a0f;
-    --color-text-bright: #fff;
-
-    /* Colors - Accent */
-    --color-accent: #1a7a9e;
-    --color-accent-hover: #15678a;
+    /* Colors - Accent (mapped to design system) */
+    --color-accent: var(--color-teal);
+    --color-accent-hover: #0a4a4a;
 
     /* Colors - Semantic */
-    --color-success: #6b9b6b;
-    --color-error: #ff4444;
-    --color-tool: #ff6b6b;
+    --color-tool: var(--color-rose);
+    --color-text-bright: var(--color-text-primary);
 
-    /* Typography */
-    --font-mono:
-        "SF Mono", "Monaco", "Inconsolata", "Roboto Mono", monospace;
+    /* Typography - Legacy mappings */
+    --font-mono: var(--font-interface);
     --font-size-xs: 0.75em;
     --font-size-sm: 0.8em;
     --font-size-base: 0.85em;
     --font-size-md: 0.9em;
     --font-size-lg: 1.5em;
 
-    /* Spacing */
-    --space-xs: 8px;
-    --space-sm: 10px;
-    --space-md: 15px;
-    --space-lg: 20px;
-    --space-xl: 24px;
-
-    /* Radii */
-    --radius-sm: 4px;
-    --radius-md: 8px;
-    --radius-full: 50%;
-
-    /* Transitions */
-    --transition-fast: 0.2s ease;
-    --transition-base: 0.3s ease;
-
     /* Layout */
     --sidebar-width: 300px;
     --container-max: 1400px;
+}
+
+/* Dark theme: marigold takes over as the accent (teal-on-teal lacks contrast) */
+[data-theme="dark"] {
+    --color-accent: var(--color-marigold);
+    --color-accent-hover: #d99a26;
 }
 
 /* ============================================
@@ -529,7 +507,7 @@ input[type="range"] {
 .sessions-list,
 .event-log {
     scrollbar-width: thin;
-    scrollbar-color: #2d3748 transparent;
+    scrollbar-color: var(--color-border-subtle) transparent;
 }
 
 .sessions-list::-webkit-scrollbar,
@@ -544,13 +522,13 @@ input[type="range"] {
 
 .sessions-list::-webkit-scrollbar-thumb,
 .event-log::-webkit-scrollbar-thumb {
-    background: #2d3748;
+    background: var(--color-border-subtle);
     border-radius: 3px;
 }
 
 .sessions-list::-webkit-scrollbar-thumb:hover,
 .event-log::-webkit-scrollbar-thumb:hover {
-    background: #4a5568;
+    background: var(--color-border);
 }
 
 /* ============================================
