@@ -3,6 +3,9 @@
   "version": "0.1.9",
   "description": "Soundscapes for coding agents - audio monitoring for Claude Code, Cursor, and other AI coding assistants",
   "type": "module",
+  "workspaces": [
+    "client"
+  ],
   "bin": {
     "bingbong": "./bin/cli.ts"
   },
@@ -15,12 +18,9 @@
   "scripts": {
     "start": "bun run bin/cli.ts",
     "dev": "bun --watch run bin/cli.ts",
-    "dev:client": "cd client && bunx vite",
-    "build:client": "cd client && bunx vite build"
-  },
-  "devDependencies": {
-    "vite": "^6.0.0",
-    "typescript": "^5.3.0"
+    "dev:client": "bun run --cwd client dev",
+    "build:client": "bun run --cwd client build",
+    "typecheck:client": "bun run --cwd client typecheck"
   },
   "keywords": [
     "claude",
