@@ -9,6 +9,7 @@
  */
 
 import os from "node:os";
+import type { BingbongEvent } from "./protocol";
 
 export async function emit(argv: string[]): Promise<void> {
   const enabled = (process.env.BINGBONG_ENABLED || "true").toLowerCase() !== "false";
@@ -53,7 +54,7 @@ export async function emit(argv: string[]): Promise<void> {
   const sessionId = (input.session_id ?? input.conversation_id ?? input.generation_id ?? "unknown") as string;
 
   // Spread stdin payload, overlay our fields
-  const payload = {
+  const payload: BingbongEvent = {
     ...input,
     event_type: eventType,
     session_id: sessionId,

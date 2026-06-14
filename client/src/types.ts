@@ -1,31 +1,11 @@
-// Types matching server definitions in src/server.ts
-
-export interface BingbongEvent {
-  event_type: string
-  session_id: string
-  machine_id: string
-  timestamp: string
-  cwd: string
-  tool_name: string
-  tool_input: Record<string, unknown>
-  tool_output: Record<string, unknown>
-}
-
-export interface EnrichedEvent extends BingbongEvent {
-  pan: number // -1 (left) to 1 (right)
-  session_index: number
-  color: string
-}
-
-export interface Session {
-  session_id: string
-  machine_id: string
-  pan: number
-  index: number
-  color: string
-  event_count: number
-  last_seen?: string
-}
+export type {
+  BingbongEvent,
+  EnrichedEvent,
+  HealthResponse,
+  InitMessage,
+  ServerMessage,
+  SessionSnapshot as Session,
+} from '../../src/protocol'
 
 export interface SoundParams {
   note?: string
