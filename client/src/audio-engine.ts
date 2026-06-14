@@ -208,7 +208,7 @@ export class AudioEngine {
     if (event_type === 'PreToolUse' || event_type === 'PostToolUse') {
       // Use tool-specific sound
       const tools = SOUND_CONFIG.tools as Record<string, SoundParams>
-      config = tools[tool_name] || tools.default
+      config = tools[tool_name || 'default'] || tools.default
 
       // Make PostToolUse slightly different (higher pitch)
       if (event_type === 'PostToolUse' && config.note) {
