@@ -4,23 +4,24 @@
   "description": "Soundscapes for coding agents - audio monitoring for Claude Code, Cursor, and other AI coding assistants",
   "type": "module",
   "workspaces": [
-    "client"
+    "apps/*",
+    "packages/*"
   ],
   "bin": {
-    "bingbong": "./bin/cli.ts"
+    "bingbong": "./packages/cli/bin/cli.ts"
   },
   "files": [
-    "bin/",
-    "src/",
-    "client/",
+    "apps/client/",
+    "packages/cli/",
+    "packages/protocol/",
     "agents/"
   ],
   "scripts": {
-    "start": "bun run bin/cli.ts",
-    "dev": "bun --watch run bin/cli.ts",
-    "dev:client": "bun run --cwd client dev",
-    "build:client": "bun run --cwd client build",
-    "typecheck:client": "bun run --cwd client typecheck"
+    "start": "bun run packages/cli/bin/cli.ts",
+    "dev": "bun --watch run packages/cli/bin/cli.ts",
+    "dev:client": "bun run --cwd apps/client dev",
+    "build:client": "bun run --cwd apps/client build",
+    "typecheck:client": "bun run --cwd apps/client typecheck"
   },
   "keywords": [
     "claude",

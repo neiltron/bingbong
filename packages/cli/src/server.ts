@@ -5,7 +5,7 @@
  * to connected frontend clients for audio rendering.
  */
 
-import clientIndex from "../client/index.html";
+import clientIndex from "../../../apps/client/index.html";
 import {
   PlainLogger,
   TerminalLayoutLogger,
@@ -13,7 +13,7 @@ import {
   type RuntimeStats,
 } from "./runtime-logger";
 import { SessionRegistry } from "./session-registry";
-import type { BingbongEvent, EnrichedEvent } from "./protocol";
+import type { BingbongEvent, EnrichedEvent } from "@bingbong/protocol";
 
 const VERSION = "0.1.9";
 export type { RuntimeLogger } from "./runtime-logger";

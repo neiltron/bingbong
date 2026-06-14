@@ -11,7 +11,7 @@
  *   2 — event send failed
  */
 
-import type { BingbongEvent, HealthResponse } from "./protocol";
+import type { BingbongEvent, HealthResponse } from "@bingbong/protocol";
 
 const TIMEOUT = 2000;
 

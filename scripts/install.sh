@@ -165,7 +165,7 @@ build_from_source() {
   (
     cd "$workdir/src"
     bun install --frozen-lockfile || bun install
-    bun build ./bin/cli.ts --compile --outfile "$workdir/bingbong"
+    bun build ./packages/cli/bin/cli.ts --compile --outfile "$workdir/bingbong"
   )
 
   local temp_bin="$install_dir/.bingbong.tmp.$$"

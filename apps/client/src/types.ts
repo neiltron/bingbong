@@ -5,7 +5,7 @@ export type {
   InitMessage,
   ServerMessage,
   SessionSnapshot as Session,
-} from '../../src/protocol'
+} from '@bingbong/protocol'
 
 export interface SoundParams {
   note?: string

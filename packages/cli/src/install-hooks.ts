@@ -10,8 +10,8 @@ import { readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, dirname } from "node:path";
 
-import opencodePluginSource from "../agents/opencode/plugins/bingbong.js" with { type: "text" };
-import piExtensionSource from "../agents/pi/extensions/bingbong.ts" with { type: "text" };
+import opencodePluginSource from "../../../agents/opencode/plugins/bingbong.js" with { type: "text" };
+import piExtensionSource from "../../../agents/pi/extensions/bingbong.ts" with { type: "text" };
 
 function getBingbongCommand(): string {
   try {

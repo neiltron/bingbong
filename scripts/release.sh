@@ -64,10 +64,10 @@ fi
 
 if [[ "$BUMP" =~ ^(patch|minor|major)$ ]]; then
   echo "[release] bumping version: $BUMP"
-  npm version "$BUMP"
+  npm version "$BUMP" --no-git-tag-version
 elif [[ "$BUMP" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "[release] setting version: $BUMP"
-  npm version "$BUMP"
+  npm version "$BUMP" --no-git-tag-version
 else
   echo "[release] invalid version argument: $BUMP" >&2
   echo "[release] use patch|minor|major or x.y.z" >&2
@@ -77,8 +77,28 @@ fi
 new_version="$(node -p "require('./package.json').version")"
 tag="v${new_version}"
 
+echo "[release] updating embedded CLI/server version constants"
+node -e '
+const fs = require("fs");
+const version = process.argv[1];
+for (const path of ["packages/cli/bin/cli.ts", "packages/cli/src/server.ts"]) {
+  const source = fs.readFileSync(path, "utf8");
+  const next = source.replace(/const VERSION = "[^"]+";/, `const VERSION = "${version}";`);
+  if (next === source) {
+    console.error(`[release] unable to update version constant in ${path}`);
+    process.exit(1);
+  }
+  fs.writeFileSync(path, next);
+}
+' "$new_version"
+
 echo "[release] verifying version parity"
 scripts/check-version-parity.sh "$tag"
+
+echo "[release] committing version bump"
+git add package.json package-lock.json packages/cli/bin/cli.ts packages/cli/src/server.ts
+git commit -m "$new_version"
+git tag "$tag"
 
 echo "[release] pushing main + tag $tag"
 git push origin main

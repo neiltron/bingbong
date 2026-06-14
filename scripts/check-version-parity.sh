@@ -24,18 +24,24 @@ need_cmd node
 
 pkg_version="$(node -p "require('./package.json').version")"
 lock_version="$(node -e "const l=require('./package-lock.json'); process.stdout.write((l.version||l.packages?.['']?.version||''));")"
+cli_version="$(node -e "const fs=require('fs'); const m=fs.readFileSync('packages/cli/bin/cli.ts','utf8').match(/const VERSION = \"([^\"]+)\"/); process.stdout.write(m?.[1]||'');")"
+server_version="$(node -e "const fs=require('fs'); const m=fs.readFileSync('packages/cli/src/server.ts','utf8').match(/const VERSION = \"([^\"]+)\"/); process.stdout.write(m?.[1]||'');")"
 
-if [[ -z "$pkg_version" || -z "$lock_version" ]]; then
+if [[ -z "$pkg_version" || -z "$lock_version" || -z "$cli_version" || -z "$server_version" ]]; then
   echo "[version-parity] FAIL: unable to read package versions" >&2
   exit 1
 fi
 
-if [[ "$pkg_version" != "$lock_version" ]]; then
-  echo "[version-parity] FAIL: package.json ($pkg_version) != package-lock.json ($lock_version)" >&2
+if [[ "$pkg_version" != "$lock_version" || "$pkg_version" != "$cli_version" || "$pkg_version" != "$server_version" ]]; then
+  echo "[version-parity] FAIL: versions disagree" >&2
+  echo "[version-parity] package.json: $pkg_version" >&2
+  echo "[version-parity] package-lock.json: $lock_version" >&2
+  echo "[version-parity] packages/cli/bin/cli.ts: $cli_version" >&2
+  echo "[version-parity] packages/cli/src/server.ts: $server_version" >&2
   exit 1
 fi
 
-echo "[version-parity] package.json == package-lock.json == $pkg_version"
+echo "[version-parity] package.json == package-lock.json == CLI/server constants == $pkg_version"
 
 if [[ -n "$TAG_INPUT" ]]; then
   tag_version="$(normalize_tag "$TAG_INPUT")"

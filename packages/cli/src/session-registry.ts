@@ -1,4 +1,8 @@
-import type { EnrichedEvent, BingbongEvent, SessionSnapshot } from "./protocol";
+import type {
+  EnrichedEvent,
+  BingbongEvent,
+  SessionSnapshot,
+} from "@bingbong/protocol";
 import type { RuntimeStats } from "./runtime-logger";
 
 interface SessionRecord extends Omit<SessionSnapshot, "first_seen" | "last_seen"> {

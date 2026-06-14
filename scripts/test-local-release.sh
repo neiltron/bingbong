@@ -117,7 +117,7 @@ for entry in "${TARGETS[@]}"; do
   stage_dir="$WORKDIR/stage/$target_name"
   mkdir -p "$stage_dir"
 
-  bun build "$ROOT_DIR/bin/cli.ts" --compile --target="$bun_target" --outfile "$stage_dir/bingbong" >/dev/null
+  bun build "$ROOT_DIR/packages/cli/bin/cli.ts" --compile --target="$bun_target" --outfile "$stage_dir/bingbong" >/dev/null
   chmod +x "$stage_dir/bingbong"
   tar -C "$stage_dir" -czf "$RELEASE_DOWNLOAD_DIR/bingbong-$target_name.tar.gz" bingbong
 done
