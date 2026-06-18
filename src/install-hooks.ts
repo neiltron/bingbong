@@ -1,8 +1,8 @@
 /**
- * bingbong install-hooks
+ * bingbong install-hooks / uninstall-hooks
  *
- * Installs bingbong hooks for supported coding agents.
- * All four agent installers live in this single file.
+ * Installs and removes bingbong hooks for supported coding agents.
+ * All four agent installers and uninstallers live in this single file.
  */
 
 import { existsSync, mkdirSync, renameSync, unlinkSync, chmodSync, statSync } from "node:fs";
@@ -44,6 +44,14 @@ const INSTALLERS: Record<string, (dryRun: boolean) => Promise<string>> = {
   pi: installPi,
 };
 
+// Uninstallers return true if anything was (or would be) removed
+const UNINSTALLERS: Record<string, (dryRun: boolean) => Promise<boolean>> = {
+  claude: uninstallClaude,
+  cursor: uninstallCursor,
+  opencode: uninstallOpencode,
+  pi: uninstallPi,
+};
+
 function printUsage() {
   console.log(`
 Usage: bingbong install-hooks [--dry-run] <agent>
@@ -63,34 +71,69 @@ Examples:
 `);
 }
 
-export async function installHooks(argv: string[]) {
+function printUninstallUsage() {
+  console.log(`
+Usage: bingbong uninstall-hooks [--dry-run] <agent>
+
+Options:
+  --dry-run  Preview changes without writing any files
+
+Available agents:
+  claude     Claude Code (${AGENTS.claude.configHint})
+  cursor     Cursor (${AGENTS.cursor.configHint})
+  opencode   OpenCode (${AGENTS.opencode.configHint})
+  pi         Pi (${AGENTS.pi.configHint})
+
+Examples:
+  bingbong uninstall-hooks cursor
+  bingbong uninstall-hooks --dry-run claude
+`);
+}
+
+function parseAgentArgs(argv: string[], usage: () => void): { agentName: string; dryRun: boolean } {
   const dryRun = argv.includes("--dry-run");
   const args = argv.filter(a => a !== "--dry-run");
   const agentName = args[0];
 
   if (!agentName || agentName === "--help" || agentName === "-h") {
-    printUsage();
-    return;
+    usage();
+    process.exit(0);
   }
 
   if (agentName.startsWith("-")) {
     console.error(`Error: Unknown option "${agentName}".`);
-    printUsage();
+    usage();
     process.exit(1);
   }
 
-  const installer = INSTALLERS[agentName];
-  if (!installer) {
+  if (!AGENTS[agentName]) {
     console.error(`Error: Unknown agent "${agentName}".`);
     console.error(`\nAvailable agents: ${Object.keys(AGENTS).join(", ")}`);
     process.exit(1);
   }
 
-  const configPath = await installer(dryRun);
+  return { agentName, dryRun };
+}
+
+export async function installHooks(argv: string[]) {
+  const { agentName, dryRun } = parseAgentArgs(argv, printUsage);
+
+  const configPath = await INSTALLERS[agentName](dryRun);
   if (dryRun) {
     console.log(`\nRun without --dry-run to apply these changes.`);
   } else {
     console.log(`Installed hooks for ${AGENTS[agentName].display} in ${configPath}`);
+  }
+}
+
+export async function uninstallHooks(argv: string[]) {
+  const { agentName, dryRun } = parseAgentArgs(argv, printUninstallUsage);
+
+  const removed = await UNINSTALLERS[agentName](dryRun);
+  if (!removed) {
+    console.log(`No bingbong hooks found for ${AGENTS[agentName].display}.`);
+  } else if (dryRun) {
+    console.log(`\nRun without --dry-run to apply these changes.`);
   }
 }
 
@@ -333,4 +376,80 @@ async function installPi(dryRun: boolean): Promise<string> {
   await writeFile(targetPath, transformed, "utf-8");
 
   return targetPath;
+}
+
+// ---------------------------------------------------------------------------
+// Uninstallers
+// ---------------------------------------------------------------------------
+
+async function uninstallJsonHooks(
+  configPath: string,
+  isBingbongEntry: (entry: any) => boolean,
+  dryRun: boolean,
+): Promise<boolean> {
+  if (!existsSync(configPath)) return false;
+
+  const config = await readJsonFile(configPath, {});
+  const hooks: Record<string, any[]> = config.hooks;
+  if (!hooks || typeof hooks !== "object") return false;
+
+  let changed = false;
+  for (const [event, entries] of Object.entries(hooks)) {
+    if (!Array.isArray(entries)) continue;
+    const kept = entries.filter((entry: any) => !isBingbongEntry(entry));
+    if (kept.length !== entries.length) changed = true;
+    if (kept.length === 0) {
+      delete hooks[event];
+    } else {
+      hooks[event] = kept;
+    }
+  }
+  if (!changed) return false;
+
+  if (Object.keys(hooks).length === 0) {
+    delete config.hooks;
+  }
+
+  if (dryRun) {
+    const existingContent = await readFile(configPath, "utf-8");
+    printPreview(configPath, existingContent, JSON.stringify(config, null, 2) + "\n");
+    return true;
+  }
+
+  await atomicWriteJson(configPath, config);
+  console.log(`Removed bingbong hooks from ${configPath.replace(homedir(), "~")}`);
+  return true;
+}
+
+async function uninstallClaude(dryRun: boolean): Promise<boolean> {
+  const configPath = join(homedir(), ".claude", "settings.json");
+  return uninstallJsonHooks(configPath, isBingbongClaudeEntry, dryRun);
+}
+
+async function uninstallCursor(dryRun: boolean): Promise<boolean> {
+  const configPath = join(homedir(), ".cursor", "hooks.json");
+  return uninstallJsonHooks(configPath, isBingbongCursorEntry, dryRun);
+}
+
+function uninstallFile(targetPath: string, dryRun: boolean): boolean {
+  if (!existsSync(targetPath)) return false;
+
+  const displayPath = targetPath.replace(homedir(), "~");
+  if (dryRun) {
+    console.log(`Would remove: ${displayPath}`);
+    return true;
+  }
+
+  unlinkSync(targetPath);
+  console.log(`Removed ${displayPath}`);
+  return true;
+}
+
+async function uninstallOpencode(dryRun: boolean): Promise<boolean> {
+  return uninstallFile(join(homedir(), ".config", "opencode", "plugins", "bingbong.js"), dryRun);
+}
+
+async function uninstallPi(dryRun: boolean): Promise<boolean> {
+  const extensionsDir = process.env.PI_EXTENSIONS_DIR || join(homedir(), ".pi", "agent", "extensions");
+  return uninstallFile(join(extensionsDir, "bingbong.ts"), dryRun);
 }
