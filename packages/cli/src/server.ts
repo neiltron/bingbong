@@ -7,7 +7,6 @@
 
 import clientIndex from "../../../apps/client/index.html";
 import {
-  PlainLogger,
   TerminalLayoutLogger,
   type RuntimeLogger,
   type RuntimeStats,
@@ -21,64 +20,61 @@ export type { RuntimeLogger } from "./runtime-logger";
 interface StartServerResult {
   server: Bun.Server;
   logger: RuntimeLogger;
+  dispose(): void;
 }
-
-let runtimeLogger: RuntimeLogger = new PlainLogger();
-
-function logInfo(message: string) {
-  runtimeLogger.info(message);
-}
-
-function logError(message: string, err?: unknown) {
-  runtimeLogger.error(message, err);
-}
-
-const sessionRegistry = new SessionRegistry();
-
-// WebSocket clients
-const wsClients = new Set<WebSocket>();
-
-function getRuntimeStats(): RuntimeStats {
-  return sessionRegistry.stats(wsClients.size);
-}
-
-function enrichEvent(event: BingbongEvent): EnrichedEvent {
-  const result = sessionRegistry.enrich(event);
-
-  if (result.createdSession) {
-    const { key, index, pan } = result.createdSession;
-    logInfo(`[Session] New session: ${key} (index=${index}, pan=${pan.toFixed(2)})`);
-  }
-
-  return result.event;
-}
-
-function broadcast(event: EnrichedEvent) {
-  const message = JSON.stringify(event);
-  for (const client of wsClients) {
-    try {
-      client.send(message);
-    } catch (err) {
-      logError("[WS] Failed to send:", err);
-      wsClients.delete(client);
-    }
-  }
-}
-
-// Clean up stale sessions (no activity for 30 minutes)
-setInterval(() => {
-  for (const key of sessionRegistry.removeStale()) {
-    logInfo(`[Session] Removing stale session: ${key}`);
-  }
-}, 60 * 1000);
 
 export async function startServer(port: number): Promise<StartServerResult> {
+  const sessionRegistry = new SessionRegistry();
+  const wsClients = new Set<WebSocket>();
+
+  function getRuntimeStats(): RuntimeStats {
+    return sessionRegistry.stats(wsClients.size);
+  }
+
   const logger = new TerminalLayoutLogger({
     port,
     version: VERSION,
     getStats: getRuntimeStats,
   });
-  runtimeLogger = logger;
+
+  function logInfo(message: string) {
+    logger.info(message);
+  }
+
+  function logError(message: string, err?: unknown) {
+    logger.error(message, err);
+  }
+
+  function enrichEvent(event: BingbongEvent): EnrichedEvent {
+    const result = sessionRegistry.enrich(event);
+
+    if (result.createdSession) {
+      const { key, index, pan } = result.createdSession;
+      logInfo(
+        `[Session] New session: ${key} (index=${index}, pan=${pan.toFixed(2)})`,
+      );
+    }
+
+    return result.event;
+  }
+
+  function broadcast(event: EnrichedEvent) {
+    const message = JSON.stringify(event);
+    for (const client of wsClients) {
+      try {
+        client.send(message);
+      } catch (err) {
+        logError("[WS] Failed to send:", err);
+        wsClients.delete(client);
+      }
+    }
+  }
+
+  const staleSessionInterval = setInterval(() => {
+    for (const key of sessionRegistry.removeStale()) {
+      logInfo(`[Session] Removing stale session: ${key}`);
+    }
+  }, 60 * 1000);
 
   const server = Bun.serve({
     port,
@@ -185,5 +181,12 @@ export async function startServer(port: number): Promise<StartServerResult> {
     },
   });
 
-  return { server, logger };
+  return {
+    server,
+    logger,
+    dispose() {
+      clearInterval(staleSessionInterval);
+      logger.dispose();
+    },
+  };
 }
