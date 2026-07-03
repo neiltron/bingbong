@@ -26,12 +26,20 @@ export interface SessionSnapshot {
   last_seen?: string;
 }
 
+export const PROTOCOL_VERSION = 1;
+
 export interface InitMessage {
   type: "init";
+  protocol_version: number;
   sessions: SessionSnapshot[];
 }
 
-export type ServerMessage = InitMessage | EnrichedEvent;
+export interface EventMessage {
+  type: "event";
+  event: EnrichedEvent;
+}
+
+export type ServerMessage = InitMessage | EventMessage;
 
 export interface HealthResponse {
   name: string;

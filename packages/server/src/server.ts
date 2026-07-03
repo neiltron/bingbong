@@ -1,29 +1,50 @@
 /**
  * Bingbong Server
  *
- * Receives events from Claude Code hooks and broadcasts them
- * to connected frontend clients for audio rendering.
+ * Receives events from agent hooks and broadcasts them to connected
+ * clients for audio rendering. Transport only — terminal rendering and
+ * client assets are injected by the host (e.g. the CLI).
  */
 
-import clientIndex from "../../../apps/client/index.html";
 import {
-  TerminalLayoutLogger,
+  PlainLogger,
   type RuntimeLogger,
   type RuntimeStats,
-} from "./runtime-logger";
+  type RuntimeStatsProvider,
+} from "./logger";
 import { SessionRegistry } from "./session-registry";
-import type { BingbongEvent, EnrichedEvent } from "@bingbong/protocol";
+import {
+  PROTOCOL_VERSION,
+  type BingbongEvent,
+  type EnrichedEvent,
+  type EventMessage,
+  type InitMessage,
+} from "@bingbong/protocol";
 
-const VERSION = "0.1.9";
-export type { RuntimeLogger } from "./runtime-logger";
+export interface LoggerContext {
+  port: number;
+  version: string;
+  getStats: RuntimeStatsProvider;
+}
 
-interface StartServerResult {
+export interface StartServerOptions {
+  port: number;
+  version: string;
+  /** Bun HTML bundle served at "/" (e.g. the browser client's index.html import). */
+  client?: unknown;
+  createLogger?: (ctx: LoggerContext) => RuntimeLogger;
+}
+
+export interface StartServerResult {
   server: Bun.Server;
   logger: RuntimeLogger;
   dispose(): void;
 }
 
-export async function startServer(port: number): Promise<StartServerResult> {
+export async function startServer(
+  options: StartServerOptions,
+): Promise<StartServerResult> {
+  const { port, version } = options;
   const sessionRegistry = new SessionRegistry();
   const wsClients = new Set<WebSocket>();
 
@@ -31,11 +52,9 @@ export async function startServer(port: number): Promise<StartServerResult> {
     return sessionRegistry.stats(wsClients.size);
   }
 
-  const logger = new TerminalLayoutLogger({
-    port,
-    version: VERSION,
-    getStats: getRuntimeStats,
-  });
+  const logger = options.createLogger
+    ? options.createLogger({ port, version, getStats: getRuntimeStats })
+    : new PlainLogger();
 
   function logInfo(message: string) {
     logger.info(message);
@@ -59,7 +78,7 @@ export async function startServer(port: number): Promise<StartServerResult> {
   }
 
   function broadcast(event: EnrichedEvent) {
-    const message = JSON.stringify(event);
+    const message = JSON.stringify({ type: "event", event } satisfies EventMessage);
     for (const client of wsClients) {
       try {
         client.send(message);
@@ -78,9 +97,7 @@ export async function startServer(port: number): Promise<StartServerResult> {
 
   const server = Bun.serve({
     port,
-    routes: {
-      "/": clientIndex,
-    },
+    routes: options.client ? { "/": options.client } : {},
 
     async fetch(req) {
       const url = new URL(req.url);
@@ -142,7 +159,7 @@ export async function startServer(port: number): Promise<StartServerResult> {
         return new Response(
           JSON.stringify({
             name: "Bingbong Server",
-            version: VERSION,
+            version,
             sessions: getRuntimeStats().sessionCount,
             clients: wsClients.size,
           }),
@@ -164,8 +181,9 @@ export async function startServer(port: number): Promise<StartServerResult> {
         ws.send(
           JSON.stringify({
             type: "init",
+            protocol_version: PROTOCOL_VERSION,
             sessions: sessionRegistry.snapshots(),
-          }),
+          } satisfies InitMessage),
         );
       },
 

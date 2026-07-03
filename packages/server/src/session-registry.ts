@@ -3,7 +3,7 @@ import type {
   BingbongEvent,
   SessionSnapshot,
 } from "@bingbong/protocol";
-import type { RuntimeStats } from "./runtime-logger";
+import type { RuntimeStats } from "./logger";
 
 interface SessionRecord extends Omit<SessionSnapshot, "first_seen" | "last_seen"> {
   first_seen: Date;

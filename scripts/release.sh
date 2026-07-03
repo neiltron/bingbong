@@ -77,11 +77,11 @@ fi
 new_version="$(node -p "require('./package.json').version")"
 tag="v${new_version}"
 
-echo "[release] updating embedded CLI/server version constants"
+echo "[release] updating embedded CLI version constant"
 node -e '
 const fs = require("fs");
 const version = process.argv[1];
-for (const path of ["packages/cli/bin/cli.ts", "packages/cli/src/server.ts"]) {
+for (const path of ["packages/cli/bin/cli.ts"]) {
   const source = fs.readFileSync(path, "utf8");
   const next = source.replace(/const VERSION = "[^"]+";/, `const VERSION = "${version}";`);
   if (next === source) {
@@ -96,7 +96,7 @@ echo "[release] verifying version parity"
 scripts/check-version-parity.sh "$tag"
 
 echo "[release] committing version bump"
-git add package.json package-lock.json packages/cli/bin/cli.ts packages/cli/src/server.ts
+git add package.json package-lock.json packages/cli/bin/cli.ts
 git commit -m "$new_version"
 git tag "$tag"
 

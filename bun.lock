@@ -19,10 +19,17 @@
       "name": "@bingbong/cli",
       "dependencies": {
         "@bingbong/protocol": "file:../protocol",
+        "@bingbong/server": "file:../server",
       },
     },
     "packages/protocol": {
       "name": "@bingbong/protocol",
+    },
+    "packages/server": {
+      "name": "@bingbong/server",
+      "dependencies": {
+        "@bingbong/protocol": "file:../protocol",
+      },
     },
   },
   "packages": {
@@ -31,6 +38,8 @@
     "@bingbong/client": ["@bingbong/client@workspace:apps/client"],
 
     "@bingbong/protocol": ["@bingbong/protocol@workspace:packages/protocol"],
+
+    "@bingbong/server": ["@bingbong/server@workspace:packages/server"],
 
     "@esbuild/aix-ppc64": ["@esbuild/aix-ppc64@0.25.12", "", { "os": "aix", "cpu": "ppc64" }, "sha512-Hhmwd6CInZ3dwpuGTF8fJG6yoWmsToE+vYgD4nytZVxcu1ulHpUQRAB1UJ8+N1Am3Mz4+xOByoQoSZf4D+CpkA=="],
 
@@ -163,5 +172,7 @@
     "@bingbong/cli/@bingbong/protocol": ["@bingbong/protocol@file:packages/protocol", {}],
 
     "@bingbong/client/@bingbong/protocol": ["@bingbong/protocol@file:packages/protocol", {}],
+
+    "@bingbong/server/@bingbong/protocol": ["@bingbong/protocol@file:packages/protocol", {}],
   }
 }

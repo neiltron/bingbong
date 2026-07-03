@@ -1,6 +1,7 @@
 export type {
   BingbongEvent,
   EnrichedEvent,
+  EventMessage,
   HealthResponse,
   InitMessage,
   ServerMessage,
