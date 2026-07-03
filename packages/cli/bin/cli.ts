@@ -10,7 +10,7 @@ import { startServer, type RuntimeLogger } from "@bingbong/server";
 import clientIndex from "../../../apps/client/index.html";
 import { TerminalLayoutLogger } from "../src/runtime-logger";
 
-const VERSION = "0.1.10";
+const VERSION = "0.1.11";
 
 let activeLogger: RuntimeLogger | null = null;
 
