@@ -55,6 +55,9 @@ fi
 echo "[release] syncing main..."
 git pull origin main
 
+echo "[release] verifying bun.lock matches workspace manifests"
+bun install --frozen-lockfile
+
 if [[ "$SKIP_LOCAL_TEST" -eq 0 ]]; then
   echo "[release] running local preflight: scripts/test-local-release.sh"
   scripts/test-local-release.sh

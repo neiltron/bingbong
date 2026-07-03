@@ -171,8 +171,12 @@
 
     "@bingbong/cli/@bingbong/protocol": ["@bingbong/protocol@file:packages/protocol", {}],
 
+    "@bingbong/cli/@bingbong/server": ["@bingbong/server@file:packages/server", { "dependencies": { "@bingbong/protocol": "file:../protocol" } }],
+
     "@bingbong/client/@bingbong/protocol": ["@bingbong/protocol@file:packages/protocol", {}],
 
     "@bingbong/server/@bingbong/protocol": ["@bingbong/protocol@file:packages/protocol", {}],
+
+    "@bingbong/cli/@bingbong/server/@bingbong/protocol": ["@bingbong/protocol@file:packages/protocol", {}],
   }
 }
