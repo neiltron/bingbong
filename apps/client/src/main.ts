@@ -1,4 +1,5 @@
 import './styles/main.css'
+import { PROTOCOL_VERSION } from '@bingbong/protocol'
 import type { EnrichedEvent, Session } from './types'
 import { AudioEngine } from './audio-engine'
 import { Connection } from './connection'
@@ -251,6 +252,11 @@ function handleMessage(data: unknown): void {
 
   // Handle init message with existing sessions
   if (msg.type === 'init' && Array.isArray(msg.sessions)) {
+    if (typeof msg.protocol_version === 'number' && msg.protocol_version !== PROTOCOL_VERSION) {
+      console.warn(
+        `[bingbong] Server speaks protocol v${msg.protocol_version}, client expects v${PROTOCOL_VERSION}`,
+      )
+    }
     // Full cleanup chain on reconnect
     sessions.clear()
     sourceOverlay?.clearSources()
@@ -267,8 +273,13 @@ function handleMessage(data: unknown): void {
     return
   }
 
-  // Handle regular event
-  handleEvent(msg as unknown as EnrichedEvent)
+  // Handle enriched event
+  if (msg.type === 'event' && msg.event && typeof msg.event === 'object') {
+    handleEvent(msg.event as EnrichedEvent)
+    return
+  }
+
+  console.warn('[bingbong] Ignoring unknown server message:', msg.type)
 }
 
 // ============================================

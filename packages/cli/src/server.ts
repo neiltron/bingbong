@@ -12,7 +12,13 @@ import {
   type RuntimeStats,
 } from "./runtime-logger";
 import { SessionRegistry } from "./session-registry";
-import type { BingbongEvent, EnrichedEvent } from "@bingbong/protocol";
+import {
+  PROTOCOL_VERSION,
+  type BingbongEvent,
+  type EnrichedEvent,
+  type EventMessage,
+  type InitMessage,
+} from "@bingbong/protocol";
 
 const VERSION = "0.1.9";
 export type { RuntimeLogger } from "./runtime-logger";
@@ -59,7 +65,7 @@ export async function startServer(port: number): Promise<StartServerResult> {
   }
 
   function broadcast(event: EnrichedEvent) {
-    const message = JSON.stringify(event);
+    const message = JSON.stringify({ type: "event", event } satisfies EventMessage);
     for (const client of wsClients) {
       try {
         client.send(message);
@@ -164,8 +170,9 @@ export async function startServer(port: number): Promise<StartServerResult> {
         ws.send(
           JSON.stringify({
             type: "init",
+            protocol_version: PROTOCOL_VERSION,
             sessions: sessionRegistry.snapshots(),
-          }),
+          } satisfies InitMessage),
         );
       },
 
