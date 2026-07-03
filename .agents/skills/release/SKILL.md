@@ -13,8 +13,8 @@ All four must stay in sync:
 
 - `package.json` — `"version": "x.y.z"`
 - `package-lock.json` — top-level `"version"` and `packages[""].version`
-- `src/server.ts` — `const VERSION = "x.y.z";`
-- `bin/cli.ts` — `const VERSION = "x.y.z";`
+- `packages/cli/src/server.ts` — `const VERSION = "x.y.z";`
+- `packages/cli/bin/cli.ts` — `const VERSION = "x.y.z";`
 
 ## Steps
 
@@ -45,7 +45,7 @@ All four must stay in sync:
    Do not continue if `package.json`, `package-lock.json`, or the tag version disagree.
 8. **Commit, tag, push:**
    ```bash
-   git add package.json package-lock.json src/server.ts bin/cli.ts
+   git add package.json package-lock.json packages/cli/src/server.ts packages/cli/bin/cli.ts
    git commit -m "<new version>"
    git tag v<new version>
    git push origin main --tags

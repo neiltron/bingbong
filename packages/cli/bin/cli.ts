@@ -165,28 +165,25 @@ async function main() {
   }
 
   // Start the server
-  const { server, logger } = await startServer(args.port);
-  activeLogger = logger;
+  const runtime = await startServer(args.port);
+  activeLogger = runtime.logger;
+
+  function shutdown() {
+    runtime.logger.info("Shutting down...");
+    runtime.dispose();
+    runtime.server.stop();
+    process.exit(0);
+  }
 
   // Handle graceful shutdown
-  process.on("SIGINT", () => {
-    logger.info("Shutting down...");
-    logger.dispose();
-    server.stop();
-    process.exit(0);
-  });
+  process.on("SIGINT", shutdown);
 
-  process.on("SIGTERM", () => {
-    logger.info("Shutting down...");
-    logger.dispose();
-    server.stop();
-    process.exit(0);
-  });
+  process.on("SIGTERM", shutdown);
 
   // Open browser if requested
   if (args.open) {
     const url = `http://localhost:${args.port}`;
-    logger.info("Opening browser...");
+    runtime.logger.info("Opening browser...");
     openBrowser(url);
   }
 }

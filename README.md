@@ -162,9 +162,11 @@ Events are normalized across agents:
 ## Project Structure
 
 ```
-bin/                     # CLI entry point
-src/                     # Server source code
-client/                  # Web Audio client (Vite build)
+apps/
+  client/                # Web Audio client (Vite build)
+packages/
+  cli/                   # CLI entry point, server, hook installers
+  protocol/              # Shared event/session TypeScript types
 agents/
   claude/hooks/          # Claude Code hook scripts
   cursor/                # Cursor hooks + installer

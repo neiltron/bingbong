@@ -1,0 +1,8 @@
+{
+  "name": "@bingbong/cli",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@bingbong/protocol": "file:../protocol"
+  }
+}

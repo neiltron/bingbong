@@ -9,6 +9,7 @@
  */
 
 import os from "node:os";
+import type { BingbongEvent } from "@bingbong/protocol";
 
 export async function emit(argv: string[]): Promise<void> {
   const enabled = (process.env.BINGBONG_ENABLED || "true").toLowerCase() !== "false";
@@ -23,7 +24,7 @@ export async function emit(argv: string[]): Promise<void> {
   // Otherwise read piped data via Bun.stdin.text().
   //
   // The 1s timeout handles a Bun quirk: when a parent process spawns us
-  // without piping stdin (e.g. `bun run bin/cli.ts emit Foo` during local
+  // without piping stdin (e.g. `bun run start -- emit Foo` during local
   // dev), process.stdin.isTTY is undefined — not false — so we enter this
   // branch, but Bun.stdin.text() hangs forever waiting for EOF that never
   // comes. The timeout lets us fall through with an empty payload instead.
@@ -53,7 +54,7 @@ export async function emit(argv: string[]): Promise<void> {
   const sessionId = (input.session_id ?? input.conversation_id ?? input.generation_id ?? "unknown") as string;
 
   // Spread stdin payload, overlay our fields
-  const payload = {
+  const payload: BingbongEvent = {
     ...input,
     event_type: eventType,
     session_id: sessionId,

@@ -11,29 +11,17 @@
  *   2 — event send failed
  */
 
+import type { BingbongEvent, HealthResponse } from "@bingbong/protocol";
+
 const TIMEOUT = 2000;
-
-interface HealthResponse {
-  name: string;
-  version: string;
-  sessions: number;
-  clients: number;
-}
-
-interface TestEvent {
-  event_type: string;
-  session_id: string;
-  machine_id: string;
-  timestamp: string;
-  cwd: string;
-  tool_name: string;
-  tool_input: Record<string, unknown>;
-  tool_output: Record<string, unknown>;
-}
 
 const TOOL_SEQUENCE = ["Read", "Edit", "Bash"];
 
-function buildEvent(sessionId: string, eventType: string, toolName: string = ""): TestEvent {
+function buildEvent(
+  sessionId: string,
+  eventType: string,
+  toolName: string = "",
+): BingbongEvent {
   return {
     event_type: eventType,
     session_id: sessionId,

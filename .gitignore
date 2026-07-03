@@ -1,6 +1,6 @@
 node_modules
 .DS_Store
-client/dist/
+apps/client/dist/
 .cursor
 docs
 

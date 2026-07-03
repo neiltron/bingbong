@@ -1,0 +1,9 @@
+{
+  "name": "@bingbong/protocol",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts"
+}
