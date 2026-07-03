@@ -8,10 +8,14 @@ import type { RuntimeStats } from "./logger";
 interface SessionRecord extends Omit<SessionSnapshot, "first_seen" | "last_seen"> {
   first_seen: Date;
   last_seen: Date;
+  label: string;
+  /** True once the label came from a cwd, false while it's an id fallback. */
+  label_from_cwd: boolean;
 }
 
 interface SessionCreation {
   key: string;
+  label: string;
   index: number;
   pan: number;
 }
@@ -44,16 +48,27 @@ export class SessionRegistry {
     session.last_seen = new Date();
     session.event_count++;
 
+    // Upgrade an id-fallback label once a cwd shows up
+    if (!session.label_from_cwd) {
+      const derived = this.deriveLabel(event.cwd, event.session_id);
+      if (derived.fromCwd) {
+        session.label = derived.label;
+        session.label_from_cwd = true;
+      }
+    }
+
     return {
       event: {
         ...event,
         pan: session.pan,
         session_index: session.index,
         color: session.color,
+        session_label: session.label,
       },
       createdSession: createdSession
         ? {
             key,
+            label: session.label,
             index: session.index,
             pan: session.pan,
           }
@@ -65,6 +80,7 @@ export class SessionRegistry {
     return Array.from(this.sessions.values()).map((session) => ({
       session_id: session.session_id,
       machine_id: session.machine_id,
+      label: session.label,
       pan: session.pan,
       index: session.index,
       color: session.color,
@@ -113,9 +129,13 @@ export class SessionRegistry {
     const pan =
       index === 0 ? 0 : ((index % 2 === 1 ? -1 : 1) * Math.ceil(index / 2)) / 5;
 
+    const { label, fromCwd } = this.deriveLabel(event.cwd, event.session_id);
+
     const session: SessionRecord = {
       session_id: event.session_id,
       machine_id: event.machine_id,
+      label,
+      label_from_cwd: fromCwd,
       first_seen: new Date(),
       last_seen: new Date(),
       event_count: 0,
@@ -127,5 +147,35 @@ export class SessionRegistry {
     this.sessions.set(key, session);
 
     return { key, session, createdSession: true };
+  }
+
+  /**
+   * Human-readable session label: the cwd's directory name, suffixed
+   * with a counter when another active session already claimed it
+   * (e.g. two agents in the same repo). Falls back to a short id
+   * prefix until an event carrying a cwd arrives.
+   */
+  private deriveLabel(
+    cwd: unknown,
+    sessionId: string,
+  ): { label: string; fromCwd: boolean } {
+    const base =
+      typeof cwd === "string"
+        ? cwd.replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? ""
+        : "";
+
+    if (!base) {
+      return { label: sessionId.slice(0, 8), fromCwd: false };
+    }
+
+    const taken = new Set(
+      Array.from(this.sessions.values(), (session) => session.label),
+    );
+    let label = base;
+    for (let n = 2; taken.has(label); n++) {
+      label = `${base} (${n})`;
+    }
+
+    return { label, fromCwd: true };
   }
 }

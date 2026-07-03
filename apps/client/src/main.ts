@@ -85,7 +85,7 @@ function updateUI(): void {
         }),
         createElement('div', { class: 'session-info' }, [
           createElement('div', { class: 'session-id', title: s.session_id }, [
-            s.session_id.slice(0, 12) + '...',
+            s.label || s.session_id.slice(0, 12) + '...',
           ]),
           createElement('div', { class: 'session-meta' }, [
             `${s.machine_id || 'Unknown'} • ${s.event_count || 0} events`,
@@ -217,6 +217,7 @@ function handleEvent(event: EnrichedEvent): void {
     const sessionData: Session = {
       session_id: event.session_id,
       machine_id: event.machine_id,
+      label: event.session_label,
       pan: event.pan,
       index: event.session_index,
       color: event.color,

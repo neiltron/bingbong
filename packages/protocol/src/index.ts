@@ -13,11 +13,13 @@ export interface EnrichedEvent extends BingbongEvent {
   pan: number;
   session_index: number;
   color: string;
+  session_label?: string;
 }
 
 export interface SessionSnapshot {
   session_id: string;
   machine_id: string;
+  label?: string;
   pan: number;
   index: number;
   color: string;
