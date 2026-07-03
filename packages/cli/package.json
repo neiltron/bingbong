@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@bingbong/protocol": "file:../protocol"
+    "@bingbong/protocol": "file:../protocol",
+    "@bingbong/server": "file:../server"
   }
 }

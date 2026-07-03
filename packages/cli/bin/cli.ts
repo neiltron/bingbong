@@ -6,7 +6,9 @@
  * Unified command to run the Bingbong server and client.
  */
 
-import { startServer, type RuntimeLogger } from "../src/server";
+import { startServer, type RuntimeLogger } from "@bingbong/server";
+import clientIndex from "../../../apps/client/index.html";
+import { TerminalLayoutLogger } from "../src/runtime-logger";
 
 const VERSION = "0.1.9";
 
@@ -164,8 +166,14 @@ async function main() {
     process.exit(1);
   }
 
-  // Start the server
-  const runtime = await startServer(args.port);
+  // Start the server: terminal rendering and the browser client bundle
+  // are CLI concerns, injected into the transport-only server package.
+  const runtime = await startServer({
+    port: args.port,
+    version: VERSION,
+    client: clientIndex,
+    createLogger: (ctx) => new TerminalLayoutLogger(ctx),
+  });
   activeLogger = runtime.logger;
 
   function shutdown() {
