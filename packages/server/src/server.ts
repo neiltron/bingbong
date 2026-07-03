@@ -68,9 +68,9 @@ export async function startServer(
     const result = sessionRegistry.enrich(event);
 
     if (result.createdSession) {
-      const { key, index, pan } = result.createdSession;
+      const { key, label, index, pan } = result.createdSession;
       logInfo(
-        `[Session] New session: ${key} (index=${index}, pan=${pan.toFixed(2)})`,
+        `[Session] New session: ${label} [${key}] (index=${index}, pan=${pan.toFixed(2)})`,
       );
     }
 

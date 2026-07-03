@@ -133,9 +133,21 @@ export class SourceOverlay {
 
   createSource(session: Session): void {
     const key = `${session.machine_id}:${session.session_id}`
+    const labelText = session.label || session.session_id.slice(0, 8)
+    const title = session.label
+      ? `${session.label} — ${session.session_id}`
+      : session.session_id || 'Unknown session'
 
-    // Skip if already exists
-    if (this.sources.has(key)) {
+    // Already exists — refresh the label (it can upgrade from an id
+    // fallback to a project name once the server sees a cwd)
+    const existing = this.sources.get(key)
+    if (existing) {
+      const labelEl = existing.el.querySelector('.source-label')
+      if (labelEl && labelEl.textContent !== labelText) {
+        labelEl.textContent = labelText
+        existing.el.title = title
+      }
+      existing.session = session
       return
     }
 
@@ -147,7 +159,7 @@ export class SourceOverlay {
     const el = document.createElement('div')
     el.className = 'source-circle'
     el.dataset.session = key
-    el.title = session.session_id || 'Unknown session'
+    el.title = title
     el.style.setProperty('--session-color', session.color)
 
     // Icon and label
@@ -157,7 +169,7 @@ export class SourceOverlay {
 
     const label = document.createElement('div')
     label.className = 'source-label'
-    label.textContent = session.session_id.slice(0, 8)
+    label.textContent = labelText
 
     el.appendChild(icon)
     el.appendChild(label)
