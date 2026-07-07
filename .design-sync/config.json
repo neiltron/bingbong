@@ -1,0 +1,9 @@
+{
+  "projectId": "394c99a0-027a-482b-8df4-62a414098580",
+  "pkg": "@bingbong/design-system",
+  "globalName": "BingbongDS",
+  "shape": "package",
+  "buildCmd": "bun install && bun run --cwd packages/design-system build",
+  "cssEntry": "dist/styles.css",
+  "readmeHeader": ".design-sync/conventions.md"
+}

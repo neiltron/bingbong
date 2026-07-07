@@ -1,0 +1,6 @@
+/* Bingbong design system entry stylesheet.
+   Fonts load from Google Fonts (same as apps/client/index.html).
+   The build concatenates apps/client/src/styles/design-system.css below this
+   header — that file is the single source of truth for tokens and component
+   styles; dist/styles.css is the flattened, self-contained result. */
+@import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
