@@ -20,5 +20,5 @@ Optional environment variables (read by the plugin at runtime):
 
 ## Event mapping
 
-See [docs/agents/event-coverage.md](../../docs/agents/event-coverage.md) for the
+See [agents/event-coverage.md](../../agents/event-coverage.md) for the
 full mapping of OpenCode bus events to Bingbong event types.

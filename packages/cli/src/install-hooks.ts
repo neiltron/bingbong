@@ -177,7 +177,7 @@ async function atomicWriteJson(filePath: string, data: object) {
 // ---------------------------------------------------------------------------
 
 // Audibly-useful subset of Claude Code hook events. The full upstream list
-// (~30 events) and the rationale for exclusions live in docs/agents/event-coverage.md.
+// (~30 events) and the rationale for exclusions live in agents/event-coverage.md.
 const CLAUDE_EVENTS: Array<{ event: string; matcher: string }> = [
   { event: "PreToolUse",         matcher: ".*" },
   { event: "PostToolUse",        matcher: ".*" },

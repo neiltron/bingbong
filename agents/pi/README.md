@@ -26,5 +26,5 @@ At runtime the extension also reads:
 
 ## Event mapping
 
-See [docs/agents/event-coverage.md](../../docs/agents/event-coverage.md) for the
+See [agents/event-coverage.md](../../agents/event-coverage.md) for the
 full mapping of pi extension events to Bingbong event types.
