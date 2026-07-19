@@ -562,15 +562,20 @@ input[type="range"] {
 }
 
 .lanes-ruler-times {
-    flex: 1;
-    display: flex;
-    justify-content: space-between;
+    position: relative;
+    flex: none;
+    height: 22px;
+    /* Matches the lane's head→track flex gap so tick x aligns with chip x */
+    margin-left: 14px;
     border-bottom: 1px solid var(--color-border);
-    padding: 0 24px 6px 0;
 }
 
 .lanes-ruler-times .trace-time {
+    position: absolute;
+    bottom: 6px;
     width: auto;
+    transform: translateX(-50%);
+    white-space: nowrap;
 }
 
 .lane {
@@ -636,12 +641,12 @@ input[type="range"] {
     white-space: nowrap;
 }
 
+/* Chips are absolutely positioned on the time axis; width set from JS */
 .lane-track {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding-right: 24px;
-    width: max-content;
+    position: relative;
+    flex: none;
+    height: 34px;
+    align-self: center;
 }
 
 /* Right-edge fade: shown while more chips exist beyond the viewport */
@@ -672,7 +677,9 @@ input[type="range"] {
 }
 
 .ev {
-    flex: none;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
     display: flex;
     align-items: center;
     gap: 7px;
@@ -683,6 +690,13 @@ input[type="range"] {
     font-size: 12px;
     font-weight: 500;
     color: var(--color-text-primary);
+    white-space: nowrap;
+}
+
+.ev-name {
+    max-width: 130px;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Only chips appended live animate in */
@@ -693,11 +707,11 @@ input[type="range"] {
 @keyframes chipIn {
     from {
         opacity: 0;
-        transform: translateX(10px) scale(0.98);
+        transform: translateY(-50%) translateX(10px) scale(0.98);
     }
     to {
         opacity: 1;
-        transform: none;
+        transform: translateY(-50%);
     }
 }
 
@@ -708,9 +722,10 @@ input[type="range"] {
     text-transform: uppercase;
 }
 
+/* Connector wire between consecutive chips; left/width set from JS */
 .ev-thread {
-    flex: none;
-    width: 14px;
+    position: absolute;
+    top: 50%;
     height: 1px;
     background: var(--color-border);
 }

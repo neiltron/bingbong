@@ -13,8 +13,18 @@ const eventLog: EnrichedEvent[] = []
 const MAX_LOG_ITEMS = 50
 const MAX_LANE_CHIPS = 30
 
-// Lanes render incrementally; handles to each lane's track/meta by session_id
-const laneEls = new Map<string, { track: HTMLElement; meta: HTMLElement }>()
+// Lanes render incrementally; handles to each lane's track/meta by session_id,
+// plus the right edge of its last chip (for burst-nudging and connectors)
+const laneEls = new Map<
+  string,
+  { track: HTMLElement; meta: HTMLElement; lastRight: number | null }
+>()
+
+// Time axis: chips sit at (timestamp - laneT0) * PX_PER_SEC
+const PX_PER_SEC = 24
+const AXIS_TAIL = 140 // breathing room past "now" so the newest chip isn't flush
+const CHIP_GAP = 8 // min spacing when a burst would overlap chips
+let laneT0: number | null = null
 const VIEW_STORAGE_KEY = 'bingbong:view'
 
 type TraceView = 'combined' | 'lanes'
@@ -278,33 +288,100 @@ function updateLanesMask(): void {
   )
 }
 
-function renderLanesRuler(): void {
-  const rulerEl = DOM.lanesRulerEl
-  if (!rulerEl) return
+function eventMs(e: EnrichedEvent): number {
+  return new Date(e.timestamp).getTime()
+}
 
-  // Time ruler: oldest visible event → now
-  rulerEl.innerHTML = ''
-  const visible = eventLog.slice(-MAX_LOG_ITEMS)
-  const labels: string[] = []
-  if (visible.length > 1) {
-    const first = new Date(visible[0].timestamp).getTime()
-    const last = Date.now()
-    for (let i = 0; i < 4; i++) {
-      const t = new Date(first + ((last - first) * i) / 4)
-      labels.push(t.toLocaleTimeString('en-US', { hour12: false }))
-    }
+function timeToX(ms: number): number {
+  return ((ms - (laneT0 ?? ms)) / 1000) * PX_PER_SEC
+}
+
+function lanesAxisWidth(): number {
+  if (laneT0 === null) return 0
+  // Cover both real time and any burst-nudge drift past it, so sticky heads
+  // and the ruler always span the full scrollable width
+  let w = timeToX(Date.now()) + AXIS_TAIL
+  for (const lane of laneEls.values()) {
+    if (lane.lastRight !== null) w = Math.max(w, lane.lastRight + AXIS_TAIL)
   }
-  labels.push('now')
-  for (const label of labels) {
-    rulerEl.appendChild(createElement('span', { class: 'trace-time' }, [label]))
+  // At least the visible area (minus head column) so the ruler border spans it
+  const headSpan = 174 + 14
+  const minVisible = (DOM.lanesScroller?.clientWidth ?? 0) - headSpan
+  return Math.max(200, minVisible, w)
+}
+
+/** Size the ruler and every lane track to the current axis width. */
+function applyLanesAxis(): void {
+  const w = lanesAxisWidth()
+  if (DOM.lanesRulerEl) DOM.lanesRulerEl.style.width = `${w}px`
+  for (const lane of laneEls.values()) {
+    lane.track.style.width = `${w}px`
   }
 }
 
+// Candidate tick intervals (seconds); pick the smallest giving ~220px spacing
+const TICK_STEPS = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1800, 3600]
+
+function renderLanesRuler(): void {
+  const rulerEl = DOM.lanesRulerEl
+  if (!rulerEl || laneT0 === null) return
+
+  rulerEl.innerHTML = ''
+  const now = Date.now()
+  const nowX = timeToX(now)
+  const stepMs = (TICK_STEPS.find((s) => s * PX_PER_SEC >= 220) ?? 3600) * 1000
+
+  for (let t = Math.ceil(laneT0 / stepMs) * stepMs; t <= now; t += stepMs) {
+    const x = timeToX(t)
+    if (nowX - x < 70) break // keep clear of the "now" label
+    rulerEl.appendChild(
+      createElement('span', { class: 'trace-time', style: { left: `${x}px` } }, [
+        new Date(t).toLocaleTimeString('en-US', { hour12: false }),
+      ])
+    )
+  }
+  rulerEl.appendChild(
+    createElement('span', { class: 'trace-time', style: { left: `${nowX}px` } }, ['now'])
+  )
+}
+
 function buildLaneChip(e: EnrichedEvent, animate: boolean): HTMLElement {
-  return createElement('div', { class: animate ? 'ev ev-in' : 'ev' }, [
+  // Compact display name keeps chips narrow so bursts stay near their true
+  // time position; the full name lives in the tooltip
+  const full = eventName(e)
+  const short = full.startsWith('mcp__') ? full.split('__').pop() || full : full
+  return createElement('div', { class: animate ? 'ev ev-in' : 'ev', title: full }, [
     createElement('span', { class: 'evb' }, [eventBadge(e)]),
-    eventName(e),
+    createElement('span', { class: 'ev-name' }, [short]),
   ])
+}
+
+/**
+ * Place a chip at its true time position (nudged right if a burst would
+ * overlap the previous chip) and wire a connector back to it. The chip is
+ * measured after insertion, so call with it already in the track.
+ */
+function placeLaneChip(
+  lane: { track: HTMLElement; lastRight: number | null },
+  chip: HTMLElement,
+  e: EnrichedEvent
+): void {
+  const trueX = timeToX(eventMs(e))
+  const x = lane.lastRight === null ? Math.max(0, trueX) : Math.max(trueX, lane.lastRight + CHIP_GAP)
+
+  if (lane.lastRight !== null && x - lane.lastRight > 14) {
+    lane.track.insertBefore(
+      createElement('div', {
+        class: 'ev-thread',
+        'aria-hidden': 'true',
+        style: { left: `${lane.lastRight + 3}px`, width: `${x - lane.lastRight - 6}px` },
+      }),
+      chip
+    )
+  }
+
+  chip.style.left = `${x}px`
+  lane.lastRight = x + chip.offsetWidth
 }
 
 /** Full rebuild (init, view switch, new session) — lands pinned to the live edge. */
@@ -312,7 +389,12 @@ function renderLanes(): void {
   const listEl = DOM.lanesListEl
   if (!listEl) return
 
-  renderLanesRuler()
+  const sc = DOM.lanesScroller
+  const wasPinned = lanesFollowingLive || lanesAtLiveEdge()
+  const prevT0 = laneT0
+  const prevScroll = sc?.scrollLeft ?? 0
+
+  laneT0 = eventLog.length > 0 ? eventMs(eventLog[0]) : Date.now()
   laneEls.clear()
   clearLanesPill()
   listEl.innerHTML = ''
@@ -323,17 +405,9 @@ function renderLanes(): void {
     return
   }
 
-  // One lane per session, chips sequence-ordered (timestamp positioning is a stretch goal)
+  // One lane per session; tracks first so the axis width applies before placing
   for (const s of sessions.values()) {
-    const chips: Node[] = []
-    for (const e of eventLog.filter((e) => e.session_id === s.session_id).slice(-MAX_LANE_CHIPS)) {
-      if (chips.length > 0) {
-        chips.push(createElement('div', { class: 'ev-thread', 'aria-hidden': 'true' }, []))
-      }
-      chips.push(buildLaneChip(e, false))
-    }
-
-    const track = createElement('div', { class: 'lane-track' }, chips)
+    const track = createElement('div', { class: 'lane-track' }, [])
     const meta = createElement('div', { class: 'lane-meta' }, [
       `${s.machine_id || 'unknown'} · ${s.event_count || 0}`,
     ])
@@ -355,10 +429,31 @@ function renderLanes(): void {
       ])
     )
 
-    laneEls.set(s.session_id, { track, meta })
+    laneEls.set(s.session_id, { track, meta, lastRight: null })
   }
 
-  if (DOM.lanesScroller) DOM.lanesScroller.scrollLeft = DOM.lanesScroller.scrollWidth
+  // Chips at their true time positions
+  for (const s of sessions.values()) {
+    const lane = laneEls.get(s.session_id)
+    if (!lane) continue
+    for (const e of eventLog.filter((e) => e.session_id === s.session_id).slice(-MAX_LANE_CHIPS)) {
+      const chip = buildLaneChip(e, false)
+      lane.track.appendChild(chip)
+      placeLaneChip(lane, chip, e)
+    }
+  }
+
+  applyLanesAxis()
+  renderLanesRuler()
+
+  if (sc) {
+    if (wasPinned || prevT0 === null) {
+      sc.scrollLeft = sc.scrollWidth
+    } else {
+      // Axis origin may have advanced (log trimmed); keep the same moment in view
+      sc.scrollLeft = Math.max(0, prevScroll - ((laneT0 - prevT0) / 1000) * PX_PER_SEC)
+    }
+  }
   updateLanesMask()
 }
 
@@ -371,23 +466,23 @@ function appendLaneChip(event: EnrichedEvent): void {
   if (!s) return
 
   const lane = laneEls.get(event.session_id)
-  if (!lane) {
-    // New session — needs a new lane row
+  if (!lane || laneT0 === null) {
+    // New session (or first render) — needs a full build
     renderLanes()
     return
   }
 
-  renderLanesRuler()
   lane.meta.textContent = `${s.machine_id || 'unknown'} · ${s.event_count || 0}`
 
   const pinned = lanesFollowingLive || lanesAtLiveEdge()
 
-  if (lane.track.children.length > 0) {
-    lane.track.appendChild(createElement('div', { class: 'ev-thread', 'aria-hidden': 'true' }, []))
-  }
-  lane.track.appendChild(buildLaneChip(event, true))
+  const chip = buildLaneChip(event, true)
+  lane.track.appendChild(chip)
+  placeLaneChip(lane, chip, event)
+  applyLanesAxis()
 
-  // Trim oldest chips (and their trailing connectors) beyond the cap
+  // Trim oldest chips beyond the cap (absolute layout: nothing shifts).
+  // DOM order is [chip, connector, chip, ...] — a connector precedes its chip.
   while (lane.track.querySelectorAll('.ev').length > MAX_LANE_CHIPS) {
     lane.track.firstElementChild?.remove()
     if (lane.track.firstElementChild?.classList.contains('ev-thread')) {
@@ -395,10 +490,12 @@ function appendLaneChip(event: EnrichedEvent): void {
     }
   }
 
+  renderLanesRuler()
+
   const sc = DOM.lanesScroller
   if (pinned && sc) {
     sc.scrollLeft = sc.scrollWidth
-  } else if (!pinned) {
+  } else {
     lanesUnseen++
     showLanesPill()
   }
@@ -737,6 +834,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const sc = DOM.lanesScroller
     sc?.scrollTo({ left: sc.scrollWidth, behavior: 'smooth' })
   })
+
+  // Keep the time axis advancing between events while lanes are visible
+  setInterval(() => {
+    if (view !== 'lanes' || laneT0 === null || sessions.size === 0) return
+    const pinned = lanesFollowingLive || lanesAtLiveEdge()
+    applyLanesAxis()
+    renderLanesRuler()
+    if (pinned && DOM.lanesScroller) {
+      DOM.lanesScroller.scrollLeft = DOM.lanesScroller.scrollWidth
+    }
+    updateLanesMask()
+  }, 1000)
 
   // Radar modal: expand chips, collapse button, scrim, Esc
   for (const chip of document.querySelectorAll('.mini-expand')) {
