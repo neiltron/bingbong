@@ -11,6 +11,25 @@ const MACHINE_ID = Bun.env.BINGBONG_MACHINE_ID || os.hostname();
 
 const TOOL_EVENT_TYPES = new Set(["tool.execute.before", "tool.execute.after"]);
 
+// High-frequency / non-session bus events that would flood the soundscape.
+// message.part.* fires on every streaming delta; session.next.* is the new
+// fine-grained streaming event family.
+const IGNORED_PREFIXES = [
+  "message.part.",
+  "session.next.",
+  "lsp.",
+  "tui.",
+  "pty.",
+  "installation.",
+  "file.watcher.",
+  "models-dev.",
+  "catalog.",
+];
+const IGNORED_TYPES = new Set(["server.connected", "global.disposed"]);
+
+const shouldIgnore = (type) =>
+  IGNORED_TYPES.has(type) || IGNORED_PREFIXES.some((p) => type.startsWith(p));
+
 const nowIso = () => new Date().toISOString();
 
 const safeJson = (value) => {
@@ -22,6 +41,9 @@ const safeJson = (value) => {
 };
 
 const extractSessionId = (candidate) =>
+  candidate?.properties?.sessionID ||
+  candidate?.properties?.info?.id ||
+  candidate?.sessionID ||
   candidate?.session?.id ||
   candidate?.sessionId ||
   candidate?.session_id ||
@@ -37,11 +59,23 @@ const EVENT_TYPE_MAP = {
   "tool.execute.after": "PostToolUse",
   "session.created": "SessionStart",
   "session.deleted": "SessionEnd",
-  "session.idle": "Stop",
+  "session.idle": "Stop", // deprecated upstream in favor of session.status, still published
   "session.error": "Stop",
+  "session.compacted": "PostCompact",
+  "permission.asked": "PermissionRequest",
 };
 
 const mapEventType = (eventType) => EVENT_TYPE_MAP[eventType] || eventType;
+
+// session.idle (deprecated) and session.status{type:"idle"} are both published
+// on current OpenCode; suppress the duplicate Stop within a short window.
+const lastStopAt = new Map();
+const isDuplicateStop = (sessionId) => {
+  const now = Date.now();
+  const last = lastStopAt.get(sessionId) || 0;
+  lastStopAt.set(sessionId, now);
+  return now - last < 1500;
+};
 
 const sendEvent = async ({
   eventType,
@@ -54,6 +88,8 @@ const sendEvent = async ({
   if (!BINGBONG_ENABLED) return;
 
   const mappedEventType = mapEventType(eventType);
+  if (mappedEventType === "Stop" && isDuplicateStop(sessionId)) return;
+
   const output =
     mappedEventType === eventType
       ? toolOutput
@@ -84,7 +120,19 @@ const sendEvent = async ({
 export const BingbongPlugin = async ({ directory }) => {
   return {
     event: async ({ event }) => {
-      if (!event || TOOL_EVENT_TYPES.has(event.type)) return;
+      if (!event || TOOL_EVENT_TYPES.has(event.type) || shouldIgnore(event.type)) return;
+
+      // session.status replaces the deprecated session.idle; only the idle
+      // transition is audibly interesting.
+      if (event.type === "session.status") {
+        if (event.properties?.status?.type !== "idle") return;
+        await sendEvent({
+          eventType: "session.idle",
+          sessionId: extractSessionId(event),
+          cwd: extractCwd(event, directory),
+        });
+        return;
+      }
 
       await sendEvent({
         eventType: event.type || "unknown",
@@ -96,6 +144,7 @@ export const BingbongPlugin = async ({ directory }) => {
       });
     },
 
+    // input: { tool, sessionID, callID }, output: { args }
     "tool.execute.before": async (input, output) => {
       await sendEvent({
         eventType: "tool.execute.before",
@@ -107,14 +156,19 @@ export const BingbongPlugin = async ({ directory }) => {
       });
     },
 
+    // input: { tool, sessionID, callID, args }, output: { title, output, metadata }
     "tool.execute.after": async (input, output) => {
       await sendEvent({
         eventType: "tool.execute.after",
         sessionId: extractSessionId(input || output),
         cwd: extractCwd(output, directory),
         toolName: input?.tool || "",
-        toolInput: output?.args || {},
-        toolOutput: output?.result || output || {},
+        toolInput: input?.args || output?.args || {},
+        toolOutput: {
+          title: output?.title,
+          output: output?.output,
+          metadata: output?.metadata,
+        },
       });
     },
   };

@@ -33,6 +33,72 @@ export const SOUND_CONFIG: Record<string, SoundParams | Record<string, SoundPara
     type: 'sawtooth',
     gain: 0.15,
   },
+  PostCompact: {
+    note: 'E4',
+    duration: 0.2,
+    type: 'sawtooth',
+    gain: 0.15,
+  },
+  SubagentStart: {
+    note: 'G4',
+    duration: 0.2,
+    type: 'triangle',
+    gain: 0.3,
+  },
+  UserPromptSubmit: {
+    note: 'C4',
+    duration: 0.06,
+    type: 'sine',
+    gain: 0.12,
+  },
+  Notification: {
+    note: 'E5',
+    duration: 0.15,
+    type: 'sine',
+    gain: 0.25,
+  },
+  PermissionRequest: {
+    notes: ['A4', 'D5'],
+    duration: 0.3,
+    type: 'triangle',
+    gain: 0.35,
+  },
+  PermissionDenied: {
+    note: 'F3',
+    duration: 0.35,
+    type: 'sawtooth',
+    gain: 0.25,
+  },
+  PostToolUseFailure: {
+    notes: ['F3', 'E3'],
+    duration: 0.35,
+    type: 'sawtooth',
+    gain: 0.3,
+  },
+  StopFailure: {
+    notes: ['G3', 'F#3'],
+    duration: 0.5,
+    type: 'sawtooth',
+    gain: 0.3,
+  },
+  TaskCreated: {
+    note: 'B4',
+    duration: 0.12,
+    type: 'triangle',
+    gain: 0.2,
+  },
+  TaskCompleted: {
+    notes: ['B4', 'E5'],
+    duration: 0.2,
+    type: 'triangle',
+    gain: 0.3,
+  },
+  TeammateIdle: {
+    note: 'A3',
+    duration: 0.3,
+    type: 'sine',
+    gain: 0.2,
+  },
 
   // Tool-specific sounds (for PreToolUse/PostToolUse)
   tools: {

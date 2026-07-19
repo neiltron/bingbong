@@ -11,6 +11,29 @@
 import os from "node:os";
 import type { BingbongEvent } from "@bingbong/protocol";
 
+/**
+ * Cursor hook names (camelCase) → canonical bingbong event types.
+ * Claude Code already emits canonical PascalCase names, and the two sets
+ * never collide, so a single lookup keyed on the raw event name is safe.
+ * Unmapped events (afterAgentResponse, afterAgentThought) pass through raw.
+ */
+const CURSOR_EVENT_MAP: Record<string, { type: string; tool?: string }> = {
+  sessionStart:         { type: "SessionStart" },
+  sessionEnd:           { type: "SessionEnd" },
+  beforeShellExecution: { type: "PreToolUse", tool: "Bash" },
+  afterShellExecution:  { type: "PostToolUse", tool: "Bash" },
+  beforeMCPExecution:   { type: "PreToolUse" },   // tool_name arrives in the payload
+  afterMCPExecution:    { type: "PostToolUse" },
+  beforeReadFile:       { type: "PreToolUse", tool: "Read" },
+  afterFileEdit:        { type: "PostToolUse", tool: "Edit" },
+  beforeSubmitPrompt:   { type: "UserPromptSubmit" },
+  postToolUseFailure:   { type: "PostToolUseFailure" },
+  subagentStart:        { type: "SubagentStart" },
+  subagentStop:         { type: "SubagentStop" },
+  preCompact:           { type: "PreCompact" },
+  stop:                 { type: "Stop" },
+};
+
 export async function emit(argv: string[]): Promise<void> {
   const enabled = (process.env.BINGBONG_ENABLED || "true").toLowerCase() !== "false";
   if (!enabled) return;
@@ -53,14 +76,31 @@ export async function emit(argv: string[]): Promise<void> {
   // Normalize session_id — agents use different field names
   const sessionId = (input.session_id ?? input.conversation_id ?? input.generation_id ?? "unknown") as string;
 
+  const mapped = CURSOR_EVENT_MAP[eventType];
+
   // Spread stdin payload, overlay our fields
   const payload: BingbongEvent = {
     ...input,
-    event_type: eventType,
+    event_type: mapped?.type ?? eventType,
     session_id: sessionId,
     machine_id: process.env.BINGBONG_MACHINE_ID || os.hostname(),
     timestamp: new Date().toISOString(),
   };
+
+  if (mapped) {
+    payload.original_event_type = eventType;
+    if (!payload.tool_name && mapped.tool) payload.tool_name = mapped.tool;
+    // Surface the most useful cursor payload field as tool_input
+    if (!payload.tool_input) {
+      if (typeof input.command === "string") payload.tool_input = { command: input.command };
+      else if (typeof input.file_path === "string") payload.tool_input = { file_path: input.file_path };
+    }
+  }
+
+  // Claude Code sends tool output as `tool_response`; normalize to the protocol field
+  if (!payload.tool_output && input.tool_response && typeof input.tool_response === "object") {
+    payload.tool_output = input.tool_response as Record<string, unknown>;
+  }
 
   try {
     await fetch(`${url}/events`, {

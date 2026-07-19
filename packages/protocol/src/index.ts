@@ -7,6 +7,8 @@ export interface BingbongEvent {
   tool_name?: string;
   tool_input?: Record<string, unknown>;
   tool_output?: Record<string, unknown>;
+  /** Harness-native event name when event_type was normalized to a canonical type */
+  original_event_type?: string;
 }
 
 export interface EnrichedEvent extends BingbongEvent {
