@@ -92,8 +92,16 @@ input[type="range"] {
     flex-shrink: 0;
 }
 
-.audio-banner:hover {
-    background: var(--color-accent);
+@media (hover: hover) and (pointer: fine) {
+    .audio-banner:hover {
+        background: var(--color-accent);
+        color: var(--color-text-inverse);
+    }
+}
+
+/* Full-bleed bar: press reads as a colour shift, not a scale */
+.audio-banner:active {
+    background: var(--color-accent-hover);
     color: var(--color-text-inverse);
 }
 
@@ -267,11 +275,23 @@ input[type="range"] {
     font-weight: 500;
     color: var(--color-text-secondary);
     cursor: pointer;
+    transition: background var(--transition-fast), color var(--transition-fast);
 }
 
 .seg button.on {
     background: var(--color-marigold);
     color: var(--color-text-on-marigold);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .seg button:not(.on):hover {
+        color: var(--color-text-primary);
+    }
+}
+
+/* Parent clips at 9px radius, so press feedback is a tint rather than a scale */
+.seg button:not(.on):active {
+    background: var(--color-bg-elevated);
 }
 
 /* ============================================
@@ -408,10 +428,22 @@ input[type="range"] {
     cursor: pointer;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
     animation: pillIn 0.2s ease-out;
+    transition: transform 160ms var(--ease-out), filter var(--transition-fast);
 }
 
-.trace-pill:hover {
-    filter: brightness(1.05);
+@media (hover: hover) and (pointer: fine) {
+    .trace-pill:hover {
+        filter: brightness(1.05);
+    }
+}
+
+/* Centring translate must survive the press, so scale composes with it */
+.trace-pill:active {
+    transform: translateX(-50%) scale(var(--press-scale));
+}
+
+.lanes-pill:active {
+    transform: scale(var(--press-scale));
 }
 
 .trace-pill[hidden] {
@@ -498,11 +530,19 @@ input[type="range"] {
     font-weight: 500;
     color: var(--color-text-secondary);
     cursor: pointer;
+    transition: color var(--transition-fast), border-color var(--transition-fast),
+        transform 160ms var(--ease-out);
 }
 
-.mini-expand:hover {
-    color: var(--color-marigold);
-    border-color: var(--color-marigold);
+@media (hover: hover) and (pointer: fine) {
+    .mini-expand:hover {
+        color: var(--color-marigold);
+        border-color: var(--color-marigold);
+    }
+}
+
+.mini-expand:active {
+    transform: scale(var(--press-scale));
 }
 
 .mini-label {
@@ -881,8 +921,11 @@ input[type="range"] {
     touch-action: none;
 }
 
-.source-circle:hover {
-    box-shadow: 0 0 15px color-mix(in srgb, var(--session-color) 50%, transparent);
+/* No :active scale here — .dragging already carries the press feedback */
+@media (hover: hover) and (pointer: fine) {
+    .source-circle:hover {
+        box-shadow: 0 0 15px color-mix(in srgb, var(--session-color) 50%, transparent);
+    }
 }
 
 .source-circle.selected {

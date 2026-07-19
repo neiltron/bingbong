@@ -173,6 +173,11 @@
     --transition-fast: 0.15s ease;
     --transition-base: 0.2s ease;
     --transition-slow: 0.3s ease;
+
+    /* Entering/exiting elements: starts fast, so the UI feels immediate */
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    /* Press feedback — subtle enough for controls hit many times a session */
+    --press-scale: 0.97;
 }
 
 /* ============================================
@@ -186,7 +191,17 @@
     border-radius: var(--radius-md);
     border: none;
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: background var(--transition-fast), color var(--transition-fast),
+        border-color var(--transition-fast), filter var(--transition-fast),
+        transform 160ms var(--ease-out);
+}
+
+.btn:active {
+    transform: scale(var(--press-scale));
+}
+
+.btn:disabled:active {
+    transform: none;
 }
 
 .btn-primary {
@@ -194,17 +209,9 @@
     color: var(--color-text-on-accent);
 }
 
-.btn-primary:hover {
-    filter: brightness(1.1);
-}
-
 .btn-accent {
     background: var(--color-marigold);
     color: var(--color-text-on-marigold);
-}
-
-.btn-accent:hover {
-    filter: brightness(1.05);
 }
 
 .btn-outline {
@@ -213,9 +220,20 @@
     color: var(--color-text-primary);
 }
 
-.btn-outline:hover {
-    background: var(--color-bg-accent);
-    color: var(--color-text-on-accent);
+/* Hover gated: touch devices fire :hover on tap and leave it stuck */
+@media (hover: hover) and (pointer: fine) {
+    .btn-primary:hover {
+        filter: brightness(1.1);
+    }
+
+    .btn-accent:hover {
+        filter: brightness(1.05);
+    }
+
+    .btn-outline:hover {
+        background: var(--color-bg-accent);
+        color: var(--color-text-on-accent);
+    }
 }
 
 /* Size modifier: compact button for headers, toolbars, and modal chrome */
@@ -245,9 +263,11 @@
     color: var(--color-cream);
 }
 
-[data-theme="dark"] .btn-outline:hover {
-    background: var(--color-cream);
-    color: var(--color-deep-teal);
+@media (hover: hover) and (pointer: fine) {
+    [data-theme="dark"] .btn-outline:hover {
+        background: var(--color-cream);
+        color: var(--color-deep-teal);
+    }
 }
 
 /* ============================================
@@ -327,7 +347,8 @@
     align-items: center;
     justify-content: center;
     cursor: grab;
-    transition: all var(--transition-fast);
+    transition: background var(--transition-fast), border-color var(--transition-fast),
+        box-shadow var(--transition-fast), opacity var(--transition-fast);
     box-shadow: var(--shadow-node);
 }
 
