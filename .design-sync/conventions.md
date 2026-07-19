@@ -1,6 +1,6 @@
 # Bingbong design system — conventions
 
-Bingbong is a soundscape monitor for coding agents. Its look: cream (`#FAF3E3`) surfaces, deep teal ink, marigold and rose accents; **Geist Mono** for all interface text, **Inter** only for display/heading type. Warm, rounded (8–16px radii), 2px solid borders.
+Bingbong is a soundscape monitor for coding agents. Its look is the "Ink + Gold" palette: cream (`#F6EFDF`) paper, warm brown-black ink (`#201A12`), gold (`#E8A832`) as the action color, rose accents — no teal or green; **Geist Mono** for all interface text, **Inter** only for display/heading type. Warm, rounded (8–16px radii), 2px solid borders. (Legacy token names survive the recolor: `--color-teal` now holds ink in light / olive-gold in dark, `--color-deep-teal` the dark ink base.)
 
 ## Setup
 
@@ -22,7 +22,7 @@ Semantic tokens flip automatically under `Theme mode="dark"` — prefer them ove
 
 ## Components
 
-`Button` (variant: primary | accent | outline), `Panel` (variant: default | accent | inverted; `title` prop for the uppercase label), `Text` (variant: display…label), `AgentSession` (name/meta/indicatorColor), `SourceNode` (status: default | active | idle | disconnected), `ToolEvent` (badge/name/agent/time), `Theme`. Each component's `.prompt.md` and `.d.ts` are the API truth; read `styles.css` for the full token set.
+`Button` (variant: primary | accent | outline; size: medium | small — small for headers/toolbars/modal chrome), `Panel` (variant: default | accent | inverted; `title` prop for the uppercase label), `Text` (variant: display…label), `AgentSession` (name/meta/indicatorColor; density: default | compact — compact is a fluid pill for narrow rails), `SourceNode` (status: default | active | idle | disconnected), `ToolEvent` (badge/name/agent/time), `Theme`. Each component's `.prompt.md` and `.d.ts` are the API truth; read `styles.css` for the full token set.
 
 ## Idiomatic example
 

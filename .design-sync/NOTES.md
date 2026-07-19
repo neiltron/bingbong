@@ -8,7 +8,12 @@
 
 ## Known render warns
 
-- SourceNode labels use `--color-text-inverse`, so they're near-invisible on `idle`/`disconnected` nodes (light theme) and low-contrast on dark — the DS's own token choice, faithful to the app (the real visualizer draws labels on canvas via `--viz-label`). Graded good deliberately.
+- ~~SourceNode labels use `--color-text-inverse`, so they're near-invisible on `idle`/`disconnected` nodes (light theme) and low-contrast on dark~~ — fixed 2026-07-19 while upstreaming the "Ink + Gold" handoff overrides: dark labels now use `--color-text-primary`, idle/disconnected labels `--color-text-muted`.
+
+## 2026-07-19 — "Ink + Gold" recolor + handoff upstreams
+
+- The Claude Design handoff ("Color scheme alternatives" / trace-first monitor) palette is now the DS default in `design-system.css` — no wrapper overrides needed. Legacy token names kept: `--color-teal` = ink `#201A12` (light) / olive-gold `#6B5A3A` (dark); `--color-deep-teal` = dark ink base `#171310`.
+- Upstreamed the handoff's component-level overrides: `Button size="small"` (`.btn-small`), `AgentSession density="compact"` (`.agent-session--compact` fluid pill), SourceNode label contrast fixes.
 
 ## Re-sync risks
 

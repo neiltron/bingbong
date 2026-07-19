@@ -10,6 +10,8 @@ export interface AgentSessionProps extends HTMLAttributes<HTMLDivElement> {
   indicatorColor?: 'teal' | 'marigold' | 'rose' | 'sand';
   /** Content inside the indicator; defaults to the first letter of `name`. */
   icon?: ReactNode;
+  /** 'compact' is a fluid pill for narrow rails — fills its container instead of the 280px default. */
+  density?: 'default' | 'compact';
 }
 
 /**
@@ -21,12 +23,16 @@ export function AgentSession({
   meta,
   indicatorColor = 'teal',
   icon,
+  density = 'default',
   className,
   ...rest
 }: AgentSessionProps) {
   const iconText = indicatorColor === 'teal' ? 'text-cream' : 'text-teal';
   return (
-    <div className={cx('agent-session', className)} {...rest}>
+    <div
+      className={cx('agent-session', density === 'compact' && 'agent-session--compact', className)}
+      {...rest}
+    >
       <div className={cx('agent-session-indicator', `bg-${indicatorColor}`, iconText)}>
         {icon ?? name.charAt(0).toUpperCase()}
       </div>

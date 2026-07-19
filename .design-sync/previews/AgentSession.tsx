@@ -20,3 +20,13 @@ export const OnDark = () => (
     </div>
   </Theme>
 );
+
+export const CompactRail = () => (
+  <Theme mode="dark" style={{ padding: 24 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: 218 }}>
+      <AgentSession density="compact" name="bingbong" meta="~/projects/bingbong · 14 calls" indicatorColor="marigold" />
+      <AgentSession density="compact" name="webapp" meta="~/projects/webapp · 6 calls" indicatorColor="rose" />
+      <AgentSession density="compact" name="api" meta="~/projects/api · 2 calls" indicatorColor="teal" />
+    </div>
+  </Theme>
+);

@@ -8,6 +8,14 @@ export const Variants = () => (
   </div>
 );
 
+export const Small = () => (
+  <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+    <Button variant="primary" size="small">Connect</Button>
+    <Button variant="accent" size="small">Play soundscape</Button>
+    <Button variant="outline" size="small">Mute</Button>
+  </div>
+);
+
 export const Disabled = () => (
   <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
     <Button variant="primary" disabled>
