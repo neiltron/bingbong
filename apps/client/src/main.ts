@@ -13,9 +13,8 @@ const eventLog: EnrichedEvent[] = []
 const MAX_LOG_ITEMS = 50
 const MAX_LANE_CHIPS = 30
 
-// Per-lane horizontal scroll state, keyed by session_id. Lanes re-render on
-// every event; "pinned" lanes follow the live right edge, others keep place.
-const laneScroll = new Map<string, { left: number; pinned: boolean }>()
+// Lanes render incrementally; handles to each lane's track/meta by session_id
+const laneEls = new Map<string, { track: HTMLElement; meta: HTMLElement }>()
 const VIEW_STORAGE_KEY = 'bingbong:view'
 
 type TraceView = 'combined' | 'lanes'
@@ -35,6 +34,8 @@ const DOM = {
   tracePill: null as HTMLButtonElement | null,
   lanesListEl: null as HTMLElement | null,
   lanesRulerEl: null as HTMLElement | null,
+  lanesScroller: null as HTMLElement | null,
+  lanesPill: null as HTMLButtonElement | null,
   railLabel: null as HTMLElement | null,
   viewTitle: null as HTMLElement | null,
   viewCaption: null as HTMLElement | null,
@@ -245,10 +246,41 @@ function appendTraceRow(e: EnrichedEvent): void {
   }
 }
 
-function renderLanes(): void {
-  const listEl = DOM.lanesListEl
+// Shared-scroller live-follow state for the lanes view
+let lanesUnseen = 0
+let lanesFollowingLive = false
+let lanesFollowingTimeout: ReturnType<typeof setTimeout> | undefined
+
+function lanesAtLiveEdge(): boolean {
+  const sc = DOM.lanesScroller
+  if (!sc) return true
+  return sc.scrollLeft >= sc.scrollWidth - sc.clientWidth - 2
+}
+
+function clearLanesPill(): void {
+  lanesUnseen = 0
+  if (DOM.lanesPill) DOM.lanesPill.hidden = true
+}
+
+function showLanesPill(): void {
+  const pill = DOM.lanesPill
+  if (!pill) return
+  pill.textContent = `${lanesUnseen} new ${lanesUnseen === 1 ? 'event' : 'events'} →`
+  pill.hidden = false
+}
+
+function updateLanesMask(): void {
+  const sc = DOM.lanesScroller
+  if (!sc || !DOM.viewLanes) return
+  DOM.viewLanes.classList.toggle(
+    'mask-right',
+    sc.scrollLeft < sc.scrollWidth - sc.clientWidth - 1
+  )
+}
+
+function renderLanesRuler(): void {
   const rulerEl = DOM.lanesRulerEl
-  if (!listEl || !rulerEl) return
+  if (!rulerEl) return
 
   // Time ruler: oldest visible event → now
   rulerEl.innerHTML = ''
@@ -266,30 +298,45 @@ function renderLanes(): void {
   for (const label of labels) {
     rulerEl.appendChild(createElement('span', { class: 'trace-time' }, [label]))
   }
+}
 
-  // One lane per session, chips sequence-ordered (timestamp positioning is a stretch goal)
+function buildLaneChip(e: EnrichedEvent, animate: boolean): HTMLElement {
+  return createElement('div', { class: animate ? 'ev ev-in' : 'ev' }, [
+    createElement('span', { class: 'evb' }, [eventBadge(e)]),
+    eventName(e),
+  ])
+}
+
+/** Full rebuild (init, view switch, new session) — lands pinned to the live edge. */
+function renderLanes(): void {
+  const listEl = DOM.lanesListEl
+  if (!listEl) return
+
+  renderLanesRuler()
+  laneEls.clear()
+  clearLanesPill()
   listEl.innerHTML = ''
+
   if (sessions.size === 0) {
     listEl.appendChild(createElement('div', { class: 'empty-state' }, ['No active sessions']))
+    updateLanesMask()
     return
   }
 
+  // One lane per session, chips sequence-ordered (timestamp positioning is a stretch goal)
   for (const s of sessions.values()) {
     const chips: Node[] = []
     for (const e of eventLog.filter((e) => e.session_id === s.session_id).slice(-MAX_LANE_CHIPS)) {
       if (chips.length > 0) {
         chips.push(createElement('div', { class: 'ev-thread', 'aria-hidden': 'true' }, []))
       }
-      chips.push(
-        createElement('div', { class: 'ev' }, [
-          createElement('span', { class: 'evb' }, [eventBadge(e)]),
-          eventName(e),
-        ])
-      )
+      chips.push(buildLaneChip(e, false))
     }
 
     const track = createElement('div', { class: 'lane-track' }, chips)
-    const trackWrap = createElement('div', { class: 'lane-track-wrap' }, [track])
+    const meta = createElement('div', { class: 'lane-meta' }, [
+      `${s.machine_id || 'unknown'} · ${s.event_count || 0}`,
+    ])
 
     listEl.appendChild(
       createElement('div', { class: 'lane' }, [
@@ -302,39 +349,60 @@ function renderLanes(): void {
             }),
             sessionName(s),
           ]),
-          createElement('div', { class: 'lane-meta' }, [
-            `${s.machine_id || 'unknown'} · ${s.event_count || 0}`,
-          ]),
+          meta,
         ]),
-        trackWrap,
+        track,
       ])
     )
 
-    // Restore scroll: pinned lanes (default) follow the newest chip on the right
-    const state = laneScroll.get(s.session_id)
-    if (!state || state.pinned) {
-      track.scrollLeft = track.scrollWidth
-    } else {
-      track.scrollLeft = state.left
-    }
-    updateLaneMask(track, trackWrap)
-
-    const sessionId = s.session_id
-    track.addEventListener('scroll', () => {
-      const atRight = track.scrollLeft >= track.scrollWidth - track.clientWidth - 2
-      laneScroll.set(sessionId, { left: track.scrollLeft, pinned: atRight })
-      updateLaneMask(track, trackWrap)
-    })
+    laneEls.set(s.session_id, { track, meta })
   }
+
+  if (DOM.lanesScroller) DOM.lanesScroller.scrollLeft = DOM.lanesScroller.scrollWidth
+  updateLanesMask()
 }
 
-/** Show a fade at each edge of a lane that has more chips in that direction. */
-function updateLaneMask(track: HTMLElement, wrap: HTMLElement): void {
-  wrap.classList.toggle('mask-left', track.scrollLeft > 1)
-  wrap.classList.toggle(
-    'mask-right',
-    track.scrollLeft < track.scrollWidth - track.clientWidth - 1
-  )
+/**
+ * Incrementally append one chip to its lane. Pinned-to-live readers follow the
+ * right edge; scrolled-back readers keep their place and get a pill.
+ */
+function appendLaneChip(event: EnrichedEvent): void {
+  const s = sessions.get(event.session_id)
+  if (!s) return
+
+  const lane = laneEls.get(event.session_id)
+  if (!lane) {
+    // New session — needs a new lane row
+    renderLanes()
+    return
+  }
+
+  renderLanesRuler()
+  lane.meta.textContent = `${s.machine_id || 'unknown'} · ${s.event_count || 0}`
+
+  const pinned = lanesFollowingLive || lanesAtLiveEdge()
+
+  if (lane.track.children.length > 0) {
+    lane.track.appendChild(createElement('div', { class: 'ev-thread', 'aria-hidden': 'true' }, []))
+  }
+  lane.track.appendChild(buildLaneChip(event, true))
+
+  // Trim oldest chips (and their trailing connectors) beyond the cap
+  while (lane.track.querySelectorAll('.ev').length > MAX_LANE_CHIPS) {
+    lane.track.firstElementChild?.remove()
+    if (lane.track.firstElementChild?.classList.contains('ev-thread')) {
+      lane.track.firstElementChild.remove()
+    }
+  }
+
+  const sc = DOM.lanesScroller
+  if (pinned && sc) {
+    sc.scrollLeft = sc.scrollWidth
+  } else if (!pinned) {
+    lanesUnseen++
+    showLanesPill()
+  }
+  updateLanesMask()
 }
 
 /** Mirror live source positions into every mini-radar thumbnail. */
@@ -515,7 +583,7 @@ function handleEvent(event: EnrichedEvent): void {
   if (view === 'combined') {
     appendTraceRow(event)
   } else {
-    renderLanes()
+    appendLaneChip(event)
   }
   renderMiniRadars()
 }
@@ -582,6 +650,8 @@ document.addEventListener('DOMContentLoaded', () => {
   DOM.tracePill = document.getElementById('trace-pill') as HTMLButtonElement
   DOM.lanesListEl = document.getElementById('lanes-list')
   DOM.lanesRulerEl = document.getElementById('lanes-ruler')
+  DOM.lanesScroller = document.getElementById('lanes-scroller')
+  DOM.lanesPill = document.getElementById('lanes-pill') as HTMLButtonElement
   DOM.railLabel = document.getElementById('rail-label')
   DOM.viewTitle = document.getElementById('view-title')
   DOM.viewCaption = document.getElementById('view-caption')
@@ -647,6 +717,25 @@ document.addEventListener('DOMContentLoaded', () => {
       followingLive = false
     }, 1500)
     DOM.traceEl?.scrollTo({ top: 0, behavior: 'smooth' })
+  })
+
+  // Lanes: reaching the live (right) edge clears the pill; clicking eases over
+  DOM.lanesScroller?.addEventListener('scroll', () => {
+    if (lanesAtLiveEdge()) {
+      lanesFollowingLive = false
+      clearLanesPill()
+    }
+    updateLanesMask()
+  })
+  DOM.lanesPill?.addEventListener('click', () => {
+    clearLanesPill()
+    lanesFollowingLive = true
+    clearTimeout(lanesFollowingTimeout)
+    lanesFollowingTimeout = setTimeout(() => {
+      lanesFollowingLive = false
+    }, 1500)
+    const sc = DOM.lanesScroller
+    sc?.scrollTo({ left: sc.scrollWidth, behavior: 'smooth' })
   })
 
   // Radar modal: expand chips, collapse button, scrim, Esc

@@ -90,11 +90,17 @@
             </div>
 
             <div class="view-lanes" id="view-lanes" hidden>
-                <div class="lanes-ruler">
-                    <div class="lanes-ruler-spacer"></div>
-                    <div class="lanes-ruler-times" id="lanes-ruler"></div>
+                <button class="trace-pill lanes-pill" id="lanes-pill" hidden>new events →</button>
+                <div class="lanes-fade-right" aria-hidden="true"></div>
+                <div class="lanes-scroller" id="lanes-scroller">
+                    <div class="lanes-content">
+                        <div class="lanes-ruler-row">
+                            <div class="lane-corner" aria-hidden="true"></div>
+                            <div class="lanes-ruler-times" id="lanes-ruler"></div>
+                        </div>
+                        <div class="lanes-list" id="lanes-list"></div>
+                    </div>
                 </div>
-                <div class="lanes-list" id="lanes-list"></div>
                 <div class="lanes-radar">
                     <div class="mini-radar">
                         <svg viewBox="0 0 100 100" fill="none" aria-hidden="true">
