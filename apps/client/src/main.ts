@@ -20,11 +20,55 @@ const laneEls = new Map<
   { track: HTMLElement; meta: HTMLElement; lastRight: number | null }
 >()
 
-// Time axis: chips sit at (timestamp - laneT0) * PX_PER_SEC
-const PX_PER_SEC = 24
-const AXIS_TAIL = 140 // breathing room past "now" so the newest chip isn't flush
+// Event-driven time axis: pixels accrue with events at PX_PER_SEC, but idle
+// stretches compress to at most GAP_MAX_PX — so the head never creeps away on
+// its own, and bursts never leave "now" behind.
+const PX_PER_SEC = 40
+const GAP_MAX_PX = 120 // an idle gap renders at most this wide
+const AXIS_TAIL = 140 // breathing room past the head so the newest chip isn't flush
 const CHIP_GAP = 8 // min spacing when a burst would overlap chips
-let laneT0: number | null = null
+
+// One anchor per event (piecewise time→x mapping), plus each event's x
+let anchors: { ms: number; x: number }[] = []
+const chipX = new WeakMap<EnrichedEvent, number>()
+
+function anchorAppend(e: EnrichedEvent): number {
+  const ms = eventMs(e)
+  const last = anchors[anchors.length - 1]
+  const dx = last ? Math.min(Math.max(((ms - last.ms) / 1000) * PX_PER_SEC, 0), GAP_MAX_PX) : 0
+  const x = last ? last.x + dx : 0
+  anchors.push({ ms, x })
+  chipX.set(e, x)
+  return x
+}
+
+/** Right end of the axis: the capped clock position, or the newest chip edge
+ *  if a burst has nudged past it — "now" always hugs the content. */
+function axisHeadX(): number {
+  const last = anchors[anchors.length - 1]
+  if (!last) return 0
+  let head =
+    last.x + Math.min(Math.max(((Date.now() - last.ms) / 1000) * PX_PER_SEC, 0), GAP_MAX_PX)
+  for (const lane of laneEls.values()) {
+    if (lane.lastRight !== null) head = Math.max(head, lane.lastRight)
+  }
+  return head
+}
+
+/** Inverse mapping for ruler labels: what moment does pixel x represent? */
+function timeAtX(x: number): number | null {
+  if (anchors.length === 0) return null
+  if (x <= anchors[0].x) return anchors[0].ms
+  for (let i = 0; i < anchors.length - 1; i++) {
+    const a = anchors[i]
+    const b = anchors[i + 1]
+    if (x <= b.x) {
+      return b.x === a.x ? b.ms : a.ms + ((x - a.x) / (b.x - a.x)) * (b.ms - a.ms)
+    }
+  }
+  const last = anchors[anchors.length - 1]
+  return Math.min(last.ms + ((x - last.x) / PX_PER_SEC) * 1000, Date.now())
+}
 const VIEW_STORAGE_KEY = 'bingbong:view'
 
 type TraceView = 'combined' | 'lanes'
@@ -292,22 +336,11 @@ function eventMs(e: EnrichedEvent): number {
   return new Date(e.timestamp).getTime()
 }
 
-function timeToX(ms: number): number {
-  return ((ms - (laneT0 ?? ms)) / 1000) * PX_PER_SEC
-}
-
 function lanesAxisWidth(): number {
-  if (laneT0 === null) return 0
-  // Cover both real time and any burst-nudge drift past it, so sticky heads
-  // and the ruler always span the full scrollable width
-  let w = timeToX(Date.now()) + AXIS_TAIL
-  for (const lane of laneEls.values()) {
-    if (lane.lastRight !== null) w = Math.max(w, lane.lastRight + AXIS_TAIL)
-  }
   // At least the visible area (minus head column) so the ruler border spans it
   const headSpan = 174 + 14
   const minVisible = (DOM.lanesScroller?.clientWidth ?? 0) - headSpan
-  return Math.max(200, minVisible, w)
+  return Math.max(200, minVisible, axisHeadX() + AXIS_TAIL)
 }
 
 /** Size the ruler and every lane track to the current axis width. */
@@ -319,29 +352,30 @@ function applyLanesAxis(): void {
   }
 }
 
-// Candidate tick intervals (seconds); pick the smallest giving ~220px spacing
-const TICK_STEPS = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1800, 3600]
+// Ruler label spacing in pixels; times come from the inverse axis mapping
+const TICK_SPACING_PX = 240
 
 function renderLanesRuler(): void {
   const rulerEl = DOM.lanesRulerEl
-  if (!rulerEl || laneT0 === null) return
+  if (!rulerEl) return
 
   rulerEl.innerHTML = ''
-  const now = Date.now()
-  const nowX = timeToX(now)
-  const stepMs = (TICK_STEPS.find((s) => s * PX_PER_SEC >= 220) ?? 3600) * 1000
+  if (anchors.length === 0) return
 
-  for (let t = Math.ceil(laneT0 / stepMs) * stepMs; t <= now; t += stepMs) {
-    const x = timeToX(t)
-    if (nowX - x < 70) break // keep clear of the "now" label
+  const headX = axisHeadX()
+  let prevLabel = ''
+  for (let x = 0; x <= headX - 70; x += TICK_SPACING_PX) {
+    const ms = timeAtX(x)
+    if (ms === null) continue
+    const label = new Date(ms).toLocaleTimeString('en-US', { hour12: false })
+    if (label === prevLabel) continue // compressed gaps can repeat a second
+    prevLabel = label
     rulerEl.appendChild(
-      createElement('span', { class: 'trace-time', style: { left: `${x}px` } }, [
-        new Date(t).toLocaleTimeString('en-US', { hour12: false }),
-      ])
+      createElement('span', { class: 'trace-time', style: { left: `${x}px` } }, [label])
     )
   }
   rulerEl.appendChild(
-    createElement('span', { class: 'trace-time', style: { left: `${nowX}px` } }, ['now'])
+    createElement('span', { class: 'trace-time', style: { left: `${headX}px` } }, ['now'])
   )
 }
 
@@ -366,7 +400,7 @@ function placeLaneChip(
   chip: HTMLElement,
   e: EnrichedEvent
 ): void {
-  const trueX = timeToX(eventMs(e))
+  const trueX = chipX.get(e) ?? 0
   const x = lane.lastRight === null ? Math.max(0, trueX) : Math.max(trueX, lane.lastRight + CHIP_GAP)
 
   if (lane.lastRight !== null && x - lane.lastRight > 14) {
@@ -382,6 +416,14 @@ function placeLaneChip(
 
   chip.style.left = `${x}px`
   lane.lastRight = x + chip.offsetWidth
+
+  // Absorb burst-nudge drift into the axis: this event was just anchored last,
+  // so moving its anchor keeps the time→x mapping monotonic and label-covered
+  const a = anchors[anchors.length - 1]
+  if (a && x > a.x) {
+    a.x = x
+    chipX.set(e, x)
+  }
 }
 
 /** Full rebuild (init, view switch, new session) — lands pinned to the live edge. */
@@ -391,10 +433,11 @@ function renderLanes(): void {
 
   const sc = DOM.lanesScroller
   const wasPinned = lanesFollowingLive || lanesAtLiveEdge()
-  const prevT0 = laneT0
   const prevScroll = sc?.scrollLeft ?? 0
+  // Where the new axis origin (oldest retained event) sat on the old axis
+  const prevOriginX = eventLog.length > 0 ? chipX.get(eventLog[0]) : undefined
 
-  laneT0 = eventLog.length > 0 ? eventMs(eventLog[0]) : Date.now()
+  anchors = []
   laneEls.clear()
   clearLanesPill()
   listEl.innerHTML = ''
@@ -432,26 +475,34 @@ function renderLanes(): void {
     laneEls.set(s.session_id, { track, meta, lastRight: null })
   }
 
-  // Chips at their true time positions
+  // Which events each lane actually displays (last N per session)
+  const kept = new Map<string, Set<EnrichedEvent>>()
   for (const s of sessions.values()) {
-    const lane = laneEls.get(s.session_id)
-    if (!lane) continue
-    for (const e of eventLog.filter((e) => e.session_id === s.session_id).slice(-MAX_LANE_CHIPS)) {
-      const chip = buildLaneChip(e, false)
-      lane.track.appendChild(chip)
-      placeLaneChip(lane, chip, e)
-    }
+    kept.set(
+      s.session_id,
+      new Set(eventLog.filter((e) => e.session_id === s.session_id).slice(-MAX_LANE_CHIPS))
+    )
+  }
+
+  // Anchor and place in global event order so nudge drift folds into the axis
+  for (const e of eventLog) {
+    anchorAppend(e)
+    const lane = laneEls.get(e.session_id)
+    if (!lane || !kept.get(e.session_id)?.has(e)) continue
+    const chip = buildLaneChip(e, false)
+    lane.track.appendChild(chip)
+    placeLaneChip(lane, chip, e)
   }
 
   applyLanesAxis()
   renderLanesRuler()
 
   if (sc) {
-    if (wasPinned || prevT0 === null) {
+    if (wasPinned || prevOriginX === undefined) {
       sc.scrollLeft = sc.scrollWidth
     } else {
       // Axis origin may have advanced (log trimmed); keep the same moment in view
-      sc.scrollLeft = Math.max(0, prevScroll - ((laneT0 - prevT0) / 1000) * PX_PER_SEC)
+      sc.scrollLeft = Math.max(0, prevScroll - prevOriginX)
     }
   }
   updateLanesMask()
@@ -466,7 +517,7 @@ function appendLaneChip(event: EnrichedEvent): void {
   if (!s) return
 
   const lane = laneEls.get(event.session_id)
-  if (!lane || laneT0 === null) {
+  if (!lane || anchors.length === 0) {
     // New session (or first render) — needs a full build
     renderLanes()
     return
@@ -476,6 +527,7 @@ function appendLaneChip(event: EnrichedEvent): void {
 
   const pinned = lanesFollowingLive || lanesAtLiveEdge()
 
+  anchorAppend(event)
   const chip = buildLaneChip(event, true)
   lane.track.appendChild(chip)
   placeLaneChip(lane, chip, event)
@@ -835,9 +887,14 @@ document.addEventListener('DOMContentLoaded', () => {
     sc?.scrollTo({ left: sc.scrollWidth, behavior: 'smooth' })
   })
 
-  // Keep the time axis advancing between events while lanes are visible
+  // Nudge the axis head between events while lanes are visible. The head only
+  // moves until the current idle gap hits its cap, then this becomes a no-op.
+  let lastTickHead = -1
   setInterval(() => {
-    if (view !== 'lanes' || laneT0 === null || sessions.size === 0) return
+    if (view !== 'lanes' || anchors.length === 0 || sessions.size === 0) return
+    const head = axisHeadX()
+    if (head === lastTickHead) return
+    lastTickHead = head
     const pinned = lanesFollowingLive || lanesAtLiveEdge()
     applyLanesAxis()
     renderLanesRuler()
