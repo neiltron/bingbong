@@ -363,10 +363,10 @@ export class Visualizer {
 
   // Theme palette cached from CSS custom properties (canvas can't resolve var())
   private palette = {
-    bg: '#052b2b',
-    grid: 'rgba(250, 243, 227, 0.15)',
-    listener: '#FAF3E3',
-    label: 'rgba(250, 243, 227, 0.55)',
+    bg: '#12100B',
+    grid: 'rgba(242, 233, 214, 0.13)',
+    listener: '#F2E9D6',
+    label: 'rgba(242, 233, 214, 0.5)',
   }
 
   constructor(canvas: HTMLCanvasElement) {
@@ -518,7 +518,7 @@ export class Visualizer {
         growthRate,
         maxRadius: maxPulseRadius,
         lineWidth,
-        color: color || '#4ECDC4',
+        color: color || '#E8A832',
         alpha: 1,
         lifetime: Math.max(8, lifetime - lifetimeOffset),
         maxLifetime: Math.max(8, lifetime - lifetimeOffset),

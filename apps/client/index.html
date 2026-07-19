@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,15 +8,6 @@
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-        <script>
-            // Set theme from system preference before first paint
-            const themeQuery = window.matchMedia("(prefers-color-scheme: dark)");
-            const applyTheme = () => {
-                document.documentElement.dataset.theme = themeQuery.matches ? "dark" : "light";
-            };
-            applyTheme();
-            themeQuery.addEventListener("change", applyTheme);
-        </script>
     </head>
     <body>
         <div class="audio-banner" id="audio-banner" role="button" tabindex="0" aria-label="Click to enable audio" hidden>
@@ -24,10 +15,11 @@
             <span>Click to enable audio</span>
         </div>
         <a href="#main-content" class="skip-link">Skip to main content</a>
-        <div class="container">
-            <header>
-                <h1><span>Bingbong</span></h1>
-                <div class="status">
+
+        <div class="app" id="main-content">
+            <header class="app-header">
+                <div class="brand">bing<b>bong</b></div>
+                <div class="header-status">
                     <div
                         class="status-dot"
                         id="status-dot"
@@ -35,37 +27,122 @@
                         aria-label="Connection status: disconnected"
                     ></div>
                     <span id="status-text">Connecting...</span>
-                    <button id="connect-btn">Disconnect</button>
+                    <span class="dot-sep" aria-hidden="true">·</span>
+                    <div class="ctl-row">
+                        <label for="volume">VOL</label>
+                        <input
+                            type="range"
+                            id="volume"
+                            class="ctl-range-header"
+                            min="0"
+                            max="100"
+                            value="70"
+                            aria-label="Master volume"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                            aria-valuenow="70"
+                        />
+                        <span class="ctl-val" id="volume-val">70</span>
+                    </div>
+                    <button class="btn btn-outline btn-small" id="mute-btn" aria-pressed="false">Mute</button>
+                    <button class="btn btn-outline btn-small" id="connect-btn">Disconnect</button>
                 </div>
             </header>
 
-            <main class="main-grid" id="main-content">
-                <div class="visualizer-section">
-                    <div class="spatial-container" id="spatial-container">
-                        <canvas
-                            id="visualizer"
-                            role="img"
-                            aria-label="Spatial audio visualization showing source positions"
-                        >
-                            <p>
-                                Spatial audio field with draggable source positions
-                            </p>
-                        </canvas>
+            <div class="view-toolbar">
+                <div class="view-title-group">
+                    <span class="view-title" id="view-title">Combined trace</span>
+                    <span class="sec-label" id="view-caption">0 ACTIVE · LIVE</span>
+                </div>
+                <div class="seg" role="tablist" aria-label="Trace view">
+                    <button id="seg-combined" class="on" role="tab" aria-selected="true">Combined</button>
+                    <button id="seg-lanes" role="tab" aria-selected="false">Swimlanes</button>
+                </div>
+            </div>
+
+            <div class="view-combined" id="view-combined">
+                <aside class="sessions-rail" aria-label="Active sessions">
+                    <span class="sec-label" id="rail-label">SESSIONS · 0</span>
+                    <div class="rail-scroll" id="sessions-list" role="list" aria-live="polite">
+                        <div class="empty-state" role="listitem">No active sessions</div>
+                    </div>
+                    <div class="mini-radar-wrap">
+                        <div class="mini-radar">
+                            <svg viewBox="0 0 100 100" fill="none" aria-hidden="true">
+                                <circle cx="50" cy="50" r="18" stroke="var(--viz-grid)" vector-effect="non-scaling-stroke"></circle>
+                                <circle cx="50" cy="50" r="34" stroke="var(--viz-grid)" vector-effect="non-scaling-stroke"></circle>
+                                <line x1="8" y1="50" x2="92" y2="50" stroke="var(--viz-grid)" vector-effect="non-scaling-stroke"></line>
+                                <line x1="50" y1="8" x2="50" y2="92" stroke="var(--viz-grid)" vector-effect="non-scaling-stroke"></line>
+                            </svg>
+                            <div class="mini-center" aria-hidden="true"></div>
+                            <div class="mini-dots" aria-hidden="true"></div>
+                            <button class="mini-expand" aria-haspopup="dialog">⤢ Expand</button>
+                            <div class="mini-label">SPATIAL VIEW</div>
+                        </div>
+                    </div>
+                </aside>
+                <div class="trace-stream-wrap">
+                    <button class="trace-pill" id="trace-pill" hidden>↑ new events</button>
+                    <div class="trace-stream" id="trace-stream" role="log" aria-live="polite" aria-atomic="false">
+                        <div class="empty-state">Waiting for events...</div>
                     </div>
                 </div>
+            </div>
 
-                <aside
-                    class="sidebar"
-                    aria-label="Controls and session information"
-                >
-                    <section class="panel" aria-labelledby="controls-heading">
-                        <h2 id="controls-heading">Controls</h2>
-                        <div class="controls">
-                            <div class="control-row">
-                                <label for="volume">Master Volume</label>
+            <div class="view-lanes" id="view-lanes" hidden>
+                <div class="lanes-ruler">
+                    <div class="lanes-ruler-spacer"></div>
+                    <div class="lanes-ruler-times" id="lanes-ruler"></div>
+                </div>
+                <div class="lanes-list" id="lanes-list"></div>
+                <div class="lanes-radar">
+                    <div class="mini-radar">
+                        <svg viewBox="0 0 100 100" fill="none" aria-hidden="true">
+                            <circle cx="50" cy="50" r="18" stroke="var(--viz-grid)" vector-effect="non-scaling-stroke"></circle>
+                            <circle cx="50" cy="50" r="34" stroke="var(--viz-grid)" vector-effect="non-scaling-stroke"></circle>
+                            <line x1="8" y1="50" x2="92" y2="50" stroke="var(--viz-grid)" vector-effect="non-scaling-stroke"></line>
+                            <line x1="50" y1="8" x2="50" y2="92" stroke="var(--viz-grid)" vector-effect="non-scaling-stroke"></line>
+                        </svg>
+                        <div class="mini-center" aria-hidden="true"></div>
+                        <div class="mini-dots" aria-hidden="true"></div>
+                        <button class="mini-expand" aria-haspopup="dialog">⤢ Expand</button>
+                        <div class="mini-label">SPATIAL VIEW</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="radar-modal-root" id="radar-modal" hidden>
+            <div class="radar-scrim" id="radar-scrim"></div>
+            <div class="radar-modal-center">
+                <div class="radar-modal" role="dialog" aria-modal="true" aria-labelledby="radar-title">
+                    <div class="radar-modal-header">
+                        <div class="view-title-group">
+                            <span class="radar-title" id="radar-title">Spatial view</span>
+                            <span class="sec-label" id="radar-caption">0 SOURCES · LISTENER CENTER</span>
+                        </div>
+                        <button class="btn btn-outline btn-small" id="radar-collapse">⤡ Collapse</button>
+                    </div>
+                    <div class="radar-modal-body">
+                        <div class="radar-stage">
+                            <div class="spatial-container" id="spatial-container">
+                                <canvas
+                                    id="visualizer"
+                                    role="img"
+                                    aria-label="Spatial audio visualization showing source positions"
+                                >
+                                    <p>Spatial audio field with draggable source positions</p>
+                                </canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="radar-modal-footer">
+                        <div class="radar-modal-sliders">
+                            <div class="ctl-row">
+                                <label for="volume-modal">Master volume</label>
                                 <input
                                     type="range"
-                                    id="volume"
+                                    id="volume-modal"
                                     min="0"
                                     max="100"
                                     value="70"
@@ -73,8 +150,9 @@
                                     aria-valuemax="100"
                                     aria-valuenow="70"
                                 />
+                                <span class="ctl-val" id="volume-modal-val">70</span>
                             </div>
-                            <div class="control-row">
+                            <div class="ctl-row">
                                 <label for="reverb">Reverb</label>
                                 <input
                                     type="range"
@@ -86,53 +164,13 @@
                                     aria-valuemax="100"
                                     aria-valuenow="30"
                                 />
-                            </div>
-                            <div class="button-row">
-                                <button
-                                    class="mute-btn"
-                                    id="mute-btn"
-                                    aria-pressed="false"
-                                >
-                                    Mute
-                                </button>
-                                <button
-                                    class="mute-btn"
-                                    id="reset-layout-btn"
-                                >
-                                    Reset Layout
-                                </button>
+                                <span class="ctl-val" id="reverb-val">30</span>
                             </div>
                         </div>
-                    </section>
-
-                    <section class="panel" aria-labelledby="sessions-heading">
-                        <h2 id="sessions-heading">Active Sessions</h2>
-                        <div
-                            class="sessions-list"
-                            id="sessions-list"
-                            role="list"
-                            aria-live="polite"
-                        >
-                            <div class="empty-state" role="listitem">
-                                No active sessions
-                            </div>
-                        </div>
-                    </section>
-
-                    <section class="panel" aria-labelledby="eventlog-heading">
-                        <h2 id="eventlog-heading">Event Log</h2>
-                        <div
-                            class="event-log"
-                            id="event-log"
-                            role="log"
-                            aria-live="polite"
-                            aria-atomic="false"
-                        >
-                            <div class="empty-state">Waiting for events...</div>
-                        </div>
-                    </section>
-                </aside>
-            </main>
+                        <button class="btn btn-outline btn-small" id="reset-layout-btn">Reset layout</button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <script type="module" src="./src/main.ts"></script>
