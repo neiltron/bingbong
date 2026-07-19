@@ -189,11 +189,14 @@ export class SourceOverlay {
   }
 
   private setElementPosition(el: HTMLElement, normX: number, normY: number): void {
-    const rect = this.canvas.getBoundingClientRect()
-    const size = Math.min(rect.width, rect.height)
+    // Layout size, not getBoundingClientRect: the modal's entrance scale would
+    // shrink the rect and skew positions computed mid-transition
+    const width = this.canvas.offsetWidth
+    const height = this.canvas.offsetHeight
+    const size = Math.min(width, height)
     const maxRadius = size * 0.45
-    const centerX = rect.width / 2
-    const centerY = rect.height / 2
+    const centerX = width / 2
+    const centerY = height / 2
 
     // Convert normalized (0-1) to pixel position within radar
     const pixelX = centerX + (normX - 0.5) * 2 * maxRadius

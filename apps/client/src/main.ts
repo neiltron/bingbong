@@ -14,10 +14,11 @@ const MAX_LOG_ITEMS = 50
 const MAX_LANE_CHIPS = 30
 
 // Lanes render incrementally; handles to each lane's track/meta by session_id,
-// plus the right edge of its last chip (for burst-nudging and connectors)
+// plus the right edge and timestamp of its last chip (for burst-nudging,
+// connectors, and labeled idle gaps)
 const laneEls = new Map<
   string,
-  { track: HTMLElement; meta: HTMLElement; lastRight: number | null }
+  { track: HTMLElement; meta: HTMLElement; lastRight: number | null; lastMs: number | null }
 >()
 
 // Event-driven time axis: pixels accrue with events at PX_PER_SEC, but idle
@@ -27,6 +28,8 @@ const PX_PER_SEC = 40
 const GAP_MAX_PX = 120 // an idle gap renders at most this wide
 const AXIS_TAIL = 140 // breathing room past the head so the newest chip isn't flush
 const CHIP_GAP = 8 // min spacing when a burst would overlap chips
+const GAP_LABEL_MS = 30_000 // lane idle gaps at least this long get a labeled break
+const GAP_LABEL_PX = 56 // min rendered width so the gap label fits
 
 // One anchor per event (piecewise time→x mapping), plus each event's x
 let anchors: { ms: number; x: number }[] = []
@@ -390,32 +393,55 @@ function buildLaneChip(e: EnrichedEvent, animate: boolean): HTMLElement {
   ])
 }
 
+/** Compact duration for gap labels: 45s, 12m, 1h 30m. */
+function fmtGap(ms: number): string {
+  const s = Math.round(ms / 1000)
+  if (s < 60) return `${s}s`
+  const m = Math.round(s / 60)
+  if (m < 60) return `${m}m`
+  const h = Math.floor(m / 60)
+  const rem = m % 60
+  return rem ? `${h}h ${rem}m` : `${h}h`
+}
+
 /**
  * Place a chip at its true time position (nudged right if a burst would
  * overlap the previous chip) and wire a connector back to it. The chip is
  * measured after insertion, so call with it already in the track.
  */
 function placeLaneChip(
-  lane: { track: HTMLElement; lastRight: number | null },
+  lane: { track: HTMLElement; lastRight: number | null; lastMs: number | null },
   chip: HTMLElement,
   e: EnrichedEvent
 ): void {
   const trueX = chipX.get(e) ?? 0
-  const x = lane.lastRight === null ? Math.max(0, trueX) : Math.max(trueX, lane.lastRight + CHIP_GAP)
+  // Long idle gaps get a labeled break, which needs room even when the
+  // compressed axis (or a wide previous chip) would leave none
+  const gapMs = lane.lastMs !== null ? eventMs(e) - lane.lastMs : 0
+  const isBreak = gapMs >= GAP_LABEL_MS
+  const minGap = isBreak ? GAP_LABEL_PX : CHIP_GAP
+  const x = lane.lastRight === null ? Math.max(0, trueX) : Math.max(trueX, lane.lastRight + minGap)
 
   if (lane.lastRight !== null && x - lane.lastRight > 14) {
+    const left = `${lane.lastRight + 3}px`
+    const width = `${x - lane.lastRight - 6}px`
     lane.track.insertBefore(
-      createElement('div', {
-        class: 'ev-thread',
-        'aria-hidden': 'true',
-        style: { left: `${lane.lastRight + 3}px`, width: `${x - lane.lastRight - 6}px` },
-      }),
+      isBreak
+        ? createElement('div', { class: 'ev-gap', 'aria-hidden': 'true', style: { left, width } }, [
+            createElement('span', {}, [fmtGap(gapMs)]),
+          ])
+        : createElement('div', {
+            class: 'ev-thread',
+            'aria-hidden': 'true',
+            style: { left, width },
+          }),
       chip
     )
   }
 
   chip.style.left = `${x}px`
   lane.lastRight = x + chip.offsetWidth
+  lane.lastMs = eventMs(e)
 
   // Absorb burst-nudge drift into the axis: this event was just anchored last,
   // so moving its anchor keeps the time→x mapping monotonic and label-covered
@@ -472,7 +498,7 @@ function renderLanes(): void {
       ])
     )
 
-    laneEls.set(s.session_id, { track, meta, lastRight: null })
+    laneEls.set(s.session_id, { track, meta, lastRight: null, lastMs: null })
   }
 
   // Which events each lane actually displays (last N per session)
@@ -534,11 +560,13 @@ function appendLaneChip(event: EnrichedEvent): void {
   applyLanesAxis()
 
   // Trim oldest chips beyond the cap (absolute layout: nothing shifts).
-  // DOM order is [chip, connector, chip, ...] — a connector precedes its chip.
+  // DOM order is [chip, connector, chip, ...] — a connector (plain thread or
+  // labeled gap) precedes its chip.
   while (lane.track.querySelectorAll('.ev').length > MAX_LANE_CHIPS) {
     lane.track.firstElementChild?.remove()
-    if (lane.track.firstElementChild?.classList.contains('ev-thread')) {
-      lane.track.firstElementChild.remove()
+    const next = lane.track.firstElementChild
+    if (next?.classList.contains('ev-thread') || next?.classList.contains('ev-gap')) {
+      next.remove()
     }
   }
 
@@ -716,7 +744,8 @@ function handleEvent(event: EnrichedEvent): void {
 
   // Add to log
   eventLog.push(event)
-  if (eventLog.length > MAX_LOG_ITEMS * 2) {
+  const trimmed = eventLog.length > MAX_LOG_ITEMS * 2
+  if (trimmed) {
     eventLog.splice(0, MAX_LOG_ITEMS)
   }
 
@@ -731,6 +760,16 @@ function handleEvent(event: EnrichedEvent): void {
   renderSessionsRail()
   if (view === 'combined') {
     appendTraceRow(event)
+  } else if (trimmed) {
+    // Rebase the axis on log trim: reclaims the trimmed events' pixels and
+    // keeps the anchor list bounded (renderLanes includes this event).
+    // Carry the unseen count across the rebuild for scrolled-back readers.
+    const unseen = lanesUnseen
+    renderLanes()
+    if (!lanesFollowingLive && !lanesAtLiveEdge()) {
+      lanesUnseen = unseen + 1
+      showLanesPill()
+    }
   } else {
     appendLaneChip(event)
   }

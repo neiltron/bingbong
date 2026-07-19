@@ -377,7 +377,7 @@ input[type="range"] {
 
 /* Only rows appended live animate in; bulk re-renders stay still */
 .trace-row-in {
-    animation: traceIn 0.24s cubic-bezier(0.2, 0.7, 0.3, 1);
+    animation: traceIn 0.24s var(--ease-out);
 }
 
 @keyframes traceIn {
@@ -427,13 +427,13 @@ input[type="range"] {
     font-weight: 500;
     cursor: pointer;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-    animation: pillIn 0.2s ease-out;
-    transition: transform 160ms var(--ease-out), filter var(--transition-fast);
+    animation: pillIn 0.2s var(--ease-out);
+    transition: transform 160ms var(--ease-out), background var(--transition-fast);
 }
 
 @media (hover: hover) and (pointer: fine) {
     .trace-pill:hover {
-        filter: brightness(1.05);
+        background: color-mix(in srgb, var(--color-marigold) 90%, white);
     }
 }
 
@@ -707,13 +707,24 @@ input[type="range"] {
     opacity: 1;
 }
 
-/* Horizontal "new events" pill for the lanes view */
+/* Horizontal "new events" pill: enters from the right, where its events are */
 .lanes-pill {
     left: auto;
     right: 20px;
     top: 44px;
     transform: none;
-    animation: none;
+    animation: lanesPillIn 0.2s var(--ease-out);
+}
+
+@keyframes lanesPillIn {
+    from {
+        opacity: 0;
+        transform: translateX(8px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
 }
 
 .ev {
@@ -741,7 +752,7 @@ input[type="range"] {
 
 /* Only chips appended live animate in */
 .ev-in {
-    animation: chipIn 0.24s cubic-bezier(0.2, 0.7, 0.3, 1);
+    animation: chipIn 0.24s var(--ease-out);
 }
 
 @keyframes chipIn {
@@ -770,6 +781,33 @@ input[type="range"] {
     background: var(--color-border);
 }
 
+/* Labeled idle gap: dashed thread with the elapsed time at its center,
+   marking where the compressed axis hides a long quiet stretch */
+.ev-gap {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    pointer-events: none;
+}
+
+.ev-gap::before,
+.ev-gap::after {
+    content: '';
+    flex: 1;
+    border-top: 1px dashed var(--color-border);
+}
+
+.ev-gap span {
+    padding: 0 6px;
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+}
+
 .lanes-radar {
     position: absolute;
     right: 20px;
@@ -784,6 +822,8 @@ input[type="range"] {
     position: fixed;
     inset: 0;
     z-index: 10;
+    /* Keep the root rendered through the exit fade, then drop it */
+    transition: display var(--transition-base) allow-discrete;
 }
 
 .radar-modal-root[hidden] {
@@ -795,6 +835,29 @@ input[type="range"] {
     inset: 0;
     background: rgba(10, 8, 6, 0.62);
     backdrop-filter: blur(3px);
+    transition: opacity var(--transition-base);
+}
+
+/* Exit: fade toward the closed state while the root's display transition holds */
+.radar-modal-root[hidden] .radar-scrim {
+    opacity: 0;
+}
+
+.radar-modal-root[hidden] .radar-modal {
+    opacity: 0;
+    transform: scale(0.97);
+}
+
+/* Enter: from the same closed state on first render (modal stays centered) */
+@starting-style {
+    .radar-modal-root:not([hidden]) .radar-scrim {
+        opacity: 0;
+    }
+
+    .radar-modal-root:not([hidden]) .radar-modal {
+        opacity: 0;
+        transform: scale(0.97);
+    }
 }
 
 .radar-modal-center {
@@ -819,6 +882,7 @@ input[type="range"] {
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    transition: opacity var(--transition-base), transform 0.2s var(--ease-out);
 }
 
 .radar-modal-header {
