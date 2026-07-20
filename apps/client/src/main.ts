@@ -260,18 +260,28 @@ function renderSessionsRail(): void {
   }
 }
 
-/** Compact display name for MCP tools (server prefix lives in the tooltip). */
-function shortToolName(full: string): string {
-  return full.startsWith('mcp__') ? full.split('__').pop() || full : full
+/** Split an mcp__Server__tool name into parts (null server for plain tools). */
+function toolNameParts(full: string): { server: string | null; tool: string } {
+  if (!full.startsWith('mcp__')) return { server: null, tool: full }
+  const rest = full.slice(5)
+  const i = rest.lastIndexOf('__')
+  if (i === -1) return { server: null, tool: rest }
+  return { server: rest.slice(0, i), tool: rest.slice(i + 2) }
 }
 
 function buildTraceRow(e: EnrichedEvent, animate: boolean): HTMLElement {
   const full = eventName(e)
+  const { server, tool } = toolNameParts(full)
   return createElement('div', { class: animate ? 'trace-row trace-row-in' : 'trace-row' }, [
     createElement('span', { class: 'trace-time' }, [eventTime(e)]),
     createElement('div', { class: 'tool-event' }, [
       createElement('span', { class: 'tool-event-badge' }, [eventBadge(e)]),
-      createElement('span', { class: 'tool-event-name', title: full }, [shortToolName(full)]),
+      createElement('span', { class: 'tool-event-name', title: full }, [
+        server
+          ? createElement('span', { class: 'tool-event-server' }, [server.replace(/_/g, ' ')])
+          : null,
+        tool,
+      ]),
       createElement('span', { class: 'tool-event-agent' }, [eventAgent(e)]),
       createElement('span', { class: 'tool-event-time' }, [eventDetail(e)]),
     ]),
@@ -431,12 +441,12 @@ function renderLanesRuler(): void {
 }
 
 function buildLaneChip(e: EnrichedEvent, animate: boolean): HTMLElement {
-  // Compact display name keeps chips narrow so bursts stay near their true
-  // time position; the full name lives in the tooltip
+  // Chips stay tool-only: their width drives time-axis packing, and the
+  // full name (with server) lives in the tooltip
   const full = eventName(e)
   return createElement('div', { class: animate ? 'ev ev-in' : 'ev', title: full }, [
     createElement('span', { class: 'evb' }, [eventBadge(e)]),
-    createElement('span', { class: 'ev-name' }, [shortToolName(full)]),
+    createElement('span', { class: 'ev-name' }, [toolNameParts(full).tool]),
   ])
 }
 
