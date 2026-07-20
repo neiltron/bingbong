@@ -30,19 +30,51 @@ const AXIS_TAIL = 140 // breathing room past the head so the newest chip isn't f
 const CHIP_GAP = 8 // min spacing when a burst would overlap chips
 const GAP_LABEL_MS = 30_000 // lane idle gaps at least this long get a labeled break
 const GAP_LABEL_PX = 56 // min rendered width so the gap label fits
+const LANE_HEAD_SPAN = 174 + 14 // sticky head column + head→track gap
+
+// Axis breaks: an all-lanes silence at least this long stops accruing pixels
+// and instead renders a fixed-width labeled corridor pushed past every chip,
+// so events on either side can never read as adjacent
+const BREAK_MIN_MS = 60_000
+const BREAK_SPAN_PX = 72 // corridor width (duration lives in the label, not the width)
+const BREAK_PAD = 12 // clearance between the corridor and chips on either side
 
 // One anchor per event (piecewise time→x mapping), plus each event's x
 let anchors: { ms: number; x: number }[] = []
+let axisBreaks: { x: number; w: number; label: string }[] = []
 const chipX = new WeakMap<EnrichedEvent, number>()
 
 function anchorAppend(e: EnrichedEvent): number {
   const ms = eventMs(e)
   const last = anchors[anchors.length - 1]
-  const dx = last ? Math.min(Math.max(((ms - last.ms) / 1000) * PX_PER_SEC, 0), GAP_MAX_PX) : 0
-  const x = last ? last.x + dx : 0
+  let x = 0
+  if (last) {
+    const gapMs = ms - last.ms
+    if (gapMs >= BREAK_MIN_MS) {
+      // Corridor starts past the rightmost chip in ANY lane, so pre-break
+      // chips (which extend rightward from their anchors) can't reach into it
+      let edge = last.x
+      for (const lane of laneEls.values()) {
+        if (lane.lastRight !== null) edge = Math.max(edge, lane.lastRight)
+      }
+      axisBreaks.push({ x: edge + BREAK_PAD, w: BREAK_SPAN_PX, label: fmtGap(gapMs) })
+      x = edge + BREAK_PAD + BREAK_SPAN_PX + BREAK_PAD
+    } else {
+      x = last.x + Math.min(Math.max((gapMs / 1000) * PX_PER_SEC, 0), GAP_MAX_PX)
+    }
+  }
   anchors.push({ ms, x })
   chipX.set(e, x)
   return x
+}
+
+/** Full-height dashed corridor marking skipped time, rendered into .lanes-list. */
+function buildBreakBand(b: { x: number; w: number }): HTMLElement {
+  return createElement('div', {
+    class: 'axis-break',
+    'aria-hidden': 'true',
+    style: { left: `${LANE_HEAD_SPAN + b.x}px`, width: `${b.w}px` },
+  })
 }
 
 /** Right end of the axis: the capped clock position, or the newest chip edge
@@ -228,12 +260,18 @@ function renderSessionsRail(): void {
   }
 }
 
+/** Compact display name for MCP tools (server prefix lives in the tooltip). */
+function shortToolName(full: string): string {
+  return full.startsWith('mcp__') ? full.split('__').pop() || full : full
+}
+
 function buildTraceRow(e: EnrichedEvent, animate: boolean): HTMLElement {
+  const full = eventName(e)
   return createElement('div', { class: animate ? 'trace-row trace-row-in' : 'trace-row' }, [
     createElement('span', { class: 'trace-time' }, [eventTime(e)]),
     createElement('div', { class: 'tool-event' }, [
       createElement('span', { class: 'tool-event-badge' }, [eventBadge(e)]),
-      createElement('span', { class: 'tool-event-name' }, [eventName(e)]),
+      createElement('span', { class: 'tool-event-name', title: full }, [shortToolName(full)]),
       createElement('span', { class: 'tool-event-agent' }, [eventAgent(e)]),
       createElement('span', { class: 'tool-event-time' }, [eventDetail(e)]),
     ]),
@@ -341,8 +379,7 @@ function eventMs(e: EnrichedEvent): number {
 
 function lanesAxisWidth(): number {
   // At least the visible area (minus head column) so the ruler border spans it
-  const headSpan = 174 + 14
-  const minVisible = (DOM.lanesScroller?.clientWidth ?? 0) - headSpan
+  const minVisible = (DOM.lanesScroller?.clientWidth ?? 0) - LANE_HEAD_SPAN
   return Math.max(200, minVisible, axisHeadX() + AXIS_TAIL)
 }
 
@@ -368,6 +405,9 @@ function renderLanesRuler(): void {
   const headX = axisHeadX()
   let prevLabel = ''
   for (let x = 0; x <= headX - 70; x += TICK_SPACING_PX) {
+    // Interpolated times inside a break corridor are meaningless; the break
+    // glyph owns that span (with padding so ticks don't crowd it)
+    if (axisBreaks.some((b) => x >= b.x - 30 && x <= b.x + b.w + 30)) continue
     const ms = timeAtX(x)
     if (ms === null) continue
     const label = new Date(ms).toLocaleTimeString('en-US', { hour12: false })
@@ -375,6 +415,14 @@ function renderLanesRuler(): void {
     prevLabel = label
     rulerEl.appendChild(
       createElement('span', { class: 'trace-time', style: { left: `${x}px` } }, [label])
+    )
+  }
+  for (const b of axisBreaks) {
+    rulerEl.appendChild(
+      createElement('span', {
+        class: 'trace-time ruler-break',
+        style: { left: `${b.x + b.w / 2}px` },
+      }, [`⋯ ${b.label}`])
     )
   }
   rulerEl.appendChild(
@@ -386,10 +434,9 @@ function buildLaneChip(e: EnrichedEvent, animate: boolean): HTMLElement {
   // Compact display name keeps chips narrow so bursts stay near their true
   // time position; the full name lives in the tooltip
   const full = eventName(e)
-  const short = full.startsWith('mcp__') ? full.split('__').pop() || full : full
   return createElement('div', { class: animate ? 'ev ev-in' : 'ev', title: full }, [
     createElement('span', { class: 'evb' }, [eventBadge(e)]),
-    createElement('span', { class: 'ev-name' }, [short]),
+    createElement('span', { class: 'ev-name' }, [shortToolName(full)]),
   ])
 }
 
@@ -416,9 +463,13 @@ function placeLaneChip(
 ): void {
   const trueX = chipX.get(e) ?? 0
   // Long idle gaps get a labeled break, which needs room even when the
-  // compressed axis (or a wide previous chip) would leave none
+  // compressed axis (or a wide previous chip) would leave none. When the gap
+  // spans an axis-break corridor, the band already carries the label — keep
+  // just a plain thread for lane continuity.
   const gapMs = lane.lastMs !== null ? eventMs(e) - lane.lastMs : 0
-  const isBreak = gapMs >= GAP_LABEL_MS
+  const crossesBand =
+    lane.lastRight !== null && axisBreaks.some((b) => b.x >= lane.lastRight! && b.x + b.w <= trueX)
+  const isBreak = gapMs >= GAP_LABEL_MS && !crossesBand
   const minGap = isBreak ? GAP_LABEL_PX : CHIP_GAP
   const x = lane.lastRight === null ? Math.max(0, trueX) : Math.max(trueX, lane.lastRight + minGap)
 
@@ -464,6 +515,7 @@ function renderLanes(): void {
   const prevOriginX = eventLog.length > 0 ? chipX.get(eventLog[0]) : undefined
 
   anchors = []
+  axisBreaks = []
   laneEls.clear()
   clearLanesPill()
   listEl.innerHTML = ''
@@ -520,6 +572,10 @@ function renderLanes(): void {
     placeLaneChip(lane, chip, e)
   }
 
+  for (const b of axisBreaks) {
+    listEl.appendChild(buildBreakBand(b))
+  }
+
   applyLanesAxis()
   renderLanesRuler()
 
@@ -553,7 +609,11 @@ function appendLaneChip(event: EnrichedEvent): void {
 
   const pinned = lanesFollowingLive || lanesAtLiveEdge()
 
+  const breaksBefore = axisBreaks.length
   anchorAppend(event)
+  if (axisBreaks.length > breaksBefore && DOM.lanesListEl) {
+    DOM.lanesListEl.appendChild(buildBreakBand(axisBreaks[axisBreaks.length - 1]))
+  }
   const chip = buildLaneChip(event, true)
   lane.track.appendChild(chip)
   placeLaneChip(lane, chip, event)

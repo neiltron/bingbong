@@ -476,19 +476,30 @@
     border-radius: var(--radius-sm);
     background: var(--color-bg-accent);
     color: var(--color-text-on-accent);
+    flex: none;
 }
 
+/* Shrink priority under pressure: detail gives way first, then agent;
+   the name ellipsizes last and never wraps */
 .tool-event-name {
     font-family: var(--font-interface);
     font-size: var(--font-size-body);
     font-weight: var(--font-weight-medium);
     color: var(--color-text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 0 1 auto;
 }
 
 .tool-event-agent {
     font-family: var(--font-interface);
     font-size: var(--font-size-body);
     color: var(--color-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 0 2 auto;
 }
 
 .tool-event-time {
@@ -496,6 +507,10 @@
     font-size: var(--font-size-body);
     color: var(--color-text-muted);
     margin-left: auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 0 4 auto;
 }
 
 /* Dark theme tool events */

@@ -319,6 +319,13 @@ input[type="range"] {
     overflow: hidden;
 }
 
+/* Tablet: narrow the rail so trace rows keep breathing room */
+@media (max-width: 1024px) {
+    .sessions-rail {
+        width: 200px;
+    }
+}
+
 .rail-scroll {
     flex: 1;
     min-height: 0;
@@ -350,6 +357,22 @@ input[type="range"] {
     min-width: 0;
     position: relative;
     display: flex;
+    container-type: inline-size;
+    container-name: trace;
+}
+
+/* Progressive disclosure keyed to the stream's own width, not the viewport:
+   the derived detail goes first, the agent name second (rail still shows who) */
+@container trace (max-width: 640px) {
+    .tool-event-time {
+        display: none;
+    }
+}
+
+@container trace (max-width: 480px) {
+    .tool-event-agent {
+        display: none;
+    }
 }
 
 .trace-stream {
@@ -616,6 +639,33 @@ input[type="range"] {
     width: auto;
     transform: translateX(-50%);
     white-space: nowrap;
+}
+
+/* Skipped-time glyph over a break corridor */
+.lanes-ruler-times .ruler-break {
+    font-style: italic;
+    letter-spacing: 0.5px;
+}
+
+/* Bands are positioned against the list, aligned with track x + head span */
+.lanes-list {
+    position: relative;
+}
+
+/* Full-height corridor marking an all-lanes silence; duration is in the ruler */
+.axis-break {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-left: 1px dashed var(--color-border-subtle);
+    border-right: 1px dashed var(--color-border-subtle);
+    background: repeating-linear-gradient(
+        -60deg,
+        transparent 0 6px,
+        var(--color-border-subtle) 6px 7px
+    );
+    opacity: 0.35;
+    pointer-events: none;
 }
 
 .lane {
