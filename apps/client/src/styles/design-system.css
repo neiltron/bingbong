@@ -4,79 +4,82 @@
    ============================================ */
 
 /* ============================================
-   Theme: Light (Cream) - Default
+   Theme: Light (Ink + Gold on Cream) - Default
    Font pairing: Geist Mono (interface) + Inter (display)
+   Note: --color-teal / --color-deep-teal keep their legacy
+   names but now hold the "Ink + Gold" ink values.
    ============================================ */
 :root,
 [data-theme="light"] {
     /* Colors - Core Palette */
-    --color-teal: #0D5E5E;
+    --color-teal: #201A12;
     --color-marigold: #E8A832;
     --color-rose: #E88FA0;
-    --color-cream: #FAF3E3;
-    --color-sand: #F5ECD7;
+    --color-cream: #F6EFDF;
+    --color-sand: #ECE2CC;
 
     /* Colors - Semantic */
     --color-bg-base: var(--color-cream);
     --color-bg-surface: #FFFFFF;
     --color-bg-elevated: var(--color-sand);
-    --color-bg-accent: var(--color-teal);
+    --color-bg-accent: #D9992E;
     --color-bg-accent-secondary: var(--color-marigold);
 
     /* Colors - Border */
     --color-border: var(--color-teal);
-    --color-border-subtle: rgba(13, 94, 94, 0.2);
+    --color-border-subtle: rgba(32, 26, 18, 0.2);
 
     /* Colors - Text */
     --color-text-primary: var(--color-teal);
-    --color-text-secondary: rgba(13, 94, 94, 0.7);
-    --color-text-muted: rgba(13, 94, 94, 0.5);
+    --color-text-secondary: rgba(32, 26, 18, 0.72);
+    --color-text-muted: rgba(32, 26, 18, 0.5);
     --color-text-inverse: var(--color-cream);
-    --color-text-on-accent: var(--color-cream);
+    --color-text-on-accent: var(--color-teal);
     --color-text-on-marigold: var(--color-teal);
 
     /* Colors - State */
     --color-success: #6b9b6b;
     --color-error: #ff4444;
     --color-disabled-bg: var(--color-sand);
-    --color-disabled-text: rgba(13, 94, 94, 0.5);
+    --color-disabled-text: rgba(32, 26, 18, 0.5);
 }
 
 /* ============================================
-   Theme: Dark (Deep Teal)
+   Theme: Dark (Ink + Gold)
    ============================================ */
 [data-theme="dark"] {
-    /* Colors - Core Palette (same hues, dark context) */
-    --color-teal: #0D5E5E;
-    --color-deep-teal: #073838;
+    /* Colors - Core Palette (--color-teal becomes olive-gold in dark) */
+    --color-teal: #6B5A3A;
+    --color-deep-teal: #171310;
     --color-marigold: #E8A832;
     --color-rose: #E88FA0;
-    --color-cream: #FAF3E3;
+    --color-cream: #F2E9D6;
+    --color-sand: #241D15;
 
     /* Colors - Semantic */
     --color-bg-base: var(--color-deep-teal);
-    --color-bg-surface: rgba(250, 243, 227, 0.05);
-    --color-bg-elevated: rgba(250, 243, 227, 0.08);
-    --color-bg-accent: var(--color-teal);
+    --color-bg-surface: rgba(242, 233, 214, 0.05);
+    --color-bg-elevated: rgba(242, 233, 214, 0.08);
+    --color-bg-accent: #C98A22;
     --color-bg-accent-secondary: var(--color-marigold);
 
     /* Colors - Border */
-    --color-border: rgba(250, 243, 227, 0.15);
-    --color-border-subtle: rgba(250, 243, 227, 0.08);
+    --color-border: rgba(242, 233, 214, 0.15);
+    --color-border-subtle: rgba(242, 233, 214, 0.08);
 
     /* Colors - Text */
     --color-text-primary: var(--color-cream);
-    --color-text-secondary: rgba(250, 243, 227, 0.7);
-    --color-text-muted: rgba(250, 243, 227, 0.5);
+    --color-text-secondary: rgba(242, 233, 214, 0.7);
+    --color-text-muted: rgba(242, 233, 214, 0.5);
     --color-text-inverse: var(--color-deep-teal);
-    --color-text-on-accent: var(--color-cream);
+    --color-text-on-accent: var(--color-deep-teal);
     --color-text-on-marigold: var(--color-deep-teal);
 
     /* Colors - State */
-    --color-success: #6b9b6b;
+    --color-success: #7FB98A;
     --color-error: #ff4444;
-    --color-disabled-bg: rgba(250, 243, 227, 0.1);
-    --color-disabled-text: rgba(250, 243, 227, 0.4);
+    --color-disabled-bg: rgba(242, 233, 214, 0.1);
+    --color-disabled-text: rgba(242, 233, 214, 0.4);
 }
 
 /* ============================================
@@ -140,7 +143,7 @@
    Shadows
    ============================================ */
 :root {
-    --shadow-node: 0 4px 16px rgba(13, 94, 94, 0.3);
+    --shadow-node: 0 4px 16px rgba(32, 26, 18, 0.3);
     --shadow-node-dark: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
@@ -151,16 +154,16 @@
 :root,
 [data-theme="light"] {
     --viz-bg: var(--color-sand);
-    --viz-grid: rgba(13, 94, 94, 0.2);
+    --viz-grid: rgba(32, 26, 18, 0.2);
     --viz-listener: var(--color-teal);
-    --viz-label: rgba(13, 94, 94, 0.6);
+    --viz-label: rgba(32, 26, 18, 0.6);
 }
 
 [data-theme="dark"] {
-    --viz-bg: #052b2b;
-    --viz-grid: rgba(250, 243, 227, 0.15);
+    --viz-bg: #12100B;
+    --viz-grid: rgba(242, 233, 214, 0.13);
     --viz-listener: var(--color-cream);
-    --viz-label: rgba(250, 243, 227, 0.55);
+    --viz-label: rgba(242, 233, 214, 0.5);
 }
 
 /* ============================================
@@ -170,6 +173,11 @@
     --transition-fast: 0.15s ease;
     --transition-base: 0.2s ease;
     --transition-slow: 0.3s ease;
+
+    /* Entering/exiting elements: starts fast, so the UI feels immediate */
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    /* Press feedback — subtle enough for controls hit many times a session */
+    --press-scale: 0.97;
 }
 
 /* ============================================
@@ -183,7 +191,16 @@
     border-radius: var(--radius-md);
     border: none;
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: background var(--transition-fast), color var(--transition-fast),
+        border-color var(--transition-fast), transform 160ms var(--ease-out);
+}
+
+.btn:active {
+    transform: scale(var(--press-scale));
+}
+
+.btn:disabled:active {
+    transform: none;
 }
 
 .btn-primary {
@@ -191,17 +208,9 @@
     color: var(--color-text-on-accent);
 }
 
-.btn-primary:hover {
-    filter: brightness(1.1);
-}
-
 .btn-accent {
     background: var(--color-marigold);
     color: var(--color-text-on-marigold);
-}
-
-.btn-accent:hover {
-    filter: brightness(1.05);
 }
 
 .btn-outline {
@@ -210,9 +219,29 @@
     color: var(--color-text-primary);
 }
 
-.btn-outline:hover {
-    background: var(--color-bg-accent);
-    color: var(--color-text-on-accent);
+/* Hover gated: touch devices fire :hover on tap and leave it stuck.
+   Tints via color-mix on background — cheaper than a filter layer. */
+@media (hover: hover) and (pointer: fine) {
+    .btn-primary:hover {
+        background: color-mix(in srgb, var(--color-bg-accent) 85%, white);
+    }
+
+    .btn-accent:hover {
+        background: color-mix(in srgb, var(--color-marigold) 90%, white);
+    }
+
+    .btn-outline:hover {
+        background: var(--color-bg-accent);
+        color: var(--color-text-on-accent);
+    }
+}
+
+/* Size modifier: compact button for headers, toolbars, and modal chrome */
+.btn-small {
+    padding: 7px 14px;
+    font-size: var(--font-size-caption);
+    border-radius: var(--radius-md);
+    white-space: nowrap;
 }
 
 .btn-disabled,
@@ -230,13 +259,20 @@
 }
 
 [data-theme="dark"] .btn-outline {
-    border-color: rgba(250, 243, 227, 0.4);
+    border-color: rgba(242, 233, 214, 0.4);
     color: var(--color-cream);
 }
 
-[data-theme="dark"] .btn-outline:hover {
-    background: var(--color-cream);
-    color: var(--color-deep-teal);
+@media (hover: hover) and (pointer: fine) {
+    /* Dark .btn-primary is cream, so its hover tint must mix from cream */
+    [data-theme="dark"] .btn-primary:hover {
+        background: color-mix(in srgb, var(--color-cream) 88%, white);
+    }
+
+    [data-theme="dark"] .btn-outline:hover {
+        background: var(--color-cream);
+        color: var(--color-deep-teal);
+    }
 }
 
 /* ============================================
@@ -300,7 +336,8 @@
     align-items: center;
     justify-content: center;
     cursor: grab;
-    transition: all var(--transition-fast);
+    transition: background var(--transition-fast), border-color var(--transition-fast),
+        box-shadow var(--transition-fast), opacity var(--transition-fast);
     box-shadow: var(--shadow-node);
 }
 
@@ -380,7 +417,7 @@
 }
 
 [data-theme="dark"] .source-node--idle {
-    background: rgba(13, 94, 94, 0.3);
+    background: rgba(107, 90, 58, 0.3);
     border-color: var(--color-teal);
 }
 
@@ -389,8 +426,18 @@
 }
 
 [data-theme="dark"] .source-node--disconnected {
-    background: rgba(250, 243, 227, 0.03);
-    border-color: rgba(250, 243, 227, 0.2);
+    background: rgba(242, 233, 214, 0.03);
+    border-color: rgba(242, 233, 214, 0.2);
+}
+
+/* Label contrast: inverse text is unreadable on unfilled/dark-context nodes */
+[data-theme="dark"] .source-node-label {
+    color: var(--color-text-primary);
+}
+
+.source-node--idle .source-node-label,
+.source-node--disconnected .source-node-label {
+    color: var(--color-text-muted);
 }
 
 /* ============================================
@@ -413,19 +460,30 @@
     border-radius: var(--radius-sm);
     background: var(--color-bg-accent);
     color: var(--color-text-on-accent);
+    flex: none;
 }
 
+/* Shrink priority under pressure: detail gives way first, then agent;
+   the name ellipsizes last and never wraps */
 .tool-event-name {
     font-family: var(--font-interface);
     font-size: var(--font-size-body);
     font-weight: var(--font-weight-medium);
     color: var(--color-text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 0 1 auto;
 }
 
 .tool-event-agent {
     font-family: var(--font-interface);
     font-size: var(--font-size-body);
     color: var(--color-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 0 2 auto;
 }
 
 .tool-event-time {
@@ -433,6 +491,10 @@
     font-size: var(--font-size-body);
     color: var(--color-text-muted);
     margin-left: auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 0 4 auto;
 }
 
 /* Dark theme tool events */
@@ -473,7 +535,7 @@
 }
 
 .panel--accent .panel-title {
-    color: rgba(250, 243, 227, 0.7);
+    color: rgba(32, 26, 18, 0.7);
 }
 
 .panel-content {
@@ -493,7 +555,7 @@
 }
 
 [data-theme="dark"] .panel--inverted .panel-title {
-    color: rgba(7, 56, 56, 0.6);
+    color: rgba(23, 19, 16, 0.6);
 }
 
 [data-theme="dark"] .panel--inverted .panel-content {

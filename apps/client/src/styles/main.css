@@ -9,7 +9,7 @@
 :root {
     /* Colors - Accent (mapped to design system) */
     --color-accent: var(--color-teal);
-    --color-accent-hover: #0a4a4a;
+    --color-accent-hover: #352b1e;
 
     /* Colors - Semantic */
     --color-tool: var(--color-rose);
@@ -22,13 +22,9 @@
     --font-size-base: 0.85em;
     --font-size-md: 0.9em;
     --font-size-lg: 1.5em;
-
-    /* Layout */
-    --sidebar-width: 300px;
-    --container-max: 1400px;
 }
 
-/* Dark theme: marigold takes over as the accent (teal-on-teal lacks contrast) */
+/* Dark theme: marigold takes over as the accent (ink-on-ink lacks contrast) */
 [data-theme="dark"] {
     --color-accent: var(--color-marigold);
     --color-accent-hover: #d99a26;
@@ -72,6 +68,10 @@ body {
     flex-direction: column;
 }
 
+input[type="range"] {
+    accent-color: var(--color-marigold);
+}
+
 /* ============================================
    Components - Audio Banner
    ============================================ */
@@ -92,8 +92,16 @@ body {
     flex-shrink: 0;
 }
 
-.audio-banner:hover {
-    background: var(--color-accent);
+@media (hover: hover) and (pointer: fine) {
+    .audio-banner:hover {
+        background: var(--color-accent);
+        color: var(--color-text-inverse);
+    }
+}
+
+/* Full-bleed bar: press reads as a colour shift, not a scale */
+.audio-banner:active {
+    background: var(--color-accent-hover);
     color: var(--color-text-inverse);
 }
 
@@ -131,115 +139,54 @@ body {
 }
 
 /* ============================================
-   Layout
+   App Shell
    ============================================ */
-.container {
-    max-width: var(--container-max);
-    margin: 0 auto;
-    padding: var(--space-lg);
+.app {
     flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    min-height: 0;
 }
 
-header {
+.app-header {
     display: flex;
+    align-items: center;
     justify-content: space-between;
-    align-items: center;
-    padding: var(--space-lg) 0;
+    padding: 18px 24px;
     border-bottom: 1px solid var(--color-border);
-    margin-bottom: var(--space-lg);
+    flex-shrink: 0;
 }
 
-.main-grid {
-    display: grid;
-    grid-template-columns: 1fr var(--sidebar-width);
-    gap: var(--space-lg);
-    flex: 1;
-    min-height: 0;
-}
-
-.sidebar {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xl);
-    height: 100%;
-    min-height: 0;
-}
-
-@media (max-width: 900px) {
-    html, body {
-        height: auto;
-        overflow: auto;
-    }
-
-    .container {
-        flex: none;
-        min-height: auto;
-    }
-
-    .main-grid {
-        grid-template-columns: 1fr;
-        flex: none;
-        min-height: auto;
-    }
-
-    #visualizer {
-        height: 300px;
-        flex: none;
-    }
-
-    .sidebar {
-        height: auto;
-    }
-
-    .sidebar .panel:nth-child(2),
-    .sidebar .panel:nth-child(3) {
-        flex: none;
-    }
-
-    .sessions-list,
-    .event-log {
-        max-height: 250px;
-        flex: none;
-    }
-}
-
-/* ============================================
-   Typography
-   ============================================ */
-h1 {
-    font-size: var(--font-size-lg);
+.brand {
+    font-family: var(--font-display);
     font-weight: 600;
-    color: var(--color-text-bright);
+    font-size: 22px;
+    line-height: 1;
+    letter-spacing: -0.01em;
+    color: var(--color-text-primary);
 }
 
-h1 span {
-    color: var(--color-accent);
+.brand b {
+    color: var(--color-marigold);
+    font-weight: 600;
 }
 
-.panel h2 {
-    font-size: var(--font-size-md);
-    font-weight: 500;
-    color: var(--color-text-muted);
-    margin-bottom: var(--space-md);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-/* ============================================
-   Components - Status
-   ============================================ */
-.status {
+.header-status {
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
+    gap: 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+}
+
+.dot-sep {
+    opacity: 0.4;
 }
 
 .status-dot {
-    width: 10px;
-    height: 10px;
+    width: 9px;
+    height: 9px;
     border-radius: var(--radius-full);
     background: var(--color-error);
     transition: background var(--transition-base);
@@ -251,284 +198,888 @@ h1 span {
 }
 
 /* ============================================
-   Components - Buttons
+   Components - Control Rows (header + modal)
    ============================================ */
-.btn {
-    border: none;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    font-family: inherit;
-    font-size: 14px;
-    transition: background var(--transition-fast);
-}
-
-.btn:disabled {
-    cursor: not-allowed;
-}
-
-#connect-btn {
-    background: var(--color-accent);
-    color: var(--color-text-inverse);
-    padding: var(--space-sm) var(--space-lg);
-    border: none;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    font-family: inherit;
-    font-size: 14px;
-    transition: background var(--transition-fast);
-}
-
-#connect-btn:hover {
-    background: var(--color-accent-hover);
-}
-
-#connect-btn:disabled {
-    background: var(--color-bg-elevated);
-    color: var(--color-text-muted);
-    cursor: not-allowed;
-}
-
-.mute-btn {
-    background: none;
-    border: 1px solid var(--color-accent);
-    color: var(--color-accent);
-    padding: var(--space-xs) var(--space-md);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    font-family: inherit;
-    font-size: 12px;
-    transition: all var(--transition-fast);
-    flex: 1;
-}
-
-.button-row {
+.ctl-row {
     display: flex;
-    gap: var(--space-sm);
+    align-items: center;
+    gap: 10px;
 }
 
-.mute-btn:hover {
-    background: var(--color-accent);
-    color: var(--color-text-inverse);
+.ctl-row label {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    white-space: nowrap;
 }
 
-.mute-btn.muted {
-    border-color: var(--color-error);
-    color: var(--color-error);
+.ctl-val {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    width: 30px;
+    text-align: right;
+}
+
+.ctl-range-header {
+    width: 88px;
 }
 
 /* ============================================
-   Components - Panel
+   Components - Section Labels
    ============================================ */
-.panel {
-    background: var(--color-bg-surface);
-    border-radius: var(--radius-md);
-    padding: var(--space-md);
-    border: 1px solid var(--color-border);
-    contain: content;
+.sec-label {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 1.5px;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
 }
 
-/* Controls panel: natural height, don't shrink */
-.sidebar .panel:first-child {
+/* ============================================
+   View Toolbar
+   ============================================ */
+.view-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 22px 6px 16px;
     flex-shrink: 0;
 }
 
-/* Sessions and Event Log panels: split remaining space */
-.sidebar .panel:nth-child(2),
-.sidebar .panel:nth-child(3) {
-    flex: 1;
-    min-height: 120px;
+.view-title-group {
     display: flex;
-    flex-direction: column;
+    align-items: baseline;
+    gap: 12px;
 }
 
-/* ============================================
-   Components - Visualizer
-   ============================================ */
-.visualizer-section {
-    background: var(--color-bg-surface);
-    border-radius: var(--radius-md);
-    padding: var(--space-lg);
+.view-title {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 17px;
+}
+
+.seg {
+    display: flex;
     border: 1px solid var(--color-border);
-    contain: layout paint;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
+    border-radius: 9px;
+    overflow: hidden;
 }
 
-#visualizer {
-    display: block;
-    width: 100%;
-    flex: 1;
-    min-height: 200px;
-    background: var(--color-bg-base);
-    border-radius: var(--radius-sm);
+.seg button {
+    appearance: none;
+    border: none;
+    background: transparent;
+    padding: 7px 14px;
+    font-family: var(--font-interface);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.seg button.on {
+    background: var(--color-marigold);
+    color: var(--color-text-on-marigold);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .seg button:not(.on):hover {
+        color: var(--color-text-primary);
+    }
+}
+
+/* Parent clips at 9px radius, so press feedback is a tint rather than a scale */
+.seg button:not(.on):active {
+    background: var(--color-bg-elevated);
 }
 
 /* ============================================
-   Components - Sessions
+   Combined View
    ============================================ */
-.sessions-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-sm);
+.view-combined {
     flex: 1;
-    overflow-y: auto;
     min-height: 0;
+    display: flex;
 }
 
+.view-combined[hidden],
+.view-lanes[hidden] {
+    display: none;
+}
+
+.sessions-rail {
+    width: 250px;
+    flex: none;
+    border-right: 1px solid var(--color-border);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow: hidden;
+}
+
+/* Tablet: narrow the rail so trace rows keep breathing room */
+@media (max-width: 1024px) {
+    .sessions-rail {
+        width: 200px;
+    }
+}
+
+.rail-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(242, 233, 214, 0.25) transparent;
+}
+
+.rail-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+.rail-scroll::-webkit-scrollbar-thumb {
+    background: rgba(242, 233, 214, 0.25);
+    border-radius: 3px;
+}
+
+.rail-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+/* Rail session item: mirrors the swimlane head — dot + name, meta below.
+   Nothing wraps; the machine name gives way before the call count. */
 .session-item {
     display: flex;
-    align-items: flex-start;
-    gap: var(--space-sm);
-    padding: var(--space-sm);
-    background: var(--color-bg-elevated);
-    border-radius: var(--radius-sm);
-}
-
-.session-color {
-    width: 12px;
-    height: 12px;
-    border-radius: var(--radius-full);
-    flex-shrink: 0;
-    margin-top: 3px;
-}
-
-.session-info {
-    flex: 1;
+    flex-direction: column;
+    gap: 4px;
     min-width: 0;
-    margin-right: var(--space-xs);
 }
 
-.session-id {
-    font-size: var(--font-size-base);
-    color: var(--color-text-bright);
+.session-item-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text-primary);
+    min-width: 0;
+}
+
+.session-item-label {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.session-meta {
-    font-size: var(--font-size-xs);
-    color: var(--color-text-secondary);
-}
-
-.pan-indicator {
-    width: 60px;
-    height: 6px;
-    background: var(--color-border);
-    border-radius: 3px;
-    position: relative;
-}
-
-.pan-dot {
-    position: absolute;
-    width: 8px;
-    height: 8px;
-    background: var(--color-accent);
-    border-radius: var(--radius-full);
-    top: -1px;
-    transform: translateX(-50%);
-}
-
-/* ============================================
-   Components - Event Log
-   ============================================ */
-.event-log {
-    flex: 1;
-    overflow-y: auto;
-    font-size: var(--font-size-sm);
-    min-height: 0;
-}
-
-.event-item {
+.session-item-meta {
     display: flex;
     align-items: baseline;
-    gap: var(--space-xs);
-    padding: var(--space-xs);
-    border-bottom: 1px solid var(--color-bg-elevated);
-    animation: fadeIn var(--transition-base);
+    font-size: 11px;
+    color: var(--color-text-muted);
+    min-width: 0;
 }
 
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(-5px);
+.session-item-machine {
+    flex: 0 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.session-item-calls {
+    flex: none;
+    white-space: nowrap;
+}
+
+.session-item-calls::before {
+    content: ' · ';
+    white-space: pre;
+}
+
+.trace-stream-wrap {
+    flex: 1;
+    min-width: 0;
+    position: relative;
+    display: flex;
+    container-type: inline-size;
+    container-name: trace;
+}
+
+/* Progressive disclosure keyed to the stream's own width, not the viewport:
+   the derived detail goes first, the agent name second (rail still shows who) */
+@container trace (max-width: 640px) {
+    .tool-event-time {
+        display: none;
     }
-    to {
-        opacity: 1;
-        transform: translateY(0);
+}
+
+@container trace (max-width: 480px) {
+    .tool-event-agent {
+        display: none;
     }
 }
 
-.event-type {
-    color: var(--color-accent);
-    font-weight: 500;
-}
-
-.event-tool {
-    color: var(--color-tool);
-    margin-left: var(--space-xs);
-}
-
-.event-time {
-    color: var(--color-text-secondary);
-    font-size: var(--font-size-md);
-    margin-left: auto;
-}
-
-/* ============================================
-   Components - Controls
-   ============================================ */
-.controls {
+.trace-stream {
+    flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: var(--space-md);
+    /* Right padding + stable 6px webkit gutter = toolbar's 22px, so row
+       edges align with the Combined/Swimlanes toggle. Standard scrollbar-*
+       props would make Chrome ignore the webkit sizing (11px gutter). */
+    padding: 16px 16px 16px 22px;
+    gap: 9px;
+    overflow-y: auto;
+    overflow-anchor: none;
+    scrollbar-gutter: stable;
 }
 
-.control-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.control-row label {
-    font-size: var(--font-size-base);
-    color: var(--color-text-muted);
-}
-
-input[type="range"] {
-    width: 100px;
-    accent-color: var(--color-accent);
-}
-
-/* ============================================
-   Components - Scrollbar
-   ============================================ */
-.sessions-list,
-.event-log {
-    scrollbar-width: thin;
-    scrollbar-color: var(--color-border-subtle) transparent;
-}
-
-.sessions-list::-webkit-scrollbar,
-.event-log::-webkit-scrollbar {
+.trace-stream::-webkit-scrollbar {
     width: 6px;
 }
 
-.sessions-list::-webkit-scrollbar-track,
-.event-log::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.sessions-list::-webkit-scrollbar-thumb,
-.event-log::-webkit-scrollbar-thumb {
-    background: var(--color-border-subtle);
+.trace-stream::-webkit-scrollbar-thumb {
+    background: rgba(242, 233, 214, 0.25);
     border-radius: 3px;
 }
 
-.sessions-list::-webkit-scrollbar-thumb:hover,
-.event-log::-webkit-scrollbar-thumb:hover {
+.trace-stream::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.trace-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+/* Only rows appended live animate in; bulk re-renders stay still */
+.trace-row-in {
+    animation: traceIn 0.24s var(--ease-out);
+}
+
+@keyframes traceIn {
+    from {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+.trace-row .tool-event {
+    flex: 1;
+    min-width: 0;
+}
+
+.trace-time {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--color-text-muted);
+    letter-spacing: 0.5px;
+    width: 56px;
+    flex: none;
+    text-align: right;
+}
+
+/* Floating "new events" pill, shown when scrolled away from the live top */
+.trace-pill {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    appearance: none;
+    border: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: var(--color-marigold);
+    color: var(--color-text-on-marigold);
+    font-family: var(--font-interface);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    animation: pillIn 0.2s var(--ease-out);
+    transition: transform 160ms var(--ease-out), background var(--transition-fast);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .trace-pill:hover {
+        background: color-mix(in srgb, var(--color-marigold) 90%, white);
+    }
+}
+
+/* Centring translate must survive the press, so scale composes with it */
+.trace-pill:active {
+    transform: translateX(-50%) scale(var(--press-scale));
+}
+
+.lanes-pill:active {
+    transform: scale(var(--press-scale));
+}
+
+.trace-pill[hidden] {
+    display: none;
+}
+
+@keyframes pillIn {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* ============================================
+   Mini Radar
+   ============================================ */
+.mini-radar-wrap {
+    margin-top: auto;
+    flex: none;
+}
+
+.mini-radar {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    max-height: min(218px, 26vh);
+    background: var(--viz-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.mini-radar svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.mini-dots {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.mini-dot {
+    position: absolute;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 8px currentColor;
+}
+
+.mini-center {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--viz-listener);
+    transform: translate(-50%, -50%);
+}
+
+.mini-expand {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 8px;
+    background: rgba(23, 19, 16, 0.7);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--color-border);
+    border-radius: 7px;
+    font-family: var(--font-interface);
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: color var(--transition-fast), border-color var(--transition-fast),
+        transform 160ms var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .mini-expand:hover {
+        color: var(--color-marigold);
+        border-color: var(--color-marigold);
+    }
+}
+
+.mini-expand:active {
+    transform: scale(var(--press-scale));
+}
+
+.mini-label {
+    position: absolute;
+    left: 10px;
+    bottom: 9px;
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 1.4px;
+    color: var(--color-text-muted);
+}
+
+/* ============================================
+   Swimlanes View
+   ============================================ */
+.view-lanes {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+/* One shared scroller: the ruler and every lane pan horizontally together */
+.lanes-scroller {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(242, 233, 214, 0.25) transparent;
+}
+
+/* Sizes to the widest lane (at least the viewport); rows stretch to match */
+.lanes-content {
+    width: max-content;
+    min-width: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.lanes-ruler-row {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    display: flex;
+    padding-top: 8px;
+    background: var(--color-bg-base);
+}
+
+/* Chips fade out before sliding under the sticky ruler, matching the
+   lane-head edge treatment */
+.lanes-ruler-row::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    height: 10px;
+    background: linear-gradient(to bottom, var(--color-bg-base), transparent);
+    pointer-events: none;
+}
+
+.lane-corner {
+    position: sticky;
+    left: 0;
+    z-index: 5;
+    width: 174px;
+    flex: none;
+    background: var(--color-bg-base);
+    /* Continues the ruler's bottom border across the label column, so the
+       first lane head has a top edge instead of floating */
+    border-bottom: 1px solid var(--color-border);
+}
+
+/* Ruler labels fade as they scroll under the corner instead of hard-clipping */
+.lane-corner::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: -24px;
+    width: 24px;
+    background: linear-gradient(to right, var(--color-bg-base), transparent);
+    pointer-events: none;
+}
+
+.lanes-ruler-times {
+    position: relative;
+    flex: none;
+    height: 22px;
+    /* Matches the lane's head→track flex gap so tick x aligns with chip x */
+    margin-left: 14px;
+    /* Bookend borders frame the label strip so it doesn't float unanchored */
+    border-top: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.lanes-ruler-times .trace-time {
+    position: absolute;
+    top: 50%;
+    width: auto;
+    /* True centering between the bookend borders, whatever the line height */
+    transform: translate(-50%, -50%);
+    white-space: nowrap;
+}
+
+/* Skipped-time glyph over a break corridor */
+.lanes-ruler-times .ruler-break {
+    font-style: italic;
+    letter-spacing: 0.5px;
+}
+
+/* Bands are positioned against the list, aligned with track x + head span */
+.lanes-list {
+    position: relative;
+}
+
+/* Full-height corridor marking an all-lanes silence; duration is in the ruler */
+.axis-break {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-left: 1px dashed var(--color-border-subtle);
+    border-right: 1px dashed var(--color-border-subtle);
+    background: repeating-linear-gradient(
+        -60deg,
+        transparent 0 6px,
+        var(--color-border-subtle) 6px 7px
+    );
+    opacity: 0.35;
+    pointer-events: none;
+}
+
+.lane {
+    display: flex;
+    align-items: stretch;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--color-border-subtle);
+    box-sizing: border-box;
+}
+
+/* Lane label stays put; chips scroll underneath and fade out at its edge */
+.lane-head {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    width: 174px;
+    padding-left: 24px;
+    box-sizing: border-box;
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    justify-content: center;
+    background: var(--color-bg-base);
+}
+
+.lane-head::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: -24px;
+    width: 24px;
+    background: linear-gradient(to right, var(--color-bg-base), transparent);
+    pointer-events: none;
+}
+
+.lane-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Session identity dot, shared by the rail, lane heads, and radar colors */
+.session-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex: none;
+}
+
+.lane-meta {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Chips are absolutely positioned on the time axis; width set from JS */
+.lane-track {
+    position: relative;
+    flex: none;
+    height: 34px;
+    align-self: center;
+}
+
+/* Right-edge fade: shown while more chips exist beyond the viewport */
+.lanes-fade-right {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: 36px;
+    background: linear-gradient(to left, var(--color-bg-base), transparent);
+    pointer-events: none;
+    z-index: 4;
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+
+.view-lanes.mask-right .lanes-fade-right {
+    opacity: 1;
+}
+
+/* Horizontal "new events" pill: enters from the right, where its events are */
+.lanes-pill {
+    left: auto;
+    right: 20px;
+    top: 44px;
+    transform: none;
+    animation: lanesPillIn 0.2s var(--ease-out);
+}
+
+@keyframes lanesPillIn {
+    from {
+        opacity: 0;
+        transform: translateX(8px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+.ev {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 11px;
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 9px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-text-primary);
+    white-space: nowrap;
+}
+
+.ev-name {
+    max-width: 130px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Only chips appended live animate in */
+.ev-in {
+    animation: chipIn 0.24s var(--ease-out);
+}
+
+@keyframes chipIn {
+    from {
+        opacity: 0;
+        transform: translateY(-50%) translateX(10px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(-50%);
+    }
+}
+
+.ev .evb {
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+}
+
+/* Connector wire between consecutive chips; left/width set from JS */
+.ev-thread {
+    position: absolute;
+    top: 50%;
+    height: 1px;
     background: var(--color-border);
+}
+
+/* Labeled idle gap: dashed thread with the elapsed time at its center,
+   marking where the compressed axis hides a long quiet stretch */
+.ev-gap {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    pointer-events: none;
+}
+
+.ev-gap::before,
+.ev-gap::after {
+    content: '';
+    flex: 1;
+    border-top: 1px dashed var(--color-border);
+}
+
+.ev-gap span {
+    padding: 0 6px;
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+}
+
+.lanes-radar {
+    position: absolute;
+    right: 20px;
+    bottom: 20px;
+    width: 150px;
+}
+
+/* ============================================
+   Radar Modal
+   ============================================ */
+.radar-modal-root {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    /* Keep the root rendered through the exit fade, then drop it */
+    transition: display var(--transition-base) allow-discrete;
+}
+
+.radar-modal-root[hidden] {
+    display: none;
+}
+
+.radar-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 8, 6, 0.62);
+    backdrop-filter: blur(3px);
+    transition: opacity var(--transition-base);
+}
+
+/* Exit: fade toward the closed state while the root's display transition holds */
+.radar-modal-root[hidden] .radar-scrim {
+    opacity: 0;
+}
+
+.radar-modal-root[hidden] .radar-modal {
+    opacity: 0;
+    transform: scale(0.97);
+}
+
+/* Enter: from the same closed state on first render (modal stays centered) */
+@starting-style {
+    .radar-modal-root:not([hidden]) .radar-scrim {
+        opacity: 0;
+    }
+
+    .radar-modal-root:not([hidden]) .radar-modal {
+        opacity: 0;
+        transform: scale(0.97);
+    }
+}
+
+.radar-modal-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    pointer-events: none;
+}
+
+.radar-modal {
+    pointer-events: auto;
+    width: 660px;
+    max-width: 100%;
+    max-height: 100%;
+    background: var(--color-bg-base);
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: opacity var(--transition-base), transform 0.2s var(--ease-out);
+}
+
+.radar-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.radar-title {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.radar-modal-body {
+    padding: 24px;
+    display: flex;
+    justify-content: center;
+    background: var(--viz-bg);
+    min-height: 0;
+    overflow: hidden;
+}
+
+.radar-stage {
+    width: min(420px, 55vh);
+    aspect-ratio: 1;
+}
+
+.radar-modal-footer {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--color-border);
+}
+
+.radar-modal-sliders {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.radar-modal-sliders .ctl-row label {
+    width: 110px;
+    flex: none;
+}
+
+.radar-modal-sliders .ctl-row input[type="range"] {
+    flex: 1;
 }
 
 /* ============================================
@@ -539,6 +1090,7 @@ input[type="range"] {
     font-style: italic;
     text-align: center;
     padding: var(--space-lg);
+    font-size: var(--font-size-sm);
 }
 
 /* ============================================
@@ -563,7 +1115,8 @@ input[type="range"] {
     width: 56px;
     height: 56px;
     border-radius: 50%;
-    background: var(--color-bg-elevated);
+    /* Session-color tint so the node reads like its mini-radar/lane dot */
+    background: color-mix(in srgb, var(--session-color, var(--color-border)) 15%, transparent);
     border: 2px solid var(--session-color, var(--color-border));
     display: flex;
     flex-direction: column;
@@ -576,8 +1129,11 @@ input[type="range"] {
     touch-action: none;
 }
 
-.source-circle:hover {
-    box-shadow: 0 0 15px color-mix(in srgb, var(--session-color) 50%, transparent);
+/* No :active scale here — .dragging already carries the press feedback */
+@media (hover: hover) and (pointer: fine) {
+    .source-circle:hover {
+        box-shadow: 0 0 15px color-mix(in srgb, var(--session-color) 50%, transparent);
+    }
 }
 
 .source-circle.selected {
@@ -602,6 +1158,7 @@ input[type="range"] {
 .source-icon {
     font-size: 18px;
     color: var(--session-color);
+    text-shadow: 0 0 8px var(--session-color);
     line-height: 1;
 }
 

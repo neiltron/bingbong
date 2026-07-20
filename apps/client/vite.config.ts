@@ -3,7 +3,8 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   root: '.',
   server: {
-    port: 5173,
+    // Honour PORT so parallel dev servers can coexist; 5173 stays the default
+    port: Number(process.env.PORT) || 5173,
     proxy: {
       '/ws': {
         target: 'ws://localhost:3334',
