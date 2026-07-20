@@ -272,18 +272,19 @@ function toolNameParts(full: string): { server: string | null; tool: string } {
 function buildTraceRow(e: EnrichedEvent, animate: boolean): HTMLElement {
   const full = eventName(e)
   const { server, tool } = toolNameParts(full)
+  // Name column carries the actor: the MCP server for mcp__ tools, the tool
+  // itself for builtins. The detail column carries the most specific context
+  // available; MCP rows with none fall back to the tool name, so a row is
+  // never just a bare server (builtins would only duplicate their name).
+  const name = server ? server.replace(/_/g, ' ') : tool
+  const detail = eventDetail(e) || (server ? tool : '')
   return createElement('div', { class: animate ? 'trace-row trace-row-in' : 'trace-row' }, [
     createElement('span', { class: 'trace-time' }, [eventTime(e)]),
     createElement('div', { class: 'tool-event' }, [
       createElement('span', { class: 'tool-event-badge' }, [eventBadge(e)]),
-      createElement('span', { class: 'tool-event-name', title: full }, [
-        server
-          ? createElement('span', { class: 'tool-event-server' }, [server.replace(/_/g, ' ')])
-          : null,
-        tool,
-      ]),
+      createElement('span', { class: 'tool-event-name', title: full }, [name]),
       createElement('span', { class: 'tool-event-agent' }, [eventAgent(e)]),
-      createElement('span', { class: 'tool-event-time' }, [eventDetail(e)]),
+      createElement('span', { class: 'tool-event-time' }, [detail]),
     ]),
   ])
 }

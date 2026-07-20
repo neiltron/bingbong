@@ -492,17 +492,6 @@
     flex: 0 1 auto;
 }
 
-/* MCP server namespace inside the name: muted, dot-separated from the tool */
-.tool-event-server {
-    color: var(--color-text-muted);
-    font-weight: var(--font-weight-regular);
-}
-
-.tool-event-server::after {
-    content: ' · ';
-    opacity: 0.6;
-}
-
 .tool-event-agent {
     font-family: var(--font-interface);
     font-size: var(--font-size-body);
