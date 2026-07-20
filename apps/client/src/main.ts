@@ -235,24 +235,23 @@ function renderSessionsRail(): void {
     return
   }
 
+  // Mirrors the swimlane head: color dot + name, meta below, no wrapping.
+  // The dot is the session's identity mark shared with lanes and the radar.
   for (const s of sessions.values()) {
     el.appendChild(
-      createElement('div', { class: 'agent-session agent-session--compact', role: 'listitem' }, [
-        createElement(
-          'div',
-          {
-            class: 'agent-session-indicator',
-            style: { background: s.color, color: 'var(--color-text-inverse)' },
+      createElement('div', { class: 'session-item', role: 'listitem' }, [
+        createElement('div', { class: 'session-item-name', title: s.session_id }, [
+          createElement('span', {
+            class: 'session-dot',
+            style: { background: s.color },
             'aria-hidden': 'true',
-          },
-          [sessionName(s).charAt(0).toUpperCase()]
-        ),
-        createElement('div', { class: 'agent-session-info' }, [
-          createElement('div', { class: 'agent-session-name', title: s.session_id }, [
-            sessionName(s),
-          ]),
-          createElement('div', { class: 'agent-session-meta' }, [
-            `${s.machine_id || 'unknown'} · ${s.event_count || 0} calls`,
+          }),
+          createElement('span', { class: 'session-item-label' }, [sessionName(s)]),
+        ]),
+        createElement('div', { class: 'session-item-meta' }, [
+          createElement('span', { class: 'session-item-machine' }, [s.machine_id || 'unknown']),
+          createElement('span', { class: 'session-item-calls' }, [
+            `${s.event_count || 0} ${s.event_count === 1 ? 'call' : 'calls'}`,
           ]),
         ]),
       ])
@@ -549,7 +548,7 @@ function renderLanes(): void {
         createElement('div', { class: 'lane-head' }, [
           createElement('div', { class: 'lane-name' }, [
             createElement('span', {
-              class: 'lane-ldot',
+              class: 'session-dot',
               style: { background: s.color },
               'aria-hidden': 'true',
             }),

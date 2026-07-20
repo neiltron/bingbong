@@ -352,6 +352,56 @@ input[type="range"] {
     background: transparent;
 }
 
+/* Rail session item: mirrors the swimlane head — dot + name, meta below.
+   Nothing wraps; the machine name gives way before the call count. */
+.session-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.session-item-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text-primary);
+    min-width: 0;
+}
+
+.session-item-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.session-item-meta {
+    display: flex;
+    align-items: baseline;
+    font-size: 11px;
+    color: var(--color-text-muted);
+    min-width: 0;
+}
+
+.session-item-machine {
+    flex: 0 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.session-item-calls {
+    flex: none;
+    white-space: nowrap;
+}
+
+.session-item-calls::before {
+    content: ' · ';
+    white-space: pre;
+}
+
 .trace-stream-wrap {
     flex: 1;
     min-width: 0;
@@ -716,7 +766,8 @@ input[type="range"] {
     white-space: nowrap;
 }
 
-.lane-ldot {
+/* Session identity dot, shared by the rail, lane heads, and radar colors */
+.session-dot {
     width: 9px;
     height: 9px;
     border-radius: 50%;

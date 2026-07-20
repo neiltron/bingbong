@@ -318,22 +318,6 @@
     color: var(--color-text-muted);
 }
 
-/* Density modifier: fluid pill card for narrow rails (fills its container) */
-.agent-session--compact {
-    min-width: 0;
-    width: 100%;
-    box-sizing: border-box;
-    gap: 10px;
-    padding: 8px 10px;
-    border-radius: 9px;
-}
-
-.agent-session--compact .agent-session-indicator {
-    width: 34px;
-    height: 34px;
-    font-size: 14px;
-}
-
 /* Dark theme agent session */
 [data-theme="dark"] .agent-session {
     background: var(--color-bg-elevated);
