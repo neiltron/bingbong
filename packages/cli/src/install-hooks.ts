@@ -176,18 +176,28 @@ async function atomicWriteJson(filePath: string, data: object) {
 // Claude Code installer
 // ---------------------------------------------------------------------------
 
+// Audibly-useful subset of Claude Code hook events. The full upstream list
+// (~30 events) and the rationale for exclusions live in agents/event-coverage.md.
 const CLAUDE_EVENTS: Array<{ event: string; matcher: string }> = [
-  { event: "PreToolUse",        matcher: ".*" },
-  { event: "PostToolUse",       matcher: ".*" },
-  { event: "SessionStart",      matcher: "" },
-  { event: "SessionEnd",        matcher: "" },
-  { event: "Stop",              matcher: "" },
-  { event: "SubagentStop",      matcher: "" },
-  { event: "PermissionRequest", matcher: "" },
-  { event: "Notification",      matcher: "" },
-  { event: "PreCompact",        matcher: "" },
-  { event: "Setup",             matcher: "" },
-  { event: "UserPromptSubmit",  matcher: "" },
+  { event: "PreToolUse",         matcher: ".*" },
+  { event: "PostToolUse",        matcher: ".*" },
+  { event: "PostToolUseFailure", matcher: ".*" },
+  { event: "SessionStart",       matcher: "" },
+  { event: "SessionEnd",         matcher: "" },
+  { event: "Stop",               matcher: "" },
+  { event: "StopFailure",        matcher: "" },
+  { event: "SubagentStart",      matcher: "" },
+  { event: "SubagentStop",       matcher: "" },
+  { event: "PermissionRequest",  matcher: "" },
+  { event: "PermissionDenied",   matcher: "" },
+  { event: "Notification",       matcher: "" },
+  { event: "PreCompact",         matcher: "" },
+  { event: "PostCompact",        matcher: "" },
+  { event: "TaskCreated",        matcher: "" },
+  { event: "TaskCompleted",      matcher: "" },
+  { event: "TeammateIdle",       matcher: "" },
+  { event: "Setup",              matcher: "" },
+  { event: "UserPromptSubmit",   matcher: "" },
 ];
 
 function isBingbongClaudeEntry(entry: any): boolean {
@@ -243,7 +253,13 @@ async function installClaude(dryRun: boolean): Promise<string> {
 // Cursor installer
 // ---------------------------------------------------------------------------
 
+// Cursor hook events (camelCase upstream names). `bingbong emit` maps these to
+// canonical bingbong event types — see CURSOR_EVENT_MAP in emit.ts.
+// Cursor's generic preToolUse/postToolUse are intentionally skipped: they overlap
+// the specific before*/after* hooks and would double-fire sounds.
 const CURSOR_EVENTS = [
+  "sessionStart",
+  "sessionEnd",
   "beforeShellExecution",
   "afterShellExecution",
   "beforeMCPExecution",
@@ -253,6 +269,10 @@ const CURSOR_EVENTS = [
   "beforeSubmitPrompt",
   "afterAgentResponse",
   "afterAgentThought",
+  "postToolUseFailure",
+  "subagentStart",
+  "subagentStop",
+  "preCompact",
   "stop",
 ];
 

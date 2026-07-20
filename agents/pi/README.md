@@ -1,23 +1,30 @@
 # pi-coding-agent Integration
 
-This directory contains the global extension for pi-coding-agent.
+This directory contains the global extension for pi
+(`@earendil-works/pi-coding-agent`, formerly `@mariozechner/pi-coding-agent`).
 
 ## Install (global)
 
 ```bash
-./agents/pi/install.sh
+bingbong install-hooks pi
 ```
+
+This installs the extension to `~/.pi/agent/extensions/bingbong.ts`.
 
 ## Configuration
 
 The installer accepts environment variables:
 
 - `PI_EXTENSIONS_DIR` (default: `~/.pi/agent/extensions`)
-- `BINGBONG_URL` (default: `http://localhost:3333`)
-- `BINGBONG_HOST` and `BINGBONG_PORT` (used to build `BINGBONG_URL`)
+- `BINGBONG_URL` (default: `http://localhost:3334`, baked into the installed file)
 
-Example:
+At runtime the extension also reads:
 
-```bash
-BINGBONG_HOST=127.0.0.1 BINGBONG_PORT=3333 ./agents/pi/install.sh
-```
+- `BINGBONG_URL` (overrides the baked-in URL)
+- `BINGBONG_ENABLED` (`false` disables all events)
+- `BINGBONG_MACHINE_ID` (override hostname)
+
+## Event mapping
+
+See [agents/event-coverage.md](../../agents/event-coverage.md) for the
+full mapping of pi extension events to Bingbong event types.

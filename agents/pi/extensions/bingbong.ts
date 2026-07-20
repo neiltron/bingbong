@@ -1,4 +1,6 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+// Type-only import: erased at compile time, so this also works on older pi
+// installs that still resolve the legacy @mariozechner scope.
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import os from "node:os";
 
 const DEFAULT_URL = "http://localhost:3334";
@@ -14,6 +16,11 @@ const EVENT_TYPE_MAP: Record<string, string> = {
   tool_result: "PostToolUse",
   session_start: "SessionStart",
   session_shutdown: "SessionEnd",
+  session_before_compact: "PreCompact",
+  session_compact: "PostCompact",
+  // agent_settled is the definitive "nothing left to do" signal on current pi;
+  // agent_end is kept mapped for older versions. Duplicate Stops are deduped.
+  agent_settled: "Stop",
   agent_end: "Stop",
 };
 
@@ -30,6 +37,16 @@ const safeJson = (value: unknown) => {
 };
 
 export default function (pi: ExtensionAPI) {
+  // agent_end and agent_settled both map to Stop and fire back-to-back on
+  // current pi; suppress the duplicate within a short window.
+  let lastStopAt = 0;
+  const isDuplicateStop = () => {
+    const now = Date.now();
+    const duplicate = now - lastStopAt < 1500;
+    lastStopAt = now;
+    return duplicate;
+  };
+
   const sendEvent = async ({
     eventType,
     sessionId,
@@ -48,6 +65,8 @@ export default function (pi: ExtensionAPI) {
     if (!enabled) return;
 
     const mappedEventType = mapEventType(eventType);
+    if (mappedEventType === "Stop" && isDuplicateStop()) return;
+
     const output =
       mappedEventType === eventType
         ? toolOutput
@@ -76,7 +95,10 @@ export default function (pi: ExtensionAPI) {
   };
 
   const baseCtx = (ctx: any) => {
-    const sessionId = ctx?.sessionManager?.getSessionFile?.() || "ephemeral";
+    const sessionId =
+      ctx?.sessionManager?.getSessionId?.() ||
+      ctx?.sessionManager?.getSessionFile?.() ||
+      "ephemeral";
     const cwd = ctx?.cwd || process.cwd();
     return { sessionId, cwd };
   };
@@ -124,12 +146,14 @@ export default function (pi: ExtensionAPI) {
     });
   };
 
-  // Session events
+  // Session events. Note: pi tears down and re-instantiates extensions on
+  // /new, /resume, /fork — session_shutdown fires on the old instance, then
+  // session_start (with event.reason) on the new one. The post-transition
+  // events session_switch/session_branch/session_fork were removed upstream.
   on("session_start");
+  on("session_info_changed");
   on("session_before_switch");
-  on("session_switch");
-  on("session_before_branch");
-  on("session_branch");
+  on("session_before_fork");
   on("session_before_compact");
   on("session_compact");
   on("session_before_tree");
@@ -143,6 +167,7 @@ export default function (pi: ExtensionAPI) {
   on("context");
   on("turn_end");
   on("agent_end");
+  on("agent_settled");
 
   // Tool events
   on("tool_call");
