@@ -179,12 +179,13 @@ agents/
 - [ ] Better 3d audio (HRTF, reverb zones)
 - [ ] Multiple machine orchestration
 - [ ] Use with pi-agent for workflow monitoring
-- [ ] Codex integration: Event support is [in development](https://github.com/openai/codex/issues/2109) by the Codex team.
+- [x] Codex integration: hooks shipped upstream ([openai/codex#2109](https://github.com/openai/codex/issues/2109)) — supported via `bingbong install-hooks codex`.
 - [ ] Claude Code Web integration: Tentative at best. Would require CCW plugin support of some kind.
 
 ## References
 
 - [Claude Code hooks](https://code.claude.com/docs/en/hooks)
-- [Cursor hooks](https://docs.cursor.com/advanced/hooks)
-- [Pi extensions](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent#extensions)
+- [Cursor hooks](https://cursor.com/docs/hooks)
+- [Pi extensions](https://github.com/earendil-works/pi/tree/main/packages/coding-agent#extensions)
+- [Codex hooks](https://developers.openai.com/codex/hooks)
 - [OpenCode events](https://opencode.ai/docs/plugins/#events)
