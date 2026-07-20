@@ -8,7 +8,7 @@ Soundscapes for coding agents. Transform AI agent sessions into spatial audio fe
 
 Bingbong turns AI coding agent activity into spatial audio feedback. Each tool and action produces distinct sounds, sessions are positioned in stereo space, and you can monitor agent activity without visual attention.
 
-**Supported agents:** Claude Code, Cursor, OpenCode, Pi
+**Supported agents:** Claude Code, Cursor, OpenCode, Pi, Codex
 
 ## Quick Start
 
@@ -42,6 +42,7 @@ The client is served at `http://localhost:3334`. Click "Connect" to start.
 | **Cursor** | `bingbong install-hooks cursor` |
 | **OpenCode** | `bingbong install-hooks opencode` |
 | **Pi** | `bingbong install-hooks pi` |
+| **Codex** | `bingbong install-hooks codex` (then approve via `/hooks` in Codex) |
 
 **4. Test it out** — sends a burst of events so you hear sounds and see the UI react.
 
