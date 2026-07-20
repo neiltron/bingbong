@@ -117,6 +117,27 @@ conversation context).
 `after_provider_response`, `model_select`, `thinking_level_select`,
 `project_trust`, `resources_discover`, `user_bash`, `input`.
 
+## Codex
+
+- **Integration:** `bingbong emit <Event>` hooks written to `~/.codex/hooks.json` by `install-hooks.ts` (`CODEX_EVENTS`).
+- **Source of truth (open source):**
+  - https://developers.openai.com/codex/hooks (docs)
+  - https://github.com/openai/codex — `codex-rs/hooks/` crate, JSON Schemas in `codex-rs/hooks/schema/generated/`
+- **Payload notes:** Codex's hooks are deliberately Claude-shaped — same config schema `{matcher, hooks: [{type: "command", command}]}` and same stdin fields (`session_id`, `cwd`, `hook_event_name`, `tool_name`, `tool_input`, `tool_response`), so events pass through `bingbong emit` with no mapping. Event names are already canonical.
+- **Trust model:** unlike Claude Code, Codex requires one-time user approval of new/changed hooks (hash-keyed) via the `/hooks` TUI. Reinstalls that change entries need re-approval; `--dangerously-bypass-hook-trust` exists for automation.
+
+**Registered (11):** PreToolUse, PostToolUse, SessionStart, SessionEnd, Stop,
+SubagentStart, SubagentStop, PermissionRequest, PreCompact, PostCompact,
+UserPromptSubmit.
+
+**Version notes:** hooks stable as of rust-v0.144.x; `SessionEnd` shipped
+2026-07-17 and needs >= 0.145. The legacy `notify` config option
+(`agent-turn-complete` only, JSON via argv) is superseded — not used.
+
+**Known upstream, not applicable:** Codex has no PostToolUseFailure /
+Notification / task events yet. Known issues: hooks flaky in Codex Desktop
+(openai/codex#33992, #21639); `tool_input` lacks per-call workdir (#33986).
+
 ---
 
 ## Audit history
@@ -124,3 +145,4 @@ conversation context).
 | Date | Notes |
 |---|---|
 | 2026-07-19 | Initial audit. Added 8 new Claude Code hooks + 6 Cursor hooks; Cursor camelCase → canonical mapping in emit.ts; fixed OpenCode `tool.execute.after` arg shapes + `properties.sessionID` extraction + stream-event flood control; pi: dropped removed events, `session_before_branch`→`session_before_fork`, added `agent_settled`, switched to `getSessionId()`; new sounds for 12 canonical event types. |
+| 2026-07-19 | Added Codex support (`install-hooks codex` → `~/.codex/hooks.json`, 11 Claude-shaped hook events, no mapping needed). |

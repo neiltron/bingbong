@@ -35,6 +35,7 @@ const AGENTS: Record<string, { display: string; configHint: string }> = {
   cursor:   { display: "Cursor",      configHint: "~/.cursor/hooks.json" },
   opencode: { display: "OpenCode",    configHint: "~/.config/opencode/plugins/" },
   pi:       { display: "Pi",          configHint: "~/.pi/agent/extensions/" },
+  codex:    { display: "Codex",       configHint: "~/.codex/hooks.json" },
 };
 
 const INSTALLERS: Record<string, (dryRun: boolean) => Promise<string>> = {
@@ -42,6 +43,7 @@ const INSTALLERS: Record<string, (dryRun: boolean) => Promise<string>> = {
   cursor: installCursor,
   opencode: installOpencode,
   pi: installPi,
+  codex: installCodex,
 };
 
 function printUsage() {
@@ -56,6 +58,7 @@ Available agents:
   cursor     Cursor (${AGENTS.cursor.configHint})
   opencode   OpenCode (${AGENTS.opencode.configHint})
   pi         Pi (${AGENTS.pi.configHint})
+  codex      Codex (${AGENTS.codex.configHint})
 
 Examples:
   bingbong install-hooks cursor
@@ -353,4 +356,72 @@ async function installPi(dryRun: boolean): Promise<string> {
   await writeFile(targetPath, transformed, "utf-8");
 
   return targetPath;
+}
+
+// ---------------------------------------------------------------------------
+// Codex installer
+// ---------------------------------------------------------------------------
+
+// Codex hook events (Claude-style lifecycle hooks, ~/.codex/hooks.json).
+// Event names and payloads mirror Claude Code's (session_id, cwd, tool_name,
+// tool_input, tool_response), so events pass straight through `bingbong emit`.
+// SessionEnd requires Codex >= 0.145; unknown events in hooks.json are the
+// user's Codex version's problem to ignore — drop it here if it errors.
+const CODEX_EVENTS: Array<{ event: string; matcher: string }> = [
+  { event: "PreToolUse",        matcher: ".*" },
+  { event: "PostToolUse",       matcher: ".*" },
+  { event: "SessionStart",      matcher: "" },
+  { event: "SessionEnd",        matcher: "" },
+  { event: "Stop",              matcher: "" },
+  { event: "SubagentStart",     matcher: "" },
+  { event: "SubagentStop",      matcher: "" },
+  { event: "PermissionRequest", matcher: "" },
+  { event: "PreCompact",        matcher: "" },
+  { event: "PostCompact",       matcher: "" },
+  { event: "UserPromptSubmit",  matcher: "" },
+];
+
+async function installCodex(dryRun: boolean): Promise<string> {
+  const bingbongCmd = getBingbongCommand();
+  const configPath = join(homedir(), ".codex", "hooks.json");
+
+  const config = await readJsonFile(configPath, { hooks: {} });
+  const existingHooks: Record<string, any[]> = config.hooks || {};
+
+  // Strip old bingbong entries so reinstalls are idempotent
+  const cleanedHooks: Record<string, any[]> = {};
+  for (const [event, entries] of Object.entries(existingHooks)) {
+    if (!Array.isArray(entries)) continue;
+    cleanedHooks[event] = entries.filter((entry: any) => !isBingbongClaudeEntry(entry));
+  }
+
+  for (const { event, matcher } of CODEX_EVENTS) {
+    const bingbongEntry = {
+      matcher,
+      hooks: [{ type: "command", command: `${bingbongCmd} emit ${event}` }],
+    };
+
+    if (!cleanedHooks[event]) {
+      cleanedHooks[event] = [];
+    }
+    cleanedHooks[event].push(bingbongEntry);
+  }
+
+  const proposed = { ...config, hooks: cleanedHooks };
+
+  if (dryRun) {
+    const existingContent = existsSync(configPath) ? await readFile(configPath, "utf-8") : null;
+    printPreview(configPath, existingContent, JSON.stringify(proposed, null, 2) + "\n");
+    return configPath;
+  }
+
+  ensureDir(dirname(configPath));
+  await atomicWriteJson(configPath, proposed);
+
+  console.log(
+    "\nNote: Codex requires one-time approval of new/changed hooks.\n" +
+    "Run `/hooks` inside Codex to review and trust the bingbong entries."
+  );
+
+  return configPath;
 }

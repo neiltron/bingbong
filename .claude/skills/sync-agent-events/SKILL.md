@@ -1,11 +1,11 @@
 ---
 name: sync-agent-events
-description: Audit bingbong's agent-harness integrations (Claude Code, Cursor, OpenCode, pi) against upstream event/hook APIs, report drift, and apply updates. Use when asked to check whether agent integrations are up to date, sync agent events, or when adding support for new harness events.
+description: Audit bingbong's agent-harness integrations (Claude Code, Cursor, OpenCode, pi, Codex) against upstream event/hook APIs, report drift, and apply updates. Use when asked to check whether agent integrations are up to date, sync agent events, or when adding support for new harness events.
 ---
 
 # Sync agent events
 
-Bingbong integrates with four agent harnesses. Each ships events differently and
+Bingbong integrates with five agent harnesses. Each ships events differently and
 each drifts over time. This skill re-runs the upstream audit and updates the
 integrations plus `agents/event-coverage.md`.
 
@@ -13,7 +13,7 @@ integrations plus `agents/event-coverage.md`.
 
 | File | Role |
 |---|---|
-| `packages/cli/src/install-hooks.ts` | `CLAUDE_EVENTS` + `CURSOR_EVENTS` hook registration lists |
+| `packages/cli/src/install-hooks.ts` | `CLAUDE_EVENTS` + `CURSOR_EVENTS` + `CODEX_EVENTS` hook registration lists |
 | `packages/cli/src/emit.ts` | `CURSOR_EVENT_MAP` (camelCase → canonical), session-id + tool_response normalization |
 | `agents/opencode/plugins/bingbong.js` | OpenCode plugin: `EVENT_TYPE_MAP`, `IGNORED_PREFIXES`, tool hook shapes |
 | `agents/pi/extensions/bingbong.ts` | pi extension: `EVENT_TYPE_MAP`, `on(...)` subscriptions |
@@ -46,6 +46,11 @@ integrations plus `agents/event-coverage.md`.
      `packages/coding-agent/src/core/extensions/types.ts` (`ExtensionEvent`
      union), `docs/extensions.md`, and `CHANGELOG.md` for breaking changes.
      Note: repo/npm moved from badlogic/pi-mono / `@mariozechner/*` in 2026.
+   - **Codex** (open source): fetch https://developers.openai.com/codex/hooks
+     and read `github.com/openai/codex` `codex-rs/hooks/` (event enum + JSON
+     Schemas in `schema/generated/`). Hooks are deliberately Claude-shaped
+     (same config schema and stdin fields); check for new events beyond the
+     initial 11 and for changes to the hook trust model (`/hooks` approval).
 
 3. **Diff findings against the matrix.** Classify each delta:
    - New event worth a sound → add to registration/subscription + mapping, and
