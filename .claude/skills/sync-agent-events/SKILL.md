@@ -38,10 +38,12 @@ integrations plus `agents/event-coverage.md`.
      and https://cursor.com/changelog. Check: hook names (camelCase),
      hooks.json `version`, stdin fields (`conversation_id`), exit-code
      semantics (exit 2 blocks — bingbong must always exit 0).
-   - **OpenCode** (open source): read
-     `github.com/sst/opencode` `packages/plugin/src/index.ts` (hook
-     interface) and `packages/schema/src/` (bus event types). Docs at
-     opencode.ai/docs/plugins have been stale before — trust source over docs.
+   - **OpenCode** (open source): read `github.com/anomalyco/opencode` (moved
+     from sst/opencode in July 2026; old URLs redirect), `dev` branch:
+     `packages/plugin/src/index.ts` (hook interface) and
+     `packages/schema/src/` (bus event types; `event-manifest.ts` is the full
+     inventory). Docs at opencode.ai/docs/plugins have been stale before —
+     trust source over docs.
    - **pi** (open source): read `github.com/earendil-works/pi`
      `packages/coding-agent/src/core/extensions/types.ts` (`ExtensionEvent`
      union), `docs/extensions.md`, and `CHANGELOG.md` for breaking changes.
