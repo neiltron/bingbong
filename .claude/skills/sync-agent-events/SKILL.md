@@ -46,9 +46,12 @@ integrations plus `agents/event-coverage.md`.
      `packages/coding-agent/src/core/extensions/types.ts` (`ExtensionEvent`
      union), `docs/extensions.md`, and `CHANGELOG.md` for breaking changes.
      Note: repo/npm moved from badlogic/pi-mono / `@mariozechner/*` in 2026.
-   - **Codex** (open source): fetch https://developers.openai.com/codex/hooks
-     and read `github.com/openai/codex` `codex-rs/hooks/` (event enum + JSON
-     Schemas in `schema/generated/`). Hooks are deliberately Claude-shaped
+   - **Codex** (open source): fetch https://learn.chatgpt.com/docs/hooks
+     (developers.openai.com/codex/hooks redirects there) and read
+     `github.com/openai/codex`: event enum `HookEventName` in
+     `codex-rs/protocol/src/protocol.rs`, config shape in
+     `codex-rs/config/src/hook_config.rs`, JSON Schemas in
+     `codex-rs/hooks/schema/generated/`. Hooks are deliberately Claude-shaped
      (same config schema and stdin fields); check for new events beyond the
      initial 11 and for changes to the hook trust model (`/hooks` approval).
 
