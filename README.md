@@ -8,7 +8,7 @@ Soundscapes for coding agents. Transform AI agent sessions into spatial audio fe
 
 Bingbong turns AI coding agent activity into spatial audio feedback. Each tool and action produces distinct sounds, sessions are positioned in stereo space, and you can monitor agent activity without visual attention.
 
-**Supported agents:** Claude Code, Cursor, OpenCode, Pi
+**Supported agents:** Claude Code, Cursor, OpenCode, Pi, Codex
 
 ## Quick Start
 
@@ -42,6 +42,7 @@ The client is served at `http://localhost:3334`. Click "Connect" to start.
 | **Cursor** | `bingbong install-hooks cursor` |
 | **OpenCode** | `bingbong install-hooks opencode` |
 | **Pi** | `bingbong install-hooks pi` |
+| **Codex** | `bingbong install-hooks codex` (then approve via `/hooks` in Codex) |
 
 **4. Test it out** — sends a burst of events so you hear sounds and see the UI react.
 
@@ -178,12 +179,13 @@ agents/
 - [ ] Better 3d audio (HRTF, reverb zones)
 - [ ] Multiple machine orchestration
 - [ ] Use with pi-agent for workflow monitoring
-- [ ] Codex integration: Event support is [in development](https://github.com/openai/codex/issues/2109) by the Codex team.
+- [x] Codex integration: hooks shipped upstream ([openai/codex#2109](https://github.com/openai/codex/issues/2109)) — supported via `bingbong install-hooks codex`.
 - [ ] Claude Code Web integration: Tentative at best. Would require CCW plugin support of some kind.
 
 ## References
 
 - [Claude Code hooks](https://code.claude.com/docs/en/hooks)
-- [Cursor hooks](https://docs.cursor.com/advanced/hooks)
-- [Pi extensions](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent#extensions)
+- [Cursor hooks](https://cursor.com/docs/hooks)
+- [Pi extensions](https://github.com/earendil-works/pi/tree/main/packages/coding-agent#extensions)
+- [Codex hooks](https://learn.chatgpt.com/docs/hooks)
 - [OpenCode events](https://opencode.ai/docs/plugins/#events)

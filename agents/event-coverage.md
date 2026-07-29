@@ -1,6 +1,6 @@
 # Agent harness event coverage
 
-Last audited: **2026-07-19**
+Last full audit: **2026-07-19** (partial re-audits in the history table below)
 
 This document is the source of truth for which upstream harness events bingbong
 consumes, how they map to bingbong's canonical event vocabulary, and where each
@@ -117,6 +117,33 @@ conversation context).
 `after_provider_response`, `model_select`, `thinking_level_select`,
 `project_trust`, `resources_discover`, `user_bash`, `input`.
 
+## Codex
+
+- **Integration:** `bingbong emit <Event>` hooks written to `~/.codex/hooks.json` by `install-hooks.ts` (`CODEX_EVENTS`).
+- **Source of truth (open source):**
+  - https://learn.chatgpt.com/docs/hooks (docs; developers.openai.com/codex/hooks redirects there)
+  - https://github.com/openai/codex — event enum `HookEventName` in `codex-rs/protocol/src/protocol.rs`, config shape in `codex-rs/config/src/hook_config.rs`, JSON Schemas in `codex-rs/hooks/schema/generated/`
+- **Payload notes:** Codex's hooks are deliberately Claude-shaped — same config schema `{matcher, hooks: [{type: "command", command}]}` and same stdin fields (`session_id`, `cwd`, `hook_event_name`, `tool_name`, `tool_input`, `tool_response`), so events pass through `bingbong emit` with no mapping. Event names are already canonical.
+- **Trust model:** unlike Claude Code, Codex requires one-time user approval of new/changed hooks (hash-keyed) via the `/hooks` TUI. Reinstalls that change entries need re-approval; `--dangerously-bypass-hook-trust` exists for automation.
+
+**Registered (11):** PreToolUse, PostToolUse, SessionStart, SessionEnd, Stop,
+SubagentStart, SubagentStop, PermissionRequest, PreCompact, PostCompact,
+UserPromptSubmit.
+
+**Version notes:** hooks stable as of rust-v0.144.x; `SessionEnd` shipped
+2026-07-17 and needs >= 0.145 (fire-and-forget: 1s default timeout, no output
+schema). Re-verified against rust-v0.146.0 (2026-07-29): still exactly these
+11 events, no payload changes. `UserPromptSubmit` and `Stop` ignore matchers
+upstream (empty matcher is correct). The legacy `notify` config option
+(`agent-turn-complete` only, JSON via argv) is superseded — not used.
+
+**Known upstream, not applicable:** Codex has no PostToolUseFailure /
+Notification / task events yet (failure signal requested in #34289). Known
+issues: hooks flaky in Codex Desktop (openai/codex#33992, #21639, #35863);
+`tool_input` lacks per-call workdir (#33986); project-level
+`<repo>/.codex/hooks.json` can be silently skipped (#35306) — bingbong installs
+globally to `~/.codex/hooks.json`, unaffected.
+
 ---
 
 ## Audit history
@@ -124,3 +151,5 @@ conversation context).
 | Date | Notes |
 |---|---|
 | 2026-07-19 | Initial audit. Added 8 new Claude Code hooks + 6 Cursor hooks; Cursor camelCase → canonical mapping in emit.ts; fixed OpenCode `tool.execute.after` arg shapes + `properties.sessionID` extraction + stream-event flood control; pi: dropped removed events, `session_before_branch`→`session_before_fork`, added `agent_settled`, switched to `getSessionId()`; new sounds for 12 canonical event types. |
+| 2026-07-19 | Added Codex support (`install-hooks codex` → `~/.codex/hooks.json`, 11 Claude-shaped hook events, no mapping needed). |
+| 2026-07-29 | Codex-only re-audit vs rust-v0.146.0: no event/payload/config drift — no code changes. Docs URL moved to learn.chatgpt.com/docs/hooks; noted `SessionEnd` 1s fire-and-forget timeout, matcher-ignoring events, and new upstream issues (#34289 no failure event, #35306 project-level hooks skipped, #35863 Desktop SessionStart). |
