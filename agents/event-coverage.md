@@ -20,9 +20,12 @@ The server and client key sounds/visuals off these `event_type` values
 
 `PreToolUse`/`PostToolUse` additionally use `tool_name` to pick tool-specific
 sounds. Unknown event types fall back to the default blip. When an integration
-maps a harness-native event to a canonical type, it preserves the native name in
-`original_event_type` (top-level for the CLI emit path, inside `tool_output` for
-the OpenCode/pi integrations).
+maps a harness-native event to a canonical type, the CLI emit path preserves the
+native name in a top-level `original_event_type`. The OpenCode/pi plugins only
+forward mapped events and send a trimmed envelope — `tool_name` plus the
+`tool_input` keys the client reads (`command`, `file_path`, `pattern`, `url`,
+`action`), no `tool_output`/`original_event_type` — fire-and-forget with a 1s
+timeout.
 
 ---
 
@@ -87,11 +90,9 @@ conversation context).
 | session.error | Stop |
 | session.compacted | PostCompact |
 | permission.asked | PermissionRequest |
-| everything else not ignored | raw passthrough (default blip) |
 
-**Ignored (flood control):** `message.part.*`, `session.next.*`, `lsp.*`,
-`tui.*`, `pty.*`, `installation.*`, `file.watcher.*`, `models-dev.*`,
-`catalog.*`, `server.connected`, `global.disposed`.
+Every other bus event is dropped (no catch-all passthrough; this also keeps
+high-frequency `message.part.*` / `session.next.*` streaming events out).
 
 **Pending (found 2026-07-29, not yet applied):** the v2 runtime publishes
 `permission.v2.asked` (`{id, sessionID, action, resources}` — different shape
@@ -116,12 +117,18 @@ hooks never receive those — no change needed for us.
 | session_start / session_shutdown | SessionStart / SessionEnd |
 | session_before_compact / session_compact | PreCompact / PostCompact |
 | agent_settled, agent_end | Stop (deduped, 1.5s window) |
-| session_info_changed, session_before_switch, session_before_fork, session_before_tree, session_tree, before_agent_start, agent_start, turn_start, context, turn_end | raw passthrough |
+
+Only these are subscribed. `session_shutdown` is the one awaited send: on quit
+pi calls `process.exit()` as soon as its handlers resolve.
 
 **Removed upstream (don't resubscribe):** `session_switch`, `session_branch`,
 `session_fork` — replaced by `session_start` with `reason: "new"|"resume"|"fork"`.
 
-**Known upstream, deliberately skipped:** `message_*`, `tool_execution_*`
+**Known upstream, deliberately skipped:** `session_info_changed`,
+`session_before_switch`, `session_before_fork`, `session_before_tree`,
+`session_tree`, `before_agent_start`, `agent_start`, `turn_start`, `context`,
+`turn_end` (no canonical type, were default blips; `context` carried the full
+conversation), `message_*`, `tool_execution_*`
 (redundant with tool_call/tool_result), `before_provider_*`,
 `after_provider_response`, `model_select`, `thinking_level_select`,
 `project_trust`, `resources_discover`, `user_bash`, `input`.
@@ -163,3 +170,4 @@ globally to `~/.codex/hooks.json`, unaffected.
 | 2026-07-19 | Added Codex support (`install-hooks codex` → `~/.codex/hooks.json`, 11 Claude-shaped hook events, no mapping needed). |
 | 2026-07-29 | Codex-only re-audit vs rust-v0.146.0: no event/payload/config drift — no code changes. Docs URL moved to learn.chatgpt.com/docs/hooks; noted `SessionEnd` 1s fire-and-forget timeout, matcher-ignoring events, and new upstream issues (#34289 no failure event, #35306 project-level hooks skipped, #35863 Desktop SessionStart). |
 | 2026-07-29 | Re-audit of Claude Code (2.1.220), Cursor, OpenCode, pi (0.83.0): no renames/removals anywhere, all registrations/subscriptions valid, no code changes. Claude Code added `DirectoryAdded` (2.1.219) → skipped list; OpenCode repo moved sst→anomalyco; recorded pending OpenCode deltas (`permission.v2.asked`, `question.v2.*` unmapped); pi tool_result gained optional `usage`. |
+| 2026-10-06 | pi + OpenCode plugins (#32, #33): sends are fire-and-forget with a 1s `AbortSignal.timeout` (pi still awaits `session_shutdown`, which precedes `process.exit()`); pi subscribes only to its 8 mapped events; OpenCode dropped the catch-all `event` passthrough (whitelist of mapped bus events); envelope trimmed to `tool_name` + the `tool_input` keys the client reads — no `tool_output`/`original_event_type` (nothing consumes them). |
