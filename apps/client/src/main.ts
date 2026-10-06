@@ -107,7 +107,7 @@ function timeAtX(x: number): number | null {
   if (low < anchors.length) {
     const a = anchors[low - 1]
     const b = anchors[low]
-    return b.x === a.x ? b.ms : a.ms + ((x - a.x) / (b.x - a.x)) * (b.ms - a.ms)
+    return a.ms + ((x - a.x) / (b.x - a.x)) * (b.ms - a.ms)
   }
 
   const last = anchors[anchors.length - 1]
@@ -216,8 +216,11 @@ function eventDetail(e: EnrichedEvent): string {
   return value.length > 32 ? value.slice(0, 31) + '…' : value
 }
 
+// Same output as toLocaleTimeString('en-US', { hour12: false }), built once
+const timeFmt = new Intl.DateTimeFormat('en-US', { timeStyle: 'medium', hour12: false })
+
 function eventTime(e: EnrichedEvent): string {
-  return e.timestamp ? new Date(e.timestamp).toLocaleTimeString('en-US', { hour12: false }) : ''
+  return e.timestamp ? timeFmt.format(new Date(e.timestamp)) : ''
 }
 
 // ============================================
@@ -421,14 +424,18 @@ function renderLanesRuler(): void {
   if (anchors.length === 0) return
 
   const headX = axisHeadX()
+  // Only the visible window gets ticks; the scroll listener re-renders
+  const sc = DOM.lanesScroller
+  const from = Math.max(0, (sc?.scrollLeft ?? 0) - LANE_HEAD_SPAN - TICK_SPACING_PX)
+  const to = Math.min(headX - 70, sc ? sc.scrollLeft + sc.clientWidth : Infinity)
   let prevLabel = ''
-  for (let x = 0; x <= headX - 70; x += TICK_SPACING_PX) {
+  for (let x = from - (from % TICK_SPACING_PX); x <= to; x += TICK_SPACING_PX) {
     // Interpolated times inside a break corridor are meaningless; the break
     // glyph owns that span (with padding so ticks don't crowd it)
     if (axisBreaks.some((b) => x >= b.x - 30 && x <= b.x + b.w + 30)) continue
     const ms = timeAtX(x)
     if (ms === null) continue
-    const label = new Date(ms).toLocaleTimeString('en-US', { hour12: false })
+    const label = timeFmt.format(ms)
     if (label === prevLabel) continue // compressed gaps can repeat a second
     prevLabel = label
     rulerEl.appendChild(
@@ -475,9 +482,9 @@ function buildLaneChip(e: EnrichedEvent, animate: boolean): HTMLElement {
  */
 function sessionsForLanes(): Map<string, Session> {
   const result = new Map(sessions)
-  const activeSessionIds = new Set(sessions.keys())
 
   for (const event of eventLog) {
+    if (!event.session_id) continue
     const existing = result.get(event.session_id)
     if (!existing) {
       result.set(event.session_id, {
@@ -489,8 +496,8 @@ function sessionsForLanes(): Map<string, Session> {
         color: event.color,
         event_count: 1,
       })
-    } else if (!activeSessionIds.has(event.session_id)) {
-      existing.event_count = (existing.event_count || 0) + 1
+    } else if (!sessions.has(event.session_id)) {
+      existing.event_count++
     }
   }
 
@@ -517,7 +524,7 @@ function placeLaneChip(
   lane: { track: HTMLElement; lastRight: number | null; lastMs: number | null },
   chip: HTMLElement,
   e: EnrichedEvent,
-  measuredSize?: { width: number }
+  width?: number
 ): void {
   const trueX = chipX.get(e) ?? 0
   // Long idle gaps get a labeled break, which needs room even when the
@@ -548,10 +555,8 @@ function placeLaneChip(
     )
   }
 
-  const chipWidth = measuredSize?.width ?? chip.offsetWidth
-
   chip.style.left = `${x}px`
-  lane.lastRight = x + chipWidth
+  lane.lastRight = x + (width ?? chip.offsetWidth)
   lane.lastMs = eventMs(e)
 
   // Absorb burst-nudge drift into the axis: this event was just anchored last,
@@ -572,8 +577,6 @@ function renderLanes(): void {
   const sc = DOM.lanesScroller
   const wasPinned = lanesFollowingLive || lanesAtLiveEdge()
   const prevScroll = sc?.scrollLeft ?? 0
-  // Where the new axis origin (oldest retained event) sat on the old axis
-  const prevOriginX = eventLog.length > 0 ? chipX.get(eventLog[0]) : undefined
 
   anchors = []
   axisBreaks = []
@@ -631,13 +634,13 @@ function renderLanes(): void {
     pendingChips.push({ event: e, lane, chip })
   }
 
-  const measuredSizes = pendingChips.map(({ chip }) => ({ width: chip.offsetWidth }))
+  const widths = pendingChips.map(({ chip }) => chip.offsetWidth)
 
   // Anchor and place in global event order so nudge drift folds into the axis.
   for (let i = 0; i < pendingChips.length; i++) {
     const { event, lane, chip } = pendingChips[i]
     anchorAppend(event)
-    placeLaneChip(lane, chip, event, measuredSizes[i])
+    placeLaneChip(lane, chip, event, widths[i])
   }
 
   for (const b of axisBreaks) {
@@ -647,14 +650,7 @@ function renderLanes(): void {
   applyLanesAxis()
   scheduleLanesRuler()
 
-  if (sc) {
-    if (wasPinned || prevOriginX === undefined) {
-      sc.scrollLeft = sc.scrollWidth
-    } else {
-      // Axis origin may have advanced (log trimmed); keep the same moment in view
-      sc.scrollLeft = Math.max(0, prevScroll - prevOriginX)
-    }
-  }
+  if (sc) sc.scrollLeft = wasPinned ? sc.scrollWidth : prevScroll
   updateLanesMask()
 }
 
@@ -859,7 +855,10 @@ function handleEvent(event: EnrichedEvent): void {
     }
   }
 
-  // Add to log
+  // Add to log. It's kept for the tab lifetime, so drop the raw payloads
+  const { command, file_path, pattern, url, action } = event.tool_input ?? {}
+  event.tool_input = { command, file_path, pattern, url, action }
+  delete event.tool_output
   eventLog.push(event)
 
   // Play sound
@@ -1017,6 +1016,7 @@ document.addEventListener('DOMContentLoaded', () => {
       clearLanesPill()
     }
     updateLanesMask()
+    scheduleLanesRuler()
   })
   DOM.lanesPill?.addEventListener('click', () => {
     clearLanesPill()
