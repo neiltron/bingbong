@@ -6,6 +6,8 @@
  * Unified command to run the Bingbong server and client.
  */
 
+import os from "node:os";
+import type { BingbongEvent } from "@bingbong/protocol";
 import { startServer, type RuntimeLogger } from "@bingbong/server";
 import clientIndex from "../../../apps/client/index.html";
 import { TerminalLayoutLogger } from "../src/runtime-logger";
@@ -74,6 +76,7 @@ Commands:
   emit <EventType>         Emit an event to the bingbong server (used by hooks)
   install-hooks <agent>    Install bingbong hooks for a coding agent
   uninstall-hooks <agent>  Remove bingbong hooks for a coding agent
+  ping [label]             Send one Ping event to a running server ($BINGBONG_URL)
   test                     Smoke-test a running bingbong server
 
 Options:
@@ -86,6 +89,7 @@ Examples:
   bingbong                        Start server on port 3334
   bingbong --open                 Start and open browser
   bingbong install-hooks cursor   Install Cursor hooks
+  make build; bingbong ping done  Ping when a command finishes
 `);
 }
 
@@ -137,6 +141,33 @@ async function main() {
   if (firstArg === "install-hooks" || firstArg === "uninstall-hooks") {
     const { installHooks } = await import("../src/install-hooks");
     await installHooks(process.argv.slice(3), firstArg === "uninstall-hooks");
+    process.exit(0);
+  }
+
+  if (firstArg === "ping") {
+    const url = process.env.BINGBONG_URL || "http://localhost:3334";
+    const label = process.argv.slice(3).join(" ");
+    const event: BingbongEvent = {
+      event_type: "Ping",
+      session_id: "ping",
+      machine_id: process.env.BINGBONG_MACHINE_ID || os.hostname(),
+      timestamp: new Date().toISOString(),
+      // tool_input.action is what the client event log renders as detail
+      tool_input: label ? { action: label } : undefined,
+    };
+    try {
+      const res = await fetch(`${url}/events`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(event),
+        signal: AbortSignal.timeout(2000),
+      });
+      if (!res.ok) throw new Error(`server responded ${res.status}`);
+    } catch (err) {
+      console.error(`Error: could not ping ${url}: ${(err as Error).message}`);
+      process.exit(1);
+    }
+    console.log(`Pinged ${url}${label ? `: ${label}` : ""}`);
     process.exit(0);
   }
 

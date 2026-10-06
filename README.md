@@ -75,6 +75,7 @@ Commands:
   emit <EventType>         Emit an event to the bingbong server (used by hooks)
   install-hooks <agent>    Install bingbong hooks for a coding agent
   uninstall-hooks <agent>  Remove bingbong hooks for a coding agent
+  ping [label]             Send one Ping event to a running server ($BINGBONG_URL)
   test                     Smoke-test a running bingbong server
 
 Options:
@@ -87,7 +88,10 @@ Examples:
   bingbong                        Start server on port 3334
   bingbong --open                 Start and open browser
   bingbong install-hooks cursor   Install Cursor hooks
+  make build; bingbong ping done  Ping when a command finishes
 ```
+
+`bingbong ping` works without any agent: chain it after a long command (`long-cmd; bingbong ping done`) to hear when it finishes. The label shows in the event log; exits nonzero if the server is unreachable.
 
 ## Configuration
 
