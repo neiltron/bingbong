@@ -1,8 +1,8 @@
 /**
  * bingbong install-hooks
  *
- * Installs bingbong hooks for supported coding agents.
- * All four agent installers live in this single file.
+ * Installs and uninstalls bingbong hooks for supported coding agents.
+ * All agent installers live in this single file.
  */
 
 import { existsSync, mkdirSync, renameSync, unlinkSync, chmodSync, statSync } from "node:fs";
@@ -30,12 +30,12 @@ function getBingbongCommand(): string {
 }
 
 // Agent registry — known at compile time, no interface needed
-const AGENTS: Record<string, { display: string; configHint: string }> = {
-  claude:   { display: "Claude Code", configHint: "~/.claude/settings.json" },
-  cursor:   { display: "Cursor",      configHint: "~/.cursor/hooks.json" },
-  opencode: { display: "OpenCode",    configHint: "~/.config/opencode/plugins/" },
-  pi:       { display: "Pi",          configHint: "~/.pi/agent/extensions/" },
-  codex:    { display: "Codex",       configHint: "~/.codex/hooks.json" },
+const AGENTS: Record<string, { display: string; configHint: string; path: string }> = {
+  claude:   { display: "Claude Code", configHint: "~/.claude/settings.json",     path: join(homedir(), ".claude", "settings.json") },
+  cursor:   { display: "Cursor",      configHint: "~/.cursor/hooks.json",        path: join(homedir(), ".cursor", "hooks.json") },
+  opencode: { display: "OpenCode",    configHint: "~/.config/opencode/plugins/", path: join(homedir(), ".config", "opencode", "plugins", "bingbong.js") },
+  pi:       { display: "Pi",          configHint: "~/.pi/agent/extensions/",     path: join(process.env.PI_EXTENSIONS_DIR || join(homedir(), ".pi", "agent", "extensions"), "bingbong.ts") },
+  codex:    { display: "Codex",       configHint: "~/.codex/hooks.json",         path: join(homedir(), ".codex", "hooks.json") },
 };
 
 const INSTALLERS: Record<string, (dryRun: boolean) => Promise<string>> = {
@@ -46,9 +46,9 @@ const INSTALLERS: Record<string, (dryRun: boolean) => Promise<string>> = {
   codex: installCodex,
 };
 
-function printUsage() {
+function printUsage(cmd: string) {
   console.log(`
-Usage: bingbong install-hooks [--dry-run] <agent>
+Usage: bingbong ${cmd} [--dry-run] <agent>
 
 Options:
   --dry-run  Preview changes without writing any files
@@ -61,24 +61,25 @@ Available agents:
   codex      Codex (${AGENTS.codex.configHint})
 
 Examples:
-  bingbong install-hooks cursor
-  bingbong install-hooks --dry-run claude
+  bingbong ${cmd} cursor
+  bingbong ${cmd} --dry-run claude
 `);
 }
 
-export async function installHooks(argv: string[]) {
+export async function installHooks(argv: string[], uninstall = false) {
+  const cmd = uninstall ? "uninstall-hooks" : "install-hooks";
   const dryRun = argv.includes("--dry-run");
   const args = argv.filter(a => a !== "--dry-run");
   const agentName = args[0];
 
   if (!agentName || agentName === "--help" || agentName === "-h") {
-    printUsage();
+    printUsage(cmd);
     return;
   }
 
   if (agentName.startsWith("-")) {
     console.error(`Error: Unknown option "${agentName}".`);
-    printUsage();
+    printUsage(cmd);
     process.exit(1);
   }
 
@@ -89,9 +90,16 @@ export async function installHooks(argv: string[]) {
     process.exit(1);
   }
 
-  const configPath = await installer(dryRun);
+  if (uninstall && !(await uninstallAgent(agentName, dryRun))) {
+    console.log(`No bingbong hooks found for ${AGENTS[agentName].display}.`);
+    return;
+  }
+
+  const configPath = uninstall ? AGENTS[agentName].path : await installer(dryRun);
   if (dryRun) {
     console.log(`\nRun without --dry-run to apply these changes.`);
+  } else if (uninstall) {
+    console.log(`Removed hooks for ${AGENTS[agentName].display} from ${configPath}`);
   } else {
     console.log(`Installed hooks for ${AGENTS[agentName].display} in ${configPath}`);
   }
@@ -175,6 +183,21 @@ async function atomicWriteJson(filePath: string, data: object) {
   }
 }
 
+// Remove bingbong entries from a hooks map in place, dropping event arrays
+// left empty. Returns true if anything was removed.
+function stripBingbongEntries(hooks: Record<string, any>, isBingbong: (entry: any) => boolean): boolean {
+  let removed = false;
+  for (const [event, entries] of Object.entries(hooks)) {
+    if (!Array.isArray(entries)) continue;
+    const kept = entries.filter((entry: any) => !isBingbong(entry));
+    if (kept.length === entries.length) continue;
+    removed = true;
+    if (kept.length) hooks[event] = kept;
+    else delete hooks[event];
+  }
+  return removed;
+}
+
 // ---------------------------------------------------------------------------
 // Claude Code installer
 // ---------------------------------------------------------------------------
@@ -214,17 +237,13 @@ function isBingbongClaudeEntry(entry: any): boolean {
 
 async function installClaude(dryRun: boolean): Promise<string> {
   const bingbongCmd = getBingbongCommand();
-  const configPath = join(homedir(), ".claude", "settings.json");
+  const configPath = AGENTS.claude.path;
 
   const settings = await readJsonFile(configPath, {});
-  const existingHooks: Record<string, any[]> = settings.hooks || {};
+  const cleanedHooks: Record<string, any[]> = settings.hooks || {};
 
   // Strip old bingbong entries (both shell script paths and bingbong emit commands)
-  const cleanedHooks: Record<string, any[]> = {};
-  for (const [event, entries] of Object.entries(existingHooks)) {
-    if (!Array.isArray(entries)) continue;
-    cleanedHooks[event] = entries.filter((entry: any) => !isBingbongClaudeEntry(entry));
-  }
+  stripBingbongEntries(cleanedHooks, isBingbongClaudeEntry);
 
   // Add fresh bingbong entries using `bingbong emit`
   for (const { event, matcher } of CLAUDE_EVENTS) {
@@ -286,17 +305,14 @@ function isBingbongCursorEntry(entry: any): boolean {
 
 async function installCursor(dryRun: boolean): Promise<string> {
   const bingbongCmd = getBingbongCommand();
-  const configPath = join(homedir(), ".cursor", "hooks.json");
+  const configPath = AGENTS.cursor.path;
 
   const config = await readJsonFile(configPath, { version: 1, hooks: {} });
   config.version = config.version || 1;
   config.hooks = config.hooks || {};
 
   // Strip old bingbong entries (both bingbong-hook.sh and bingbong emit commands)
-  for (const [event, entries] of Object.entries(config.hooks)) {
-    if (!Array.isArray(entries)) continue;
-    config.hooks[event] = entries.filter((entry: any) => !isBingbongCursorEntry(entry));
-  }
+  stripBingbongEntries(config.hooks, isBingbongCursorEntry);
 
   // Add fresh bingbong entries using `bingbong emit`
   for (const event of CURSOR_EVENTS) {
@@ -322,7 +338,7 @@ async function installCursor(dryRun: boolean): Promise<string> {
 // ---------------------------------------------------------------------------
 
 async function installOpencode(dryRun: boolean): Promise<string> {
-  const targetPath = join(homedir(), ".config", "opencode", "plugins", "bingbong.js");
+  const targetPath = AGENTS.opencode.path;
 
   if (dryRun) {
     const existingContent = existsSync(targetPath) ? await readFile(targetPath, "utf-8") : null;
@@ -341,8 +357,7 @@ async function installOpencode(dryRun: boolean): Promise<string> {
 // ---------------------------------------------------------------------------
 
 async function installPi(dryRun: boolean): Promise<string> {
-  const extensionsDir = process.env.PI_EXTENSIONS_DIR || join(homedir(), ".pi", "agent", "extensions");
-  const targetPath = join(extensionsDir, "bingbong.ts");
+  const targetPath = AGENTS.pi.path;
   const bingbongUrl = process.env.BINGBONG_URL || "http://localhost:3334";
   const transformed = piExtensionSource.replace("__BINGBONG_URL__", bingbongUrl);
 
@@ -352,7 +367,7 @@ async function installPi(dryRun: boolean): Promise<string> {
     return targetPath;
   }
 
-  ensureDir(extensionsDir);
+  ensureDir(dirname(targetPath));
   await writeFile(targetPath, transformed, "utf-8");
 
   return targetPath;
@@ -383,17 +398,13 @@ const CODEX_EVENTS: Array<{ event: string; matcher: string }> = [
 
 async function installCodex(dryRun: boolean): Promise<string> {
   const bingbongCmd = getBingbongCommand();
-  const configPath = join(homedir(), ".codex", "hooks.json");
+  const configPath = AGENTS.codex.path;
 
   const config = await readJsonFile(configPath, { hooks: {} });
-  const existingHooks: Record<string, any[]> = config.hooks || {};
+  const cleanedHooks: Record<string, any[]> = config.hooks || {};
 
   // Strip old bingbong entries so reinstalls are idempotent
-  const cleanedHooks: Record<string, any[]> = {};
-  for (const [event, entries] of Object.entries(existingHooks)) {
-    if (!Array.isArray(entries)) continue;
-    cleanedHooks[event] = entries.filter((entry: any) => !isBingbongClaudeEntry(entry));
-  }
+  stripBingbongEntries(cleanedHooks, isBingbongClaudeEntry);
 
   for (const { event, matcher } of CODEX_EVENTS) {
     const bingbongEntry = {
@@ -424,4 +435,33 @@ async function installCodex(dryRun: boolean): Promise<string> {
   );
 
   return configPath;
+}
+
+// ---------------------------------------------------------------------------
+// Uninstaller
+// ---------------------------------------------------------------------------
+
+// Returns true if anything was (or, with dryRun, would be) removed.
+async function uninstallAgent(agentName: string, dryRun: boolean): Promise<boolean> {
+  const path = AGENTS[agentName].path;
+  if (!existsSync(path)) return false;
+
+  if (agentName === "opencode" || agentName === "pi") {
+    if (dryRun) console.log(`Would remove: ${path.replace(homedir(), "~")}`);
+    else unlinkSync(path);
+    return true;
+  }
+
+  const config = await readJsonFile(path, {});
+  const hooks = config.hooks || {};
+  if (!stripBingbongEntries(hooks, agentName === "cursor" ? isBingbongCursorEntry : isBingbongClaudeEntry)) return false;
+  // settings.json holds all Claude settings; don't leave an empty hooks key behind
+  if (agentName === "claude" && Object.keys(hooks).length === 0) delete config.hooks;
+
+  if (dryRun) {
+    printPreview(path, await readFile(path, "utf-8"), JSON.stringify(config, null, 2) + "\n");
+  } else {
+    await atomicWriteJson(path, config);
+  }
+  return true;
 }
