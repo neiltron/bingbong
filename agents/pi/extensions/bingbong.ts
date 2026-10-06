@@ -24,19 +24,11 @@ const EVENT_TYPE_MAP: Record<string, string> = {
   agent_end: "Stop",
 };
 
-const mapEventType = (eventType: string) => EVENT_TYPE_MAP[eventType] || eventType;
-
 const nowIso = () => new Date().toISOString();
 
-const safeJson = (value: unknown) => {
-  try {
-    return JSON.parse(JSON.stringify(value ?? {}));
-  } catch {
-    return {};
-  }
-};
-
 export default function (pi: ExtensionAPI) {
+  if (!enabled) return;
+
   // agent_end and agent_settled both map to Stop and fire back-to-back on
   // current pi; suppress the duplicate within a short window.
   let lastStopAt = 0;
@@ -45,53 +37,6 @@ export default function (pi: ExtensionAPI) {
     const duplicate = now - lastStopAt < 1500;
     lastStopAt = now;
     return duplicate;
-  };
-
-  const sendEvent = async ({
-    eventType,
-    sessionId,
-    cwd,
-    toolName = "",
-    toolInput = {},
-    toolOutput = {},
-  }: {
-    eventType: string;
-    sessionId: string;
-    cwd: string;
-    toolName?: string;
-    toolInput?: Record<string, unknown>;
-    toolOutput?: Record<string, unknown>;
-  }) => {
-    if (!enabled) return;
-
-    const mappedEventType = mapEventType(eventType);
-    if (mappedEventType === "Stop" && isDuplicateStop()) return;
-
-    const output =
-      mappedEventType === eventType
-        ? toolOutput
-        : { ...safeJson(toolOutput), original_event_type: eventType };
-
-    const payload = {
-      event_type: mappedEventType,
-      session_id: sessionId,
-      machine_id: machineId,
-      timestamp: nowIso(),
-      cwd,
-      tool_name: toolName,
-      tool_input: safeJson(toolInput),
-      tool_output: output,
-    };
-
-    try {
-      await fetch(`${url}/events`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-    } catch {
-      // Best-effort telemetry; never block pi.
-    }
   };
 
   const baseCtx = (ctx: any) => {
@@ -103,73 +48,45 @@ export default function (pi: ExtensionAPI) {
     return { sessionId, cwd };
   };
 
-  const on = (eventType: string) => {
+  // Only subscribe to events with a canonical mapping; the rest would just be
+  // default blips (and some, like `context`, carry the whole conversation).
+  // Note: pi tears down and re-instantiates extensions on /new, /resume,
+  // /fork — session_shutdown fires on the old instance, then session_start
+  // (with event.reason) on the new one.
+  for (const [eventType, mappedEventType] of Object.entries(EVENT_TYPE_MAP)) {
     pi.on(eventType as any, async (event: any, ctx: any) => {
+      if (mappedEventType === "Stop" && isDuplicateStop()) return;
+
       const { sessionId, cwd } = baseCtx(ctx);
-      const isToolCall = eventType === "tool_call";
-      const isToolResult = eventType === "tool_result";
-
-      if (isToolCall) {
-        await sendEvent({
-          eventType,
-          sessionId,
-          cwd,
-          toolName: event.toolName || "",
-          toolInput: event.input || {},
-          toolOutput: {},
-        });
-        return;
-      }
-
-      if (isToolResult) {
-        await sendEvent({
-          eventType,
-          sessionId,
-          cwd,
-          toolName: event.toolName || "",
-          toolInput: event.input || {},
-          toolOutput: {
-            content: event.content,
-            details: event.details,
-            isError: event.isError,
-          },
-        });
-        return;
-      }
-
-      await sendEvent({
-        eventType,
-        sessionId,
+      const input = event.input || {};
+      const payload = {
+        event_type: mappedEventType,
+        session_id: sessionId,
+        machine_id: machineId,
+        timestamp: nowIso(),
         cwd,
-        toolOutput: { event },
-      });
+        tool_name: event.toolName || "",
+        // Only the keys the client reads (eventDetail in apps/client/src/main.ts).
+        tool_input: {
+          command: input.command,
+          file_path: input.file_path,
+          pattern: input.pattern,
+          url: input.url,
+          action: input.action,
+        },
+      };
+
+      // Fire and forget: best-effort telemetry must never block pi. The
+      // timeout frees the socket if the server stalls.
+      const sent = fetch(`${url}/events`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(1000),
+      }).catch(() => {});
+      // On quit pi calls process.exit() as soon as session_shutdown handlers
+      // resolve, so this one send is awaited (bounded by the timeout).
+      if (eventType === "session_shutdown") await sent;
     });
-  };
-
-  // Session events. Note: pi tears down and re-instantiates extensions on
-  // /new, /resume, /fork — session_shutdown fires on the old instance, then
-  // session_start (with event.reason) on the new one. The post-transition
-  // events session_switch/session_branch/session_fork were removed upstream.
-  on("session_start");
-  on("session_info_changed");
-  on("session_before_switch");
-  on("session_before_fork");
-  on("session_before_compact");
-  on("session_compact");
-  on("session_before_tree");
-  on("session_tree");
-  on("session_shutdown");
-
-  // Agent events
-  on("before_agent_start");
-  on("agent_start");
-  on("turn_start");
-  on("context");
-  on("turn_end");
-  on("agent_end");
-  on("agent_settled");
-
-  // Tool events
-  on("tool_call");
-  on("tool_result");
+  }
 }

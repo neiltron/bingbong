@@ -15,8 +15,8 @@ integrations plus `agents/event-coverage.md`.
 |---|---|
 | `packages/cli/src/install-hooks.ts` | `CLAUDE_EVENTS` + `CURSOR_EVENTS` + `CODEX_EVENTS` hook registration lists |
 | `packages/cli/src/emit.ts` | `CURSOR_EVENT_MAP` (camelCase → canonical), session-id + tool_response normalization |
-| `agents/opencode/plugins/bingbong.js` | OpenCode plugin: `EVENT_TYPE_MAP`, `IGNORED_PREFIXES`, tool hook shapes |
-| `agents/pi/extensions/bingbong.ts` | pi extension: `EVENT_TYPE_MAP`, `on(...)` subscriptions |
+| `agents/opencode/plugins/bingbong.js` | OpenCode plugin: `EVENT_TYPE_MAP` (also the bus-event whitelist), tool hook shapes |
+| `agents/pi/extensions/bingbong.ts` | pi extension: `EVENT_TYPE_MAP` (also the subscription list) |
 | `apps/client/src/config.ts` | `SOUND_CONFIG` — canonical event types → sounds |
 | `packages/protocol/src/index.ts` | `BingbongEvent` wire shape |
 | `agents/event-coverage.md` | Coverage matrix, mapping decisions, audit history |
@@ -62,7 +62,7 @@ integrations plus `agents/event-coverage.md`.
      add a `SOUND_CONFIG` entry if it's a new canonical type (notes must exist
      in `NOTE_FREQ`).
    - New event that's noisy/meta → add to the skipped list in the matrix with a
-     one-line reason (for OpenCode, consider `IGNORED_PREFIXES`).
+     one-line reason.
    - Renamed/removed event → update integration; never leave dead
      subscriptions (they fail silently).
    - Payload shape change → fix extraction (session id fields, tool arg
@@ -73,7 +73,8 @@ integrations plus `agents/event-coverage.md`.
    - Avoid double sounds: when two upstream events signal the same thing
      (e.g. deprecated + replacement both firing), dedupe with a time window —
      see `isDuplicateStop` in the OpenCode plugin and pi extension.
-   - Keep `original_event_type` when normalizing a native name.
+   - Keep `original_event_type` when normalizing a native name in `emit.ts`
+     (the pi/OpenCode plugins send a trimmed envelope without it).
    - Old harness versions still exist: prefer additive handling (subscribe to
      both old and new events with dedupe) over hard cutovers.
 

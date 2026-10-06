@@ -9,36 +9,7 @@ const BINGBONG_URL = Bun.env.BINGBONG_URL || DEFAULT_URL;
 const BINGBONG_ENABLED = (Bun.env.BINGBONG_ENABLED || "true").toLowerCase() !== "false";
 const MACHINE_ID = Bun.env.BINGBONG_MACHINE_ID || os.hostname();
 
-const TOOL_EVENT_TYPES = new Set(["tool.execute.before", "tool.execute.after"]);
-
-// High-frequency / non-session bus events that would flood the soundscape.
-// message.part.* fires on every streaming delta; session.next.* is the new
-// fine-grained streaming event family.
-const IGNORED_PREFIXES = [
-  "message.part.",
-  "session.next.",
-  "lsp.",
-  "tui.",
-  "pty.",
-  "installation.",
-  "file.watcher.",
-  "models-dev.",
-  "catalog.",
-];
-const IGNORED_TYPES = new Set(["server.connected", "global.disposed"]);
-
-const shouldIgnore = (type) =>
-  IGNORED_TYPES.has(type) || IGNORED_PREFIXES.some((p) => type.startsWith(p));
-
 const nowIso = () => new Date().toISOString();
-
-const safeJson = (value) => {
-  try {
-    return JSON.parse(JSON.stringify(value ?? {}));
-  } catch {
-    return {};
-  }
-};
 
 const extractSessionId = (candidate) =>
   candidate?.properties?.sessionID ||
@@ -65,8 +36,6 @@ const EVENT_TYPE_MAP = {
   "permission.asked": "PermissionRequest",
 };
 
-const mapEventType = (eventType) => EVENT_TYPE_MAP[eventType] || eventType;
-
 // session.idle (deprecated) and session.status{type:"idle"} are both published
 // on current OpenCode; suppress the duplicate Stop within a short window.
 const lastStopAt = new Map();
@@ -77,23 +46,11 @@ const isDuplicateStop = (sessionId) => {
   return now - last < 1500;
 };
 
-const sendEvent = async ({
-  eventType,
-  sessionId,
-  cwd,
-  toolName = "",
-  toolInput = {},
-  toolOutput = {},
-}) => {
+const sendEvent = ({ eventType, sessionId, cwd, toolName = "", toolInput = {} }) => {
   if (!BINGBONG_ENABLED) return;
 
-  const mappedEventType = mapEventType(eventType);
+  const mappedEventType = EVENT_TYPE_MAP[eventType];
   if (mappedEventType === "Stop" && isDuplicateStop(sessionId)) return;
-
-  const output =
-    mappedEventType === eventType
-      ? toolOutput
-      : { ...safeJson(toolOutput), original_event_type: eventType };
 
   const payload = {
     event_type: mappedEventType,
@@ -102,73 +59,64 @@ const sendEvent = async ({
     timestamp: nowIso(),
     cwd,
     tool_name: toolName,
-    tool_input: safeJson(toolInput),
-    tool_output: output,
+    // Only the keys the client reads (eventDetail in apps/client/src/main.ts).
+    tool_input: {
+      command: toolInput.command,
+      file_path: toolInput.file_path,
+      pattern: toolInput.pattern,
+      url: toolInput.url,
+      action: toolInput.action,
+    },
   };
 
-  try {
-    await fetch(`${BINGBONG_URL}/events`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-  } catch {
-    // Never block OpenCode execution on telemetry failures.
-  }
+  // Fire and forget: never block OpenCode on telemetry. The timeout frees the
+  // socket if the server stalls.
+  void fetch(`${BINGBONG_URL}/events`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(1000),
+  }).catch(() => {});
 };
 
 export const BingbongPlugin = async ({ directory }) => {
   return {
+    // Only mapped bus events; everything else (incl. high-frequency
+    // message.part.* streaming deltas) is dropped.
     event: async ({ event }) => {
-      if (!event || TOOL_EVENT_TYPES.has(event.type) || shouldIgnore(event.type)) return;
-
       // session.status replaces the deprecated session.idle; only the idle
       // transition is audibly interesting.
-      if (event.type === "session.status") {
-        if (event.properties?.status?.type !== "idle") return;
-        await sendEvent({
-          eventType: "session.idle",
-          sessionId: extractSessionId(event),
-          cwd: extractCwd(event, directory),
-        });
-        return;
-      }
-
-      await sendEvent({
-        eventType: event.type || "unknown",
+      const type =
+        event?.type === "session.status" && event.properties?.status?.type === "idle"
+          ? "session.idle"
+          : event?.type;
+      if (!EVENT_TYPE_MAP[type]) return;
+      sendEvent({
+        eventType: type,
         sessionId: extractSessionId(event),
         cwd: extractCwd(event, directory),
-        toolName: event.tool || event.tool_name || "",
-        toolInput: event.tool_input || {},
-        toolOutput: event.tool_output || {},
       });
     },
 
     // input: { tool, sessionID, callID }, output: { args }
     "tool.execute.before": async (input, output) => {
-      await sendEvent({
+      sendEvent({
         eventType: "tool.execute.before",
         sessionId: extractSessionId(input || output),
         cwd: extractCwd(output, directory),
         toolName: input?.tool || "",
         toolInput: output?.args || {},
-        toolOutput: {},
       });
     },
 
     // input: { tool, sessionID, callID, args }, output: { title, output, metadata }
     "tool.execute.after": async (input, output) => {
-      await sendEvent({
+      sendEvent({
         eventType: "tool.execute.after",
         sessionId: extractSessionId(input || output),
         cwd: extractCwd(output, directory),
         toolName: input?.tool || "",
         toolInput: input?.args || output?.args || {},
-        toolOutput: {
-          title: output?.title,
-          output: output?.output,
-          metadata: output?.metadata,
-        },
       });
     },
   };
