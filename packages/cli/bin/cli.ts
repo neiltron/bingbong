@@ -71,9 +71,10 @@ Usage: bingbong [options]
        bingbong <command> [options]
 
 Commands:
-  emit <EventType>       Emit an event to the bingbong server (used by hooks)
-  install-hooks <agent>  Install bingbong hooks for a coding agent
-  test                   Smoke-test a running bingbong server
+  emit <EventType>         Emit an event to the bingbong server (used by hooks)
+  install-hooks <agent>    Install bingbong hooks for a coding agent
+  uninstall-hooks <agent>  Remove bingbong hooks for a coding agent
+  test                     Smoke-test a running bingbong server
 
 Options:
   -p, --port <number>  Port to run server on (default: 3334)
@@ -133,9 +134,9 @@ async function main() {
     process.exit(0);
   }
 
-  if (firstArg === "install-hooks") {
+  if (firstArg === "install-hooks" || firstArg === "uninstall-hooks") {
     const { installHooks } = await import("../src/install-hooks");
-    await installHooks(process.argv.slice(3));
+    await installHooks(process.argv.slice(3), firstArg === "uninstall-hooks");
     process.exit(0);
   }
 
