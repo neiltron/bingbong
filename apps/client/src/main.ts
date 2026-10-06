@@ -765,6 +765,15 @@ function closeRadar(): void {
 // ============================================
 // Connection Status UI
 // ============================================
+// Audio not yet enabled counts as muted: nothing is audible either way.
+function updateTitle(): void {
+  document.title = !connection.connected
+    ? 'bingbong (disconnected)'
+    : !audioEngine.initialized || audioEngine.isMuted
+      ? 'bingbong (muted)'
+      : 'bingbong'
+}
+
 function setConnected(): void {
   const { statusDot: dot, statusText: text, connectBtn: btn } = DOM
   if (dot) {
@@ -776,6 +785,7 @@ function setConnected(): void {
     btn.textContent = 'Disconnect'
     btn.disabled = false
   }
+  updateTitle()
 }
 
 function setDisconnected(): void {
@@ -789,6 +799,7 @@ function setDisconnected(): void {
     btn.textContent = 'Connect'
     btn.disabled = false
   }
+  updateTitle()
 }
 
 function setReconnecting(): void {
@@ -823,6 +834,7 @@ function onAudioBannerClick(): void {
   try {
     audioEngine.init()
     hideAudioBanner()
+    updateTitle()
   } catch {
     // AudioContext failed — leave banner visible
   }
@@ -1102,6 +1114,7 @@ document.addEventListener('DOMContentLoaded', () => {
     target.textContent = muted ? 'Unmute' : 'Mute'
     target.classList.toggle('muted', muted)
     target.setAttribute('aria-pressed', String(muted))
+    updateTitle()
   })
 
   // Reset layout button

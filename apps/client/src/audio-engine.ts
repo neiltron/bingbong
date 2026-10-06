@@ -16,6 +16,10 @@ export class AudioEngine {
     return !!this.ctx
   }
 
+  get isMuted(): boolean {
+    return this.muted
+  }
+
   // Must be called from a user gesture handler.
   // AudioContext creation is synchronous to satisfy browser gesture requirements.
   // Reverb impulse generation happens async afterward.
