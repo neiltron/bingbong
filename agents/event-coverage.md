@@ -30,7 +30,7 @@ the OpenCode/pi integrations).
 
 - **Integration:** `bingbong emit <Event>` hooks written to `~/.claude/settings.json` by `packages/cli/src/install-hooks.ts` (`CLAUDE_EVENTS`).
 - **Source of truth:** https://code.claude.com/docs/en/hooks.md (hooks reference; not open source).
-- **Payload notes:** common fields `session_id`, `transcript_path`, `cwd`, `hook_event_name`; tool events carry `tool_name`, `tool_input`, and `tool_response` (normalized to `tool_output` in `emit.ts`). `bingbong emit` always exits 0, so hooks can never block actions.
+- **Payload notes:** common fields `session_id`, `transcript_path`, `cwd`, `hook_event_name`; tool events carry `tool_name`, `tool_input`, `tool_use_id`, and `tool_response` (normalized to `tool_output` in `emit.ts`). Optional common fields as of 2.1.2xx: `prompt_id`, `permission_mode`, `effort`, `agent_id`/`agent_type` (set inside subagents). SessionStart `source` values are now `startup|resume|clear|compact|fork` (forks report `fork`, not `resume`, since 2.1.214) — we don't matcher-filter SessionStart, so no impact. Hook handler types beyond `"command"` exist (`http`, `mcp_tool`, `prompt`, `agent`) — not used. `bingbong emit` always exits 0, so hooks can never block actions.
 
 **Registered (19):** PreToolUse, PostToolUse, PostToolUseFailure, SessionStart,
 SessionEnd, Stop, StopFailure, SubagentStart, SubagentStop, PermissionRequest,
@@ -41,13 +41,14 @@ TaskCompleted, TeammateIdle, Setup, UserPromptSubmit — all pass through as-is
 **Known upstream, deliberately skipped (too noisy / not audibly useful — each
 hook spawns a process):** PostToolBatch, FileChanged, CwdChanged, ConfigChange,
 InstructionsLoaded, WorktreeCreate, WorktreeRemove, Elicitation,
-ElicitationResult, MessageDisplay, UserPromptExpansion.
+ElicitationResult, MessageDisplay, UserPromptExpansion, DirectoryAdded (new in
+2.1.219 — fires on `/add-dir`; workspace meta, not audibly useful).
 
 ## Cursor
 
 - **Integration:** `bingbong emit <event>` hooks written to `~/.cursor/hooks.json` (`version: 1`) by `install-hooks.ts` (`CURSOR_EVENTS`); camelCase names normalized to canonical types by `CURSOR_EVENT_MAP` in `packages/cli/src/emit.ts`.
 - **Source of truth:** https://cursor.com/docs/hooks + https://cursor.com/changelog (not open source).
-- **Payload notes:** session identity is `conversation_id` (normalized in `emit.ts`); `session_id` only on sessionStart/sessionEnd. Exit code 2 from a hook blocks actions — `bingbong emit` always exits 0.
+- **Payload notes:** session identity is `conversation_id` (normalized in `emit.ts`); `session_id` only on sessionStart/sessionEnd. Exit code 2 from a hook blocks actions — `bingbong emit` always exits 0. hooks.json entries may now carry extra fields beyond `command` (`type: "prompt"`, `timeout`, `loop_limit`, `failClosed`, `matcher`) — our installer only strips/appends its own entries, so foreign entries with these fields are preserved untouched. Cloud agents run command hooks only and don't support sessionStart/sessionEnd or the MCP/tab/workspace hooks.
 
 | Cursor event | Canonical type | tool_name |
 |---|---|---|
@@ -71,9 +72,9 @@ conversation context).
 ## OpenCode
 
 - **Integration:** plugin at `agents/opencode/plugins/bingbong.js`, installed to `~/.config/opencode/plugins/bingbong.js`.
-- **Source of truth (open source):**
-  - https://github.com/sst/opencode/blob/dev/packages/plugin/src/index.ts (hook interface)
-  - https://github.com/sst/opencode/blob/dev/packages/schema/src/ (bus event definitions)
+- **Source of truth (open source):** repo moved to https://github.com/anomalyco/opencode in July 2026 (sst/opencode URLs redirect)
+  - `packages/plugin/src/index.ts` on the `dev` branch (hook interface)
+  - `packages/schema/src/` on the `dev` branch (bus event definitions; `event-manifest.ts` is the full inventory)
   - https://opencode.ai/docs/plugins (docs; has been stale before — prefer source)
 - **Payload notes:** bus events arrive as `{ type, properties }`; session id is `properties.sessionID` (or `properties.info.id`). Tool hooks: `tool.execute.before(input: {tool, sessionID, callID}, output: {args})`, `tool.execute.after(input: {tool, sessionID, callID, args}, output: {title, output, metadata})`.
 
@@ -92,6 +93,14 @@ conversation context).
 `tui.*`, `pty.*`, `installation.*`, `file.watcher.*`, `models-dev.*`,
 `catalog.*`, `server.connected`, `global.disposed`.
 
+**Pending (found 2026-07-29, not yet applied):** the v2 runtime publishes
+`permission.v2.asked` (`{id, sessionID, action, resources}` — different shape
+from v1's `permission`/`patterns`) which we don't map to PermissionRequest yet;
+`question.v2.asked/replied/rejected` are similarly unmapped. `session.error`'s
+`sessionID` is optional in the schema — extraction falls back to "unknown".
+The SSE stream also emits `{type: "sync"}` envelope events, but plugin `event`
+hooks never receive those — no change needed for us.
+
 ## pi
 
 - **Integration:** extension at `agents/pi/extensions/bingbong.ts`, installed to `~/.pi/agent/extensions/bingbong.ts`.
@@ -99,7 +108,7 @@ conversation context).
   - `packages/coding-agent/src/core/extensions/types.ts` (`ExtensionEvent` union)
   - `packages/coding-agent/docs/extensions.md`
   - `packages/coding-agent/CHANGELOG.md` (breaking changes)
-- **Payload notes:** session id via `ctx.sessionManager.getSessionId()` (falls back to `getSessionFile()`); tool events carry `toolName`, `input`, `content`/`details`/`isError`. Extensions are torn down and re-created on `/new`, `/resume`, `/fork` (`session_shutdown` → `session_start` with `event.reason`).
+- **Payload notes:** session id via `ctx.sessionManager.getSessionId()` (falls back to `getSessionFile()`); tool events carry `toolName`, `input`, `content`/`details`/`isError`, and (since 0.81.0) an optional `usage` on tool_result. Extensions are torn down and re-created on `/new`, `/resume`, `/fork` (`session_shutdown` → `session_start` with `event.reason`). Since 0.82.0 bash subprocesses also get `PI_SESSION_ID`/`PI_SESSION_FILE` env vars — a possible alternate session-id channel.
 
 | pi event | Canonical type |
 |---|---|
@@ -153,3 +162,4 @@ globally to `~/.codex/hooks.json`, unaffected.
 | 2026-07-19 | Initial audit. Added 8 new Claude Code hooks + 6 Cursor hooks; Cursor camelCase → canonical mapping in emit.ts; fixed OpenCode `tool.execute.after` arg shapes + `properties.sessionID` extraction + stream-event flood control; pi: dropped removed events, `session_before_branch`→`session_before_fork`, added `agent_settled`, switched to `getSessionId()`; new sounds for 12 canonical event types. |
 | 2026-07-19 | Added Codex support (`install-hooks codex` → `~/.codex/hooks.json`, 11 Claude-shaped hook events, no mapping needed). |
 | 2026-07-29 | Codex-only re-audit vs rust-v0.146.0: no event/payload/config drift — no code changes. Docs URL moved to learn.chatgpt.com/docs/hooks; noted `SessionEnd` 1s fire-and-forget timeout, matcher-ignoring events, and new upstream issues (#34289 no failure event, #35306 project-level hooks skipped, #35863 Desktop SessionStart). |
+| 2026-07-29 | Re-audit of Claude Code (2.1.220), Cursor, OpenCode, pi (0.83.0): no renames/removals anywhere, all registrations/subscriptions valid, no code changes. Claude Code added `DirectoryAdded` (2.1.219) → skipped list; OpenCode repo moved sst→anomalyco; recorded pending OpenCode deltas (`permission.v2.asked`, `question.v2.*` unmapped); pi tool_result gained optional `usage`. |
