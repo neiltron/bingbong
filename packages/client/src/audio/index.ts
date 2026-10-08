@@ -4,3 +4,5 @@
  */
 export { AudioEngine } from "./engine";
 export { NOTE_FREQ, SOUND_CONFIG, type SoundConfig, type SoundParams } from "./config";
+export { BuiltinSoundSystem } from "./builtin";
+export type { ParamSpec, SoundSystem, TriggerEvent, Voice } from "./sound-system";

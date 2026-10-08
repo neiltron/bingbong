@@ -1,5 +1,6 @@
 import type { EnrichedEvent } from '@bingbong/protocol'
-import { SOUND_CONFIG, NOTE_FREQ, type SoundParams } from './config'
+import { BuiltinSoundSystem } from './builtin'
+import type { SoundSystem, Voice } from './sound-system'
 
 export class AudioEngine {
   private ctx: AudioContext | null = null
@@ -11,6 +12,12 @@ export class AudioEngine {
   private volume = 0.7
   private reverbAmount = 0.3
   private sessionPanners = new Map<string, PannerNode>()
+  private sessionVoices = new Map<string, Voice>()
+  private fallbackPanner: StereoPannerNode | null = null
+  private fallbackVoice: Voice | null = null
+
+  /** Routing and space live here; timbre is delegated to the sound system. */
+  constructor(private readonly system: SoundSystem = new BuiltinSoundSystem()) {}
 
   get initialized(): boolean {
     return !!this.ctx
@@ -45,6 +52,8 @@ export class AudioEngine {
     this.reverbGain.connect(this.masterGain)
     this.dryGain.connect(this.masterGain)
     this.masterGain.connect(this.ctx.destination)
+
+    this.system.start(this.ctx).catch((err) => console.error('[audio] sound system failed to start', err))
 
     // Set listener at origin for 3D audio
     const listener = this.ctx.listener
@@ -148,94 +157,35 @@ export class AudioEngine {
       panner.disconnect()
       this.sessionPanners.delete(sessionKey)
     }
-  }
-
-  playSound(config: SoundParams, pan = 0, sessionKey: string | null = null): void {
-    if (!this.ctx || this.muted) return
-
-    const now = this.ctx.currentTime
-    const notes = config.notes || (config.note ? [config.note] : [])
-
-    // Use session's 3D panner if available, otherwise create stereo panner
-    const sessionPanner = sessionKey ? this.sessionPanners.get(sessionKey) : null
-
-    notes.forEach((note, i) => {
-      const freq = NOTE_FREQ[note] || 440
-      const delay = i * 0.05 // Slight delay for chords
-
-      // Create oscillator
-      const osc = this.ctx!.createOscillator()
-      osc.type = config.type || 'sine'
-      osc.frequency.value = freq
-
-      // Create gain for envelope
-      const gainNode = this.ctx!.createGain()
-      gainNode.gain.value = 0
-
-      // Connect through session's 3D panner or fallback to stereo
-      osc.connect(gainNode)
-      if (sessionPanner) {
-        // Route through session's pre-configured PannerNode
-        gainNode.connect(sessionPanner)
-      } else {
-        // Fallback: create stereo panner for non-session sounds
-        const panner = this.ctx!.createStereoPanner()
-        panner.pan.value = pan
-        gainNode.connect(panner)
-        if (this.dryGain) panner.connect(this.dryGain)
-        if (this.convolver) panner.connect(this.convolver)
-      }
-
-      // Envelope
-      const attackTime = 0.01
-      const gain = config.gain || 0.2
-
-      gainNode.gain.setValueAtTime(0, now + delay)
-      gainNode.gain.linearRampToValueAtTime(gain, now + delay + attackTime)
-      gainNode.gain.exponentialRampToValueAtTime(0.001, now + delay + config.duration)
-
-      // Start and stop
-      osc.start(now + delay)
-      osc.stop(now + delay + config.duration + 0.1)
-    })
+    this.sessionVoices.get(sessionKey)?.dispose()
+    this.sessionVoices.delete(sessionKey)
   }
 
   playEvent(event: EnrichedEvent): void {
-    const { event_type, tool_name, pan, machine_id, session_id } = event
+    if (!this.ctx || this.muted) return
 
-    // Build session key for 3D panner lookup
+    const { machine_id, session_id } = event
     const sessionKey = machine_id && session_id ? `${machine_id}:${session_id}` : null
+    const panner = sessionKey ? this.sessionPanners.get(sessionKey) : undefined
 
-    // Get sound config based on event type
-    let config: SoundParams
-
-    if (event_type === 'PreToolUse' || event_type === 'PostToolUse') {
-      // Use tool-specific sound
-      const tools = SOUND_CONFIG.tools as Record<string, SoundParams>
-      config = tools[tool_name || 'default'] || tools.default
-
-      // Make PostToolUse slightly different (higher pitch)
-      if (event_type === 'PostToolUse' && config.note) {
-        const noteKeys = Object.keys(NOTE_FREQ)
-        const noteIndex = noteKeys.indexOf(config.note)
-        if (noteIndex > 0 && noteIndex < noteKeys.length - 1) {
-          config = {
-            ...config,
-            note: noteKeys[noteIndex + 1],
-          }
-        }
-      }
+    let voice: Voice
+    if (sessionKey && panner) {
+      voice = this.sessionVoices.get(sessionKey) ?? this.system.createVoice(panner)
+      this.sessionVoices.set(sessionKey, voice)
     } else {
-      // Use event type sound
-      const eventConfig = SOUND_CONFIG[event_type]
-      if (eventConfig && 'duration' in eventConfig) {
-        config = eventConfig as SoundParams
-      } else {
-        const tools = SOUND_CONFIG.tools as Record<string, SoundParams>
-        config = tools.default
+      // Non-session path: shared stereo panner, re-aimed per event.
+      // ponytail: overlapping fallback notes with different pans share one panner;
+      // give each pan its own panner+voice if that ever becomes audible.
+      if (!this.fallbackPanner) {
+        this.fallbackPanner = this.ctx.createStereoPanner()
+        if (this.dryGain) this.fallbackPanner.connect(this.dryGain)
+        if (this.convolver) this.fallbackPanner.connect(this.convolver)
       }
+      this.fallbackPanner.pan.value = event.pan || 0
+      this.fallbackVoice ??= this.system.createVoice(this.fallbackPanner)
+      voice = this.fallbackVoice
     }
 
-    this.playSound(config, pan || 0, sessionKey)
+    voice.trigger({ ...event, type: event.event_type, tool: event.tool_name })
   }
 }
