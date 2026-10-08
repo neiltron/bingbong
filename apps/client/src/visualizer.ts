@@ -1,5 +1,5 @@
 import type { EnrichedEvent, Session, PulseRing, Position } from './types'
-import type { AudioEngine } from './audio-engine'
+import type { AudioEngine } from '@bingbong/client/audio'
 
 // ============================================
 // Position Manager - localStorage persistence

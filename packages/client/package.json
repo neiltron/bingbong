@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./audio": "./src/audio/index.ts"
   },
   "types": "./src/index.ts",
   "scripts": {

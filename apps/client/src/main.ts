@@ -1,7 +1,7 @@
 import './styles/main.css'
 import { BingbongClient, PROTOCOL_VERSION, sessionKey } from '@bingbong/client'
 import type { EnrichedEvent, Session } from './types'
-import { AudioEngine } from './audio-engine'
+import { AudioEngine } from '@bingbong/client/audio'
 import { captureHashToken, getToken, setToken } from './token'
 import { createVisualization, type SourceOverlay, type Visualizer } from './visualizer'
 

@@ -8,17 +8,7 @@ export type {
   SessionSnapshot as Session,
 } from '@bingbong/protocol'
 
-export interface SoundParams {
-  note?: string
-  notes?: string[]
-  duration: number
-  type: OscillatorType
-  gain: number
-}
-
-export interface SoundConfig {
-  [key: string]: SoundParams | { [toolName: string]: SoundParams }
-}
+export type { SoundConfig, SoundParams } from '@bingbong/client/audio'
 
 export interface Position {
   x: number

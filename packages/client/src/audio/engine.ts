@@ -1,5 +1,5 @@
-import { SOUND_CONFIG, NOTE_FREQ } from './config'
-import type { EnrichedEvent, SoundParams } from './types'
+import type { EnrichedEvent } from '@bingbong/protocol'
+import { SOUND_CONFIG, NOTE_FREQ, type SoundParams } from './config'
 
 export class AudioEngine {
   private ctx: AudioContext | null = null
