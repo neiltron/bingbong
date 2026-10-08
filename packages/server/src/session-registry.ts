@@ -90,6 +90,7 @@ export class SessionRegistry {
     return Array.from(this.sessions.values()).map((session) => ({
       session_id: session.session_id,
       machine_id: session.machine_id,
+      parent_session_id: session.parent_session_id,
       label: session.label,
       pan: session.pan,
       index: session.index,
@@ -139,6 +140,8 @@ export class SessionRegistry {
       registry.sessions.set(`${s.machine_id}:${s.session_id}`, {
         session_id: s.session_id,
         machine_id: s.machine_id,
+        parent_session_id:
+          typeof s.parent_session_id === "string" ? s.parent_session_id : undefined,
         label: typeof s.label === "string" ? s.label : s.session_id.slice(0, 8),
         label_from_cwd: s.label_from_cwd === true,
         first_seen,
@@ -202,6 +205,7 @@ export class SessionRegistry {
     const session: SessionRecord = {
       session_id: event.session_id,
       machine_id: event.machine_id,
+      parent_session_id: event.parent_session_id,
       label,
       label_from_cwd: fromCwd,
       first_seen: new Date(),

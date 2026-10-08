@@ -218,6 +218,7 @@ export class BingbongClient {
       const session: SessionSnapshot = {
         session_id: e.session_id,
         machine_id: e.machine_id,
+        parent_session_id: e.parent_session_id ?? prev?.parent_session_id,
         label: e.session_label ?? prev?.label,
         pan: e.pan,
         index: e.session_index,

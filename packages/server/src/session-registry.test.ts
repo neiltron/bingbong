@@ -75,3 +75,16 @@ describe("SessionRegistry toJSON/fromJSON", () => {
     expect(big.enrich(event("b")).event.session_index).toBe(1);
   });
 });
+
+describe("SessionRegistry parent_session_id", () => {
+  test("is carried into the snapshot and survives a round-trip", () => {
+    const r = new SessionRegistry();
+    r.enrich(event("root"));
+    r.enrich({ ...event("child"), parent_session_id: "root" });
+    const child = r.snapshots().find((s) => s.session_id === "child");
+    expect(child?.parent_session_id).toBe("root");
+    const restored = SessionRegistry.fromJSON(JSON.parse(JSON.stringify(r)));
+    expect(restored.snapshots().find((s) => s.session_id === "child")?.parent_session_id).toBe("root");
+    expect(restored.snapshots().find((s) => s.session_id === "root")?.parent_session_id).toBeUndefined();
+  });
+});

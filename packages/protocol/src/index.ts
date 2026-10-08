@@ -2,6 +2,8 @@ export interface BingbongEvent {
   event_type: string;
   session_id: string;
   machine_id: string;
+  /** Session that spawned this one (same machine), for harnesses with agent trees */
+  parent_session_id?: string;
   timestamp: string;
   cwd?: string;
   tool_name?: string;
@@ -21,6 +23,7 @@ export interface EnrichedEvent extends BingbongEvent {
 export interface SessionSnapshot {
   session_id: string;
   machine_id: string;
+  parent_session_id?: string;
   label?: string;
   pan: number;
   index: number;

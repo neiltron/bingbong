@@ -37,7 +37,7 @@ const CURSOR_EVENT_MAP: Record<string, { type: string; tool?: string }> = {
 
 // Same shape the pi/OpenCode plugins send. The tool_input keys are the ones
 // the web client reads (eventDetail in apps/client/src/main.ts).
-const METADATA_KEYS = ["event_type", "session_id", "machine_id", "timestamp", "cwd", "tool_name", "original_event_type"] as const;
+const METADATA_KEYS = ["event_type", "session_id", "machine_id", "parent_session_id", "timestamp", "cwd", "tool_name", "original_event_type"] as const;
 const DISPLAY_KEYS = ["command", "file_path", "pattern", "url", "action"] as const;
 const MAX_DISPLAY_LEN = 256;
 
