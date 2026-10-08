@@ -3,6 +3,7 @@ import { PROTOCOL_VERSION } from '@bingbong/protocol'
 import type { EnrichedEvent, Session } from './types'
 import { AudioEngine } from './audio-engine'
 import { Connection } from './connection'
+import { captureHashToken, getToken, setToken } from './token'
 import { createVisualization, type SourceOverlay, type Visualizer } from './visualizer'
 
 // ============================================
@@ -802,7 +803,7 @@ function setDisconnected(): void {
   updateTitle()
 }
 
-function setReconnecting(): void {
+function setReconnecting(neverOpened = false): void {
   const { statusDot: dot, statusText: text, connectBtn: btn } = DOM
   if (dot) {
     dot.classList.remove('connected')
@@ -812,6 +813,17 @@ function setReconnecting(): void {
   if (btn) {
     btn.textContent = 'Disconnect'
     btn.disabled = false
+  }
+  // Browsers hide the upgrade's 401, and a down server closes the same way; ask /sessions which it is.
+  if (neverOpened && text) {
+    const token = getToken()
+    fetch('/sessions', { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      .then((res) => {
+        if (res.status === 401 && text.textContent === 'Reconnecting...') {
+          text.textContent = 'Unauthorized — set token in settings'
+        }
+      })
+      .catch(() => {})
   }
 }
 
@@ -990,7 +1002,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const savedView = localStorage.getItem(VIEW_STORAGE_KEY)
   setView(savedView === 'lanes' ? 'lanes' : 'combined')
 
-  // Initialize connection with auto-connect
+  // Initialize connection with auto-connect (token from #token=... or settings)
+  captureHashToken()
   connection = new Connection({
     onConnected: setConnected,
     onDisconnected: setDisconnected,
@@ -1098,6 +1111,14 @@ document.addEventListener('DOMContentLoaded', () => {
       setVolume(parseInt((e.target as HTMLInputElement).value))
     })
   }
+
+  // Server token (modal): reconnect with the new token unless the user disconnected
+  const tokenInput = document.getElementById('server-token') as HTMLInputElement | null
+  if (tokenInput) tokenInput.value = getToken()
+  tokenInput?.addEventListener('change', () => {
+    setToken(tokenInput.value.trim())
+    if (connection.active) connection.connect()
+  })
 
   // Reverb control (modal)
   DOM.reverbInput?.addEventListener('input', (e) => {

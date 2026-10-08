@@ -3,11 +3,14 @@
 // Owns connect/disconnect lifecycle with exponential backoff reconnection
 // ============================================
 
+import { getToken } from './token'
+
 export interface ConnectionCallbacks {
   onConnected: () => void
   onDisconnected: () => void
   onMessage: (data: unknown) => void
-  onReconnecting: () => void
+  /** neverOpened: the socket closed before onopen, e.g. a 401 on the upgrade or the server being down */
+  onReconnecting: (neverOpened: boolean) => void
 }
 
 export class Connection {
@@ -23,6 +26,11 @@ export class Connection {
 
   get connected(): boolean {
     return this.ws?.readyState === WebSocket.OPEN
+  }
+
+  /** connected or trying to (i.e. not user-disconnected) */
+  get active(): boolean {
+    return this.shouldConnect
   }
 
   connect(): void {
@@ -51,9 +59,13 @@ export class Connection {
     }
 
     const protocol = location.protocol === 'https:' ? 'wss' : 'ws'
-    this.ws = new WebSocket(`${protocol}://${location.host}/ws`)
+    const token = getToken()
+    const query = token ? `?token=${encodeURIComponent(token)}` : ''
+    this.ws = new WebSocket(`${protocol}://${location.host}/ws${query}`)
+    let opened = false
 
     this.ws.onopen = () => {
+      opened = true
       this.reconnectAttempts = 0
       this.callbacks.onConnected()
     }
@@ -74,7 +86,7 @@ export class Connection {
       this.callbacks.onDisconnected()
 
       if (this.shouldConnect) {
-        this.scheduleReconnect()
+        this.scheduleReconnect(!opened)
       }
     }
 
@@ -83,13 +95,13 @@ export class Connection {
     }
   }
 
-  private scheduleReconnect(): void {
+  private scheduleReconnect(neverOpened: boolean): void {
     if (!this.shouldConnect) return
 
     const delay = Math.min(30000, 1000 * Math.pow(2, this.reconnectAttempts))
     this.reconnectAttempts++
 
-    this.callbacks.onReconnecting()
+    this.callbacks.onReconnecting(neverOpened)
 
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null
