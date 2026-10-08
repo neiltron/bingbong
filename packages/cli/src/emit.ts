@@ -2,8 +2,9 @@
  * bingbong emit
  *
  * Reads hook payload JSON from stdin, spreads it into the POST body
- * with event_type/timestamp/machine_id overlaid, and sends it to
- * the bingbong server's /events endpoint.
+ * with event_type/timestamp/machine_id overlaid, trims it to metadata
+ * unless the payload mode is "full", and sends it to the bingbong
+ * server's /events endpoint.
  *
  * Always exits 0. Completely silent (no stdout, no stderr).
  */
@@ -34,6 +35,30 @@ const CURSOR_EVENT_MAP: Record<string, { type: string; tool?: string }> = {
   stop:                 { type: "Stop" },
 };
 
+// Same shape the pi/OpenCode plugins send. The tool_input keys are the ones
+// the web client reads (eventDetail in apps/client/src/main.ts).
+const METADATA_KEYS = ["event_type", "session_id", "machine_id", "timestamp", "cwd", "tool_name", "original_event_type"] as const;
+const DISPLAY_KEYS = ["command", "file_path", "pattern", "url", "action"] as const;
+const MAX_DISPLAY_LEN = 256;
+
+/**
+ * "metadata" (default) keeps only what the UI needs, so tool inputs/outputs,
+ * prompts and transcript paths never leave the machine. "full" passes
+ * the whole hook payload through.
+ */
+export function shapePayload(payload: BingbongEvent, mode: "metadata" | "full"): BingbongEvent {
+  if (mode === "full") return payload;
+  const out: Record<string, unknown> = {};
+  for (const k of METADATA_KEYS) if (payload[k] !== undefined) out[k] = payload[k];
+  const input: Record<string, string> = {};
+  for (const k of DISPLAY_KEYS) {
+    const v = payload.tool_input?.[k];
+    if (typeof v === "string") input[k] = v.slice(0, MAX_DISPLAY_LEN);
+  }
+  if (Object.keys(input).length) out.tool_input = input;
+  return out as unknown as BingbongEvent;
+}
+
 export async function emit(argv: string[]): Promise<void> {
   const enabled = (process.env.BINGBONG_ENABLED || "true").toLowerCase() !== "false";
   if (!enabled) return;
@@ -41,7 +66,7 @@ export async function emit(argv: string[]): Promise<void> {
   const eventType = argv[0];
   if (!eventType) return;
 
-  const { url, machine_id, token } = loadConfig();
+  const { url, machine_id, token, payload: mode } = loadConfig();
 
   // Read stdin: if TTY (interactive terminal), skip — no data to read.
   // Otherwise read piped data via Bun.stdin.text().
@@ -109,7 +134,7 @@ export async function emit(argv: string[]): Promise<void> {
         "Content-Type": "application/json",
         ...(token && { Authorization: `Bearer ${token}` }),
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(shapePayload(payload, mode)),
       signal: AbortSignal.timeout(2000),
     });
   } catch {

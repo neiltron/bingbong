@@ -102,7 +102,9 @@ Hooks, `ping` and `test` read `~/.config/bingbong/config.json` (or `$XDG_CONFIG_
 | `url` | `http://localhost:3334` | Server the hooks post to |
 | `machine_id` | hostname | Label for this machine |
 | `token` | none | Shared secret for the server and hooks |
-| `payload` | `metadata` | `metadata` or `full` (reserved) |
+| `payload` | `metadata` | `metadata`: event type, tool name, cwd and a short display detail (command, file path, pattern, URL or action, capped at 256 chars). `full`: the entire hook payload, including tool inputs and outputs |
+
+`payload` defaults to `metadata` because Claude Code, Cursor and Codex hook payloads include full tool inputs and responses (commands, file contents, prompts), and these shouldn't leave the machine just to play a sound. Use `bingbong config set payload full` only when you need the full data and trust the server.
 
 ```bash
 bingbong config                                # show effective config; exits 1 naming the bad key if the file is invalid

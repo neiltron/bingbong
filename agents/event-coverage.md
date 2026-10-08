@@ -25,7 +25,9 @@ native name in a top-level `original_event_type`. The OpenCode/pi plugins only
 forward mapped events and send a trimmed envelope — `tool_name` plus the
 `tool_input` keys the client reads (`command`, `file_path`, `pattern`, `url`,
 `action`), no `tool_output`/`original_event_type` — fire-and-forget with a 1s
-timeout.
+timeout. `bingbong emit` (Claude Code, Cursor, Codex) applies the same metadata
+shape (`shapePayload` in `emit.ts`, keeping `original_event_type` and capping each
+`tool_input` string at 256 chars) unless the user config sets `payload=full`.
 
 ---
 
