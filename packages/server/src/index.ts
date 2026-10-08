@@ -9,7 +9,7 @@ export {
   type RuntimeStats,
   type RuntimeStatsProvider,
 } from "./logger";
-export { SessionRegistry } from "./session-registry";
+export { SessionRegistry, type RegistryState } from "./session-registry";
 export {
   BingbongHub,
   type HubClient,

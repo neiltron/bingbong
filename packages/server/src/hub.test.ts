@@ -166,4 +166,37 @@ describe("BingbongHub", () => {
       expect(hub.registry.snapshots().map((s) => s.session_id)).toEqual(["fresh"]);
     });
   });
+
+  test("onChange fires after ingest and after a pruning addClient, not on a plain addClient", () => {
+    const min = 60 * 1000;
+    const t0 = Date.now();
+    let t = t0;
+    let changes = 0;
+    const hub = new BingbongHub({ version: "t", now: () => t, onChange: () => changes++ });
+
+    hub.addClient(recorder().client);
+    expect(changes).toBe(0);
+
+    hub.ingest(event("s1"));
+    hub.ingest(event("s1"));
+    expect(changes).toBe(2);
+
+    t = t0 + 29.5 * min; // prune runs but removes nothing
+    hub.addClient(recorder().client);
+    expect(changes).toBe(2);
+
+    t = t0 + 31 * min; // prune removes s1
+    hub.addClient(recorder().client);
+    expect(hub.registry.snapshots()).toHaveLength(0);
+    expect(changes).toBe(3);
+  });
+
+  test("addClient with sendInit: false sends nothing but still receives broadcasts", () => {
+    const hub = new BingbongHub({ version: "t" });
+    const a = recorder();
+    hub.addClient(a.client, { sendInit: false });
+    expect(a.sent).toEqual([]);
+    const enriched = hub.ingest(event("s1"));
+    expect(a.sent).toEqual([{ type: "event", event: enriched }]);
+  });
 });

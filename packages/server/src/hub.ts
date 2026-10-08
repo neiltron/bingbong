@@ -29,6 +29,8 @@ export interface HubOptions {
   registry?: SessionRegistry;
   /** shared secret; when unset every route stays open */
   token?: string;
+  /** called after registry state changes (every ingest, or a prune that removed sessions) so hosts can persist it */
+  onChange?: (registry: SessionRegistry) => void;
 }
 
 const PRUNE_INTERVAL_MS = 60 * 1000;
@@ -56,6 +58,7 @@ export class BingbongHub {
   private readonly version: string;
   private readonly logger: HubLogger;
   private readonly token?: string;
+  private readonly onChange?: (registry: SessionRegistry) => void;
   private lastPruneAt: number;
 
   constructor(opts: HubOptions) {
@@ -63,6 +66,7 @@ export class BingbongHub {
     this.logger = opts.logger ?? silentLogger;
     this.registry = opts.registry ?? new SessionRegistry();
     this.token = opts.token;
+    this.onChange = opts.onChange;
     this.lastPruneAt = Date.now();
   }
 
@@ -84,16 +88,18 @@ export class BingbongHub {
     );
 
     this.broadcast(enriched);
+    this.onChange?.(this.registry);
     return enriched;
   }
 
-  /** registers a client and immediately sends it the InitMessage */
-  addClient(client: HubClient): void {
-    this.pruneStale();
+  /** registers a client and sends it the InitMessage; `sendInit: false` re-attaches a surviving (hibernated) socket silently */
+  addClient(client: HubClient, opts: { sendInit?: boolean } = {}): void {
+    if (this.pruneStale()) this.onChange?.(this.registry);
 
     this.clients.add(client);
     this.logger.info(`[WS] Client connected (total: ${this.clients.size})`);
 
+    if (opts.sendInit === false) return;
     try {
       client.send(
         JSON.stringify({
@@ -196,12 +202,15 @@ export class BingbongHub {
 
   // Pruned lazily on activity instead of on a setInterval: Durable Objects
   // hibernate between requests, so background timers can't be relied on.
-  private pruneStale() {
+  /** true when at least one session was removed */
+  private pruneStale(): boolean {
     const now = Date.now();
-    if (now - this.lastPruneAt < PRUNE_INTERVAL_MS) return;
+    if (now - this.lastPruneAt < PRUNE_INTERVAL_MS) return false;
     this.lastPruneAt = now;
-    for (const key of this.registry.removeStale(now)) {
+    const removed = this.registry.removeStale(now);
+    for (const key of removed) {
       this.logger.info(`[Session] Removing stale session: ${key}`);
     }
+    return removed.length > 0;
   }
 }

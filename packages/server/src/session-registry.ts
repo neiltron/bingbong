@@ -20,6 +20,12 @@ interface SessionCreation {
   pan: number;
 }
 
+/** Persistable registry dump; label_from_cwd is internal, so it rides alongside the snapshot. */
+export interface RegistryState {
+  counter: number;
+  sessions: (SessionSnapshot & { label_from_cwd?: boolean })[];
+}
+
 export interface EnrichmentResult {
   event: EnrichedEvent;
   createdSession: SessionCreation | null;
@@ -88,6 +94,62 @@ export class SessionRegistry {
       first_seen: session.first_seen.toISOString(),
       last_seen: session.last_seen.toISOString(),
     }));
+  }
+
+  toJSON(): RegistryState {
+    const records = Array.from(this.sessions.values());
+    return {
+      counter: this.sessionCounter,
+      sessions: this.snapshots().map((snapshot, i) => ({
+        ...snapshot,
+        label_from_cwd: records[i].label_from_cwd,
+      })),
+    };
+  }
+
+  /** Tolerant restore: anything malformed is dropped, bad/missing input gives an empty registry. */
+  static fromJSON(state: RegistryState | undefined | null): SessionRegistry {
+    const registry = new SessionRegistry();
+    if (!state || typeof state !== "object" || !Array.isArray(state.sessions)) {
+      return registry;
+    }
+
+    let counter = Number.isInteger(state.counter) ? state.counter : 0;
+    for (const s of state.sessions) {
+      if (
+        !s ||
+        typeof s.session_id !== "string" ||
+        typeof s.machine_id !== "string" ||
+        !Number.isInteger(s.index)
+      ) {
+        continue;
+      }
+      const first_seen = new Date(s.first_seen ?? NaN);
+      const last_seen = new Date(s.last_seen ?? NaN);
+      if (Number.isNaN(first_seen.getTime()) || Number.isNaN(last_seen.getTime())) {
+        continue;
+      }
+
+      registry.sessions.set(`${s.machine_id}:${s.session_id}`, {
+        session_id: s.session_id,
+        machine_id: s.machine_id,
+        label: typeof s.label === "string" ? s.label : s.session_id.slice(0, 8),
+        label_from_cwd: s.label_from_cwd === true,
+        first_seen,
+        last_seen,
+        event_count: Number.isFinite(s.event_count) ? s.event_count : 0,
+        pan: Number.isFinite(s.pan) ? s.pan : 0,
+        index: s.index,
+        color:
+          typeof s.color === "string"
+            ? s.color
+            : SESSION_COLORS[s.index % SESSION_COLORS.length],
+      });
+      counter = Math.max(counter, s.index + 1);
+    }
+    registry.sessionCounter = counter;
+
+    return registry;
   }
 
   stats(clientCount: number): RuntimeStats {
