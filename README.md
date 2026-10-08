@@ -130,6 +130,21 @@ The pi extension bakes in `url` and `token` at install time; re-run `bingbong in
 
 --- 
 
+## Deploy to Cloudflare
+
+`packages/worker` hosts the server in a Durable Object (sessions persist across restarts) and serves the browser client from the same origin. Single tenant: one token, one shared session list.
+
+```bash
+bun run build:client
+bun run deploy:worker
+cd packages/worker && bunx wrangler secret put BINGBONG_TOKEN
+# on each machine that runs hooks:
+bingbong config set url https://bingbong.<account>.workers.dev
+bingbong config set token <same value>
+```
+
+Then open the worker URL and enter the token in the client settings. For local dev, copy `packages/worker/.dev.vars.example` to `.dev.vars` and run `bun run dev:worker`.
+
 ## Troubleshooting
 
 **No sounds?**

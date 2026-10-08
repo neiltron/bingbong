@@ -15,3 +15,5 @@ ds-bundle/
 .design-sync/learnings/
 .design-sync/node_modules
 packages/design-system/dist/
+.dev.vars
+packages/worker/.wrangler/

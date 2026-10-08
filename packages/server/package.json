@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./hub": "./src/hub.ts",
+    "./session-registry": "./src/session-registry.ts"
   },
   "types": "./src/index.ts",
   "dependencies": {
