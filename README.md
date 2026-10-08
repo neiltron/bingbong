@@ -95,13 +95,32 @@ Examples:
 
 ## Configuration
 
-Server defaults to `http://localhost:3334`. Configure agent hooks via environment:
+Hooks, `ping` and `test` read `~/.config/bingbong/config.json` (or `$XDG_CONFIG_HOME/bingbong/config.json`):
+
+| Key | Default | |
+|-----|---------|---|
+| `url` | `http://localhost:3334` | Server the hooks post to |
+| `machine_id` | hostname | Label for this machine |
+| `token` | none | Auth token (reserved) |
+| `payload` | `metadata` | `metadata` or `full` (reserved) |
+
+```bash
+bingbong config                                # show effective config
+bingbong config set url https://bingbong.example.com
+bingbong config unset machine_id
+```
+
+Environment variables override the file, which helps for one-off runs:
 
 ```bash
 BINGBONG_URL=http://localhost:3334
-BINGBONG_ENABLED=true
 BINGBONG_MACHINE_ID=my-laptop
+BINGBONG_TOKEN=...
+BINGBONG_PAYLOAD=metadata
+BINGBONG_ENABLED=true    # false silences hooks
 ```
+
+The pi extension bakes in `url` at install time; re-run `bingbong install-hooks pi` after changing it.
 
 --- 
 

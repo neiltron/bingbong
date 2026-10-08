@@ -8,7 +8,7 @@
  * Always exits 0. Completely silent (no stdout, no stderr).
  */
 
-import os from "node:os";
+import { loadConfig } from "./config";
 import type { BingbongEvent } from "@bingbong/protocol";
 
 /**
@@ -41,7 +41,7 @@ export async function emit(argv: string[]): Promise<void> {
   const eventType = argv[0];
   if (!eventType) return;
 
-  const url = process.env.BINGBONG_URL || "http://localhost:3334";
+  const { url, machine_id } = loadConfig();
 
   // Read stdin: if TTY (interactive terminal), skip — no data to read.
   // Otherwise read piped data via Bun.stdin.text().
@@ -83,7 +83,7 @@ export async function emit(argv: string[]): Promise<void> {
     ...input,
     event_type: mapped?.type ?? eventType,
     session_id: sessionId,
-    machine_id: process.env.BINGBONG_MACHINE_ID || os.hostname(),
+    machine_id,
     timestamp: new Date().toISOString(),
   };
 

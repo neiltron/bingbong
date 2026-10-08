@@ -6,7 +6,6 @@
  * Unified command to run the Bingbong server and client.
  */
 
-import os from "node:os";
 import type { BingbongEvent } from "@bingbong/protocol";
 import { startServer, type RuntimeLogger } from "@bingbong/server";
 import clientIndex from "../../../apps/client/index.html";
@@ -76,8 +75,11 @@ Commands:
   emit <EventType>         Emit an event to the bingbong server (used by hooks)
   install-hooks <agent>    Install bingbong hooks for a coding agent
   uninstall-hooks <agent>  Remove bingbong hooks for a coding agent
-  ping [label]             Send one Ping event to a running server ($BINGBONG_URL)
+  ping [label]             Send one Ping event to the configured server
   test                     Smoke-test a running bingbong server
+  config                   Show config (url, token, machine_id, payload)
+  config set <key> <val>   Set a config value (e.g. config set url https://...)
+  config unset <key>       Remove a config value
 
 Options:
   -p, --port <number>  Port to run server on (default: 3334)
@@ -145,12 +147,13 @@ async function main() {
   }
 
   if (firstArg === "ping") {
-    const url = process.env.BINGBONG_URL || "http://localhost:3334";
+    const { loadConfig } = await import("../src/config");
+    const { url, machine_id } = loadConfig();
     const label = process.argv.slice(3).join(" ");
     const event: BingbongEvent = {
       event_type: "Ping",
       session_id: "ping",
-      machine_id: process.env.BINGBONG_MACHINE_ID || os.hostname(),
+      machine_id,
       timestamp: new Date().toISOString(),
       // tool_input.action is what the client event log renders as detail
       tool_input: label ? { action: label } : undefined,
@@ -168,6 +171,12 @@ async function main() {
       process.exit(1);
     }
     console.log(`Pinged ${url}${label ? `: ${label}` : ""}`);
+    process.exit(0);
+  }
+
+  if (firstArg === "config") {
+    const { configCommand } = await import("../src/config");
+    configCommand(process.argv.slice(3));
     process.exit(0);
   }
 

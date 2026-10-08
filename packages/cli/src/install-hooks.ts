@@ -12,6 +12,7 @@ import { join, dirname } from "node:path";
 
 import opencodePluginSource from "../../../agents/opencode/plugins/bingbong.js" with { type: "text" };
 import piExtensionSource from "../../../agents/pi/extensions/bingbong.ts" with { type: "text" };
+import { loadConfig } from "./config";
 
 function getBingbongCommand(): string {
   try {
@@ -358,8 +359,7 @@ async function installOpencode(dryRun: boolean): Promise<string> {
 
 async function installPi(dryRun: boolean): Promise<string> {
   const targetPath = AGENTS.pi.path;
-  const bingbongUrl = process.env.BINGBONG_URL || "http://localhost:3334";
-  const transformed = piExtensionSource.replace("__BINGBONG_URL__", bingbongUrl);
+  const transformed = piExtensionSource.replace("__BINGBONG_URL__", loadConfig().url);
 
   if (dryRun) {
     const existingContent = existsSync(targetPath) ? await readFile(targetPath, "utf-8") : null;

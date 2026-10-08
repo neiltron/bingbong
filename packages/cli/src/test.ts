@@ -16,6 +16,7 @@
 
 import { parseArgs } from "node:util";
 import type { BingbongEvent, HealthResponse } from "@bingbong/protocol";
+import { loadConfig } from "./config";
 
 const TIMEOUT = 2000;
 
@@ -73,7 +74,7 @@ async function sendEvent(url: string, event: BingbongEvent): Promise<boolean> {
 }
 
 export async function test(argv: string[]): Promise<void> {
-  const url = process.env.BINGBONG_URL || "http://localhost:3334";
+  const { url } = loadConfig();
   const sessionId = `bingbong-test-${Date.now()}`;
   const { values } = parseArgs({
     args: argv,
@@ -85,7 +86,7 @@ export async function test(argv: string[]): Promise<void> {
   if (!healthy) {
     console.error(`❌ Could not reach server at ${url}`);
     console.error(`   Try: bingbong --open`);
-    console.error(`   Or set BINGBONG_URL=http://localhost:<port>`);
+    console.error(`   Or run: bingbong config set url http://localhost:<port>`);
     process.exit(1);
   }
   console.log(`✅ Server reachable at ${url}`);
