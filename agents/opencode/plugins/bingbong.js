@@ -8,6 +8,7 @@ const DEFAULT_URL = "http://localhost:3334";
 const BINGBONG_URL = Bun.env.BINGBONG_URL || DEFAULT_URL;
 const BINGBONG_ENABLED = (Bun.env.BINGBONG_ENABLED || "true").toLowerCase() !== "false";
 const MACHINE_ID = Bun.env.BINGBONG_MACHINE_ID || os.hostname();
+const BINGBONG_TOKEN = Bun.env.BINGBONG_TOKEN;
 
 const nowIso = () => new Date().toISOString();
 
@@ -73,7 +74,10 @@ const sendEvent = ({ eventType, sessionId, cwd, toolName = "", toolInput = {} })
   // socket if the server stalls.
   void fetch(`${BINGBONG_URL}/events`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(BINGBONG_TOKEN && { Authorization: `Bearer ${BINGBONG_TOKEN}` }),
+    },
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(1000),
   }).catch(() => {});

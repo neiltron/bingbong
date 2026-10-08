@@ -101,7 +101,7 @@ Hooks, `ping` and `test` read `~/.config/bingbong/config.json` (or `$XDG_CONFIG_
 |-----|---------|---|
 | `url` | `http://localhost:3334` | Server the hooks post to |
 | `machine_id` | hostname | Label for this machine |
-| `token` | none | Auth token (reserved) |
+| `token` | none | Shared secret for the server and hooks |
 | `payload` | `metadata` | `metadata` or `full` (reserved) |
 
 ```bash
@@ -122,7 +122,9 @@ BINGBONG_PAYLOAD=metadata
 BINGBONG_ENABLED=true    # false silences hooks
 ```
 
-The pi extension bakes in `url` at install time; re-run `bingbong install-hooks pi` after changing it.
+When `token` is set, the server started on that machine requires it on `/events`, `/sessions` and `/ws` (`/health` stays open), and hooks, `ping` and `test` send it. Set the same token on every machine that posts events; `bingbong --token <value>` overrides it for the server. Without a token everything stays open.
+
+The pi extension bakes in `url` and `token` at install time; re-run `bingbong install-hooks pi` after changing them.
 
 --- 
 

@@ -41,7 +41,7 @@ export async function emit(argv: string[]): Promise<void> {
   const eventType = argv[0];
   if (!eventType) return;
 
-  const { url, machine_id } = loadConfig();
+  const { url, machine_id, token } = loadConfig();
 
   // Read stdin: if TTY (interactive terminal), skip — no data to read.
   // Otherwise read piped data via Bun.stdin.text().
@@ -105,7 +105,10 @@ export async function emit(argv: string[]): Promise<void> {
   try {
     await fetch(`${url}/events`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(2000),
     });

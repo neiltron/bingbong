@@ -17,10 +17,12 @@ The installer accepts environment variables:
 
 - `PI_EXTENSIONS_DIR` (default: `~/.pi/agent/extensions`)
 - `BINGBONG_URL` (default: `http://localhost:3334`, baked into the installed file)
+- `BINGBONG_TOKEN` (default: config `token`, baked into the installed file)
 
 At runtime the extension also reads:
 
 - `BINGBONG_URL` (overrides the baked-in URL)
+- `BINGBONG_TOKEN` (overrides the baked-in token)
 - `BINGBONG_ENABLED` (`false` disables all events)
 - `BINGBONG_MACHINE_ID` (override hostname)
 

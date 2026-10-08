@@ -359,7 +359,11 @@ async function installOpencode(dryRun: boolean): Promise<string> {
 
 async function installPi(dryRun: boolean): Promise<string> {
   const targetPath = AGENTS.pi.path;
-  const transformed = piExtensionSource.replace("__BINGBONG_URL__", loadConfig().url);
+  const { url, token } = loadConfig();
+  const transformed = piExtensionSource
+    .replace("__BINGBONG_URL__", url)
+    // JSON-quoted so any token is a valid string literal
+    .replace('"__BINGBONG_TOKEN__"', () => JSON.stringify(token ?? ""));
 
   if (dryRun) {
     const existingContent = existsSync(targetPath) ? await readFile(targetPath, "utf-8") : null;

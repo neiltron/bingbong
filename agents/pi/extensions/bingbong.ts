@@ -5,11 +5,13 @@ import os from "node:os";
 
 const DEFAULT_URL = "http://localhost:3334";
 const BUILT_URL = "__BINGBONG_URL__";
+const BUILT_TOKEN = "__BINGBONG_TOKEN__";
 
 const envUrl = process.env.BINGBONG_URL;
 const url = envUrl && envUrl.length > 0 ? envUrl : BUILT_URL || DEFAULT_URL;
 const enabled = (process.env.BINGBONG_ENABLED || "true").toLowerCase() !== "false";
 const machineId = process.env.BINGBONG_MACHINE_ID || os.hostname();
+const token = process.env.BINGBONG_TOKEN || BUILT_TOKEN;
 
 const EVENT_TYPE_MAP: Record<string, string> = {
   tool_call: "PreToolUse",
@@ -80,7 +82,10 @@ export default function (pi: ExtensionAPI) {
       // timeout frees the socket if the server stalls.
       const sent = fetch(`${url}/events`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
         body: JSON.stringify(payload),
         signal: AbortSignal.timeout(1000),
       }).catch(() => {});

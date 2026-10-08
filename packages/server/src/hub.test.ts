@@ -75,11 +75,38 @@ describe("BingbongHub", () => {
     const opts = await hub.fetch(req("OPTIONS", "/events"));
     expect(opts.status).toBe(200);
     expect(opts.headers.get("Access-Control-Allow-Methods")).toBe("GET, POST, OPTIONS");
-    expect(opts.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type");
+    expect(opts.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, Authorization");
 
     const missing = await hub.fetch(req("GET", "/ws"));
     expect(missing.status).toBe(404);
     expect(await missing.text()).toBe("Not Found");
+  });
+
+  test("token guards /events and /sessions, leaves /health open", async () => {
+    const hub = new BingbongHub({ version: "t", token: "s3cret" });
+    const body = JSON.stringify(event("s1"));
+    const bearer = (method: string, path: string, b?: string, token = "s3cret") =>
+      new Request(`http://hub${path}`, { method, body: b, headers: { Authorization: `Bearer ${token}` } });
+
+    const denied = await hub.fetch(req("POST", "/events", body));
+    expect(denied.status).toBe(401);
+    expect(await denied.json()).toEqual({ error: "Unauthorized" });
+    expect(denied.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect((await hub.fetch(req("GET", "/sessions"))).status).toBe(401);
+    expect((await hub.fetch(bearer("POST", "/events", body, "wrong"))).status).toBe(401);
+
+    expect((await hub.fetch(bearer("POST", "/events", body))).status).toBe(200);
+    expect((await hub.fetch(bearer("GET", "/sessions"))).status).toBe(200);
+    expect((await hub.fetch(req("POST", "/events?token=s3cret", body))).status).toBe(200);
+    expect((await hub.fetch(req("GET", "/sessions?token=s3cret"))).status).toBe(200);
+
+    expect((await hub.fetch(req("GET", "/health"))).status).toBe(200);
+    expect((await hub.fetch(req("OPTIONS", "/events"))).status).toBe(200);
+
+    expect(hub.authorized(req("GET", "/ws?token=s3cret"))).toBe(true);
+    expect(hub.authorized(req("GET", "/ws?token=s3cre"))).toBe(false);
+    expect(hub.authorized(req("GET", "/ws"))).toBe(false);
+    expect(new BingbongHub({ version: "t" }).authorized(req("GET", "/ws"))).toBe(true);
   });
 
   test("a client whose init send throws is dropped, not propagated", () => {

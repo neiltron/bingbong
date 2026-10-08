@@ -17,6 +17,7 @@ let activeLogger: RuntimeLogger | null = null;
 
 interface Args {
   port: number;
+  token?: string;
   open: boolean;
   help: boolean;
   version: boolean;
@@ -53,6 +54,13 @@ function parseArgs(argv: string[]): Args {
         process.exit(1);
       }
       args.port = port;
+    } else if (arg === "--token" || arg === "-t") {
+      const token = argv[++i];
+      if (!token) {
+        console.error("Error: --token requires a value");
+        process.exit(1);
+      }
+      args.token = token;
     } else if (arg.startsWith("-")) {
       console.error(
         `Error: Unknown option "${arg}". Run bingbong --help for usage.`,
@@ -83,6 +91,8 @@ Commands:
 
 Options:
   -p, --port <number>  Port to run server on (default: 3334)
+  -t, --token <value>  Require this token on /events, /sessions and /ws
+                       (default: config token, if set)
   -o, --open           Open browser automatically
   -h, --help           Show this help message
   -v, --version        Show version number
@@ -148,7 +158,7 @@ async function main() {
 
   if (firstArg === "ping") {
     const { loadConfig } = await import("../src/config");
-    const { url, machine_id } = loadConfig();
+    const { url, machine_id, token } = loadConfig();
     const label = process.argv.slice(3).join(" ");
     const event: BingbongEvent = {
       event_type: "Ping",
@@ -161,7 +171,10 @@ async function main() {
     try {
       const res = await fetch(`${url}/events`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
         body: JSON.stringify(event),
         signal: AbortSignal.timeout(2000),
       });
@@ -207,19 +220,21 @@ async function main() {
     process.exit(1);
   }
 
-  // Refuse to start on a malformed config rather than silently ignoring it.
+  // A malformed config throws here, so the server refuses to start rather than running open.
   const { loadConfig } = await import("../src/config");
-  loadConfig();
+  const token = args.token ?? loadConfig().token;
 
   // Start the server: terminal rendering and the browser client bundle
   // are CLI concerns, injected into the transport-only server package.
   const runtime = await startServer({
     port: args.port,
     version: VERSION,
+    token,
     client: clientIndex,
     createLogger: (ctx) => new TerminalLayoutLogger(ctx),
   });
   activeLogger = runtime.logger;
+  if (token) runtime.logger.info("[Auth] Token required for /events, /sessions and /ws");
 
   function shutdown() {
     runtime.logger.info("Shutting down...");
@@ -235,7 +250,7 @@ async function main() {
 
   // Open browser if requested
   if (args.open) {
-    const url = `http://localhost:${args.port}`;
+    const url = `http://localhost:${args.port}${token ? `/#token=${encodeURIComponent(token)}` : ""}`;
     runtime.logger.info("Opening browser...");
     openBrowser(url);
   }

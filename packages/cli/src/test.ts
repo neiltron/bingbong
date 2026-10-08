@@ -58,23 +58,37 @@ async function checkHealth(url: string): Promise<boolean> {
   }
 }
 
-async function sendEvent(url: string, event: BingbongEvent): Promise<boolean> {
+/** HTTP status, or 0 on network error */
+async function sendEvent(url: string, event: BingbongEvent, token?: string): Promise<number> {
   try {
     const res = await fetch(`${url}/events`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
       body: JSON.stringify(event),
       signal: AbortSignal.timeout(TIMEOUT),
     });
 
-    return res.ok;
+    return res.status;
   } catch {
-    return false;
+    return 0;
   }
 }
 
+function rejected(status: number, what: string): never {
+  console.error(`❌ ${what}`);
+  if (status === 401) {
+    console.error(`   Server requires a token. Run: bingbong config set token <token>`);
+  } else {
+    console.error(`   Server is reachable but rejected the event.`);
+  }
+  process.exit(2);
+}
+
 export async function test(argv: string[]): Promise<void> {
-  const { url } = loadConfig();
+  const { url, token } = loadConfig();
   const sessionId = `bingbong-test-${Date.now()}`;
   const { values } = parseArgs({
     args: argv,
@@ -106,10 +120,8 @@ export async function test(argv: string[]): Promise<void> {
       event.timestamp = new Date(ms).toISOString();
       event.cwd = `/test/session-${i % sessions}`;
       event.tool_input = { command: `${tool} ${i + 1}` };
-      if (!(await sendEvent(url, event))) {
-        console.error(`❌ Event ${i + 1} rejected`);
-        process.exit(2);
-      }
+      const status = await sendEvent(url, event, token);
+      if (status !== 200) rejected(status, `Event ${i + 1} rejected`);
     }
     console.log(`✅ Sent ${count} events across ${sessions} sessions`);
     return;
@@ -129,12 +141,8 @@ export async function test(argv: string[]): Promise<void> {
 
   let sent = 0;
   for (const { type, tool } of events) {
-    const ok = await sendEvent(url, buildEvent(sessionId, type, tool));
-    if (!ok) {
-      console.error(`❌ Failed to send ${type}${tool ? ` (${tool})` : ""} event`);
-      console.error(`   Server is reachable but rejected the event.`);
-      process.exit(2);
-    }
+    const status = await sendEvent(url, buildEvent(sessionId, type, tool), token);
+    if (status !== 200) rejected(status, `Failed to send ${type}${tool ? ` (${tool})` : ""} event`);
     sent++;
     if (sent < events.length) {
       await sleep(250);

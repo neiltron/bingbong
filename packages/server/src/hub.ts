@@ -27,16 +27,27 @@ export interface HubOptions {
   version: string;
   logger?: HubLogger;
   registry?: SessionRegistry;
+  /** shared secret; when unset every route stays open */
+  token?: string;
 }
 
 const PRUNE_INTERVAL_MS = 60 * 1000;
+
+// Constant-time for equal lengths; length itself may leak, which is fine
+// for a shared secret. Pure JS so Durable Objects need no nodejs_compat.
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
 
 const silentLogger: HubLogger = { info() {}, error() {} };
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
 export class BingbongHub {
@@ -44,12 +55,14 @@ export class BingbongHub {
   private readonly clients = new Set<HubClient>();
   private readonly version: string;
   private readonly logger: HubLogger;
+  private readonly token?: string;
   private lastPruneAt: number;
 
   constructor(opts: HubOptions) {
     this.version = opts.version;
     this.logger = opts.logger ?? silentLogger;
     this.registry = opts.registry ?? new SessionRegistry();
+    this.token = opts.token;
     this.lastPruneAt = Date.now();
   }
 
@@ -108,12 +121,27 @@ export class BingbongHub {
     return this.registry.stats(this.clients.size);
   }
 
+  /** true when no token is configured, or via `Authorization: Bearer` or `?token=` (browsers can't set WS upgrade headers) */
+  authorized(req: Request): boolean {
+    if (!this.token) return true;
+    const header = req.headers.get("Authorization") ?? "";
+    const query = new URL(req.url).searchParams.get("token") ?? "";
+    return safeEqual(header, `Bearer ${this.token}`) || safeEqual(query, this.token);
+  }
+
   /** HTTP routes only; /ws upgrade is runtime-specific and stays in the adapters. */
   async fetch(req: Request): Promise<Response> {
     const url = new URL(req.url);
 
     if (req.method === "OPTIONS") {
       return new Response(null, { headers: corsHeaders });
+    }
+
+    if ((url.pathname === "/events" || url.pathname === "/sessions") && !this.authorized(req)) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
     }
 
     if (req.method === "POST" && url.pathname === "/events") {
