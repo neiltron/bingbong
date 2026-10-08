@@ -88,6 +88,11 @@ export class BingbongClient {
     this.openWebSocket();
   }
 
+  /** used by the next connect() and request */
+  setToken(token: string): void {
+    this.opts.token = token;
+  }
+
   disconnect(): void {
     this.shouldConnect = false;
     this.clearTimer();

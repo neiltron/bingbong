@@ -1,18 +1,16 @@
 import './styles/main.css'
-import { PROTOCOL_VERSION } from '@bingbong/protocol'
+import { BingbongClient, PROTOCOL_VERSION, sessionKey } from '@bingbong/client'
 import type { EnrichedEvent, Session } from './types'
 import { AudioEngine } from './audio-engine'
-import { Connection } from './connection'
 import { captureHashToken, getToken, setToken } from './token'
 import { createVisualization, type SourceOverlay, type Visualizer } from './visualizer'
 
 // ============================================
 // State - lives here, passed to classes as needed
 // ============================================
-const sessions = new Map<string, Session>()
 const eventLog: EnrichedEvent[] = []
 
-// Lanes render incrementally; handles to each lane's track/meta by session_id,
+// Lanes render incrementally; handles to each lane's track/meta by sessionKey,
 // plus the right edge and timestamp of its last chip (for burst-nudging,
 // connectors, and labeled idle gaps)
 const laneEls = new Map<
@@ -122,7 +120,7 @@ let view: TraceView = 'combined'
 let audioEngine: AudioEngine
 let visualizer: Visualizer
 let sourceOverlay: SourceOverlay
-let connection: Connection
+let client: BingbongClient // owns the session map, keyed by sessionKey(machine_id, session_id)
 
 // ============================================
 // DOM cache - populated once on DOMContentLoaded
@@ -201,7 +199,7 @@ function eventName(e: EnrichedEvent): string {
 }
 
 function eventAgent(e: EnrichedEvent): string {
-  const s = sessions.get(e.session_id)
+  const s = client.sessions.get(sessionKey(e.machine_id, e.session_id))
   return s ? sessionName(s) : e.session_label || ''
 }
 
@@ -228,7 +226,7 @@ function eventTime(e: EnrichedEvent): string {
 // UI Updates
 // ============================================
 function updateCaptions(): void {
-  const n = sessions.size
+  const n = client.sessions.size
   if (DOM.viewCaption) DOM.viewCaption.textContent = `${n} ACTIVE · LIVE`
   if (DOM.railLabel) DOM.railLabel.textContent = `SESSIONS · ${n}`
   if (DOM.radarCaption) {
@@ -241,7 +239,7 @@ function renderSessionsRail(): void {
   if (!el) return
   el.innerHTML = ''
 
-  if (sessions.size === 0) {
+  if (client.sessions.size === 0) {
     el.appendChild(
       createElement('div', { class: 'empty-state', role: 'listitem' }, ['No active sessions'])
     )
@@ -250,7 +248,7 @@ function renderSessionsRail(): void {
 
   // Mirrors the swimlane head: color dot + name, meta below, no wrapping.
   // The dot is the session's identity mark shared with lanes and the radar.
-  for (const s of sessions.values()) {
+  for (const s of client.sessions.values()) {
     el.appendChild(
       createElement('div', { class: 'session-item', role: 'listitem' }, [
         createElement('div', { class: 'session-item-name', title: s.session_id }, [
@@ -482,13 +480,14 @@ function buildLaneChip(e: EnrichedEvent, animate: boolean): HTMLElement {
  * enough display metadata to reconstruct those historical lane heads.
  */
 function sessionsForLanes(): Map<string, Session> {
-  const result = new Map(sessions)
+  const result = new Map(client.sessions)
 
   for (const event of eventLog) {
     if (!event.session_id) continue
-    const existing = result.get(event.session_id)
+    const key = sessionKey(event.machine_id, event.session_id)
+    const existing = result.get(key)
     if (!existing) {
-      result.set(event.session_id, {
+      result.set(key, {
         session_id: event.session_id,
         machine_id: event.machine_id,
         label: event.session_label,
@@ -497,7 +496,7 @@ function sessionsForLanes(): Map<string, Session> {
         color: event.color,
         event_count: 1,
       })
-    } else if (!sessions.has(event.session_id)) {
+    } else if (!client.sessions.has(key)) {
       existing.event_count++
     }
   }
@@ -615,7 +614,7 @@ function renderLanes(): void {
       ])
     )
 
-    laneEls.set(s.session_id, { track, meta, lastRight: null, lastMs: null })
+    laneEls.set(sessionKey(s.machine_id, s.session_id), { track, meta, lastRight: null, lastMs: null })
   }
 
   // Build every chip first, then measure the batch in one layout pass. Reading
@@ -628,7 +627,7 @@ function renderLanes(): void {
   }[] = []
 
   for (const e of eventLog) {
-    const lane = laneEls.get(e.session_id)
+    const lane = laneEls.get(sessionKey(e.machine_id, e.session_id))
     if (!lane) continue
     const chip = buildLaneChip(e, false)
     lane.track.appendChild(chip)
@@ -660,10 +659,11 @@ function renderLanes(): void {
  * right edge; scrolled-back readers keep their place and get a pill.
  */
 function appendLaneChip(event: EnrichedEvent): void {
-  const s = sessions.get(event.session_id)
+  const key = sessionKey(event.machine_id, event.session_id)
+  const s = client.sessions.get(key)
   if (!s) return
 
-  const lane = laneEls.get(event.session_id)
+  const lane = laneEls.get(key)
   if (!lane || anchors.length === 0) {
     // New session (or first render) — needs a full build
     renderLanes()
@@ -768,7 +768,7 @@ function closeRadar(): void {
 // ============================================
 // Audio not yet enabled counts as muted: nothing is audible either way.
 function updateTitle(): void {
-  document.title = !connection.connected
+  document.title = !client.connected
     ? 'bingbong (disconnected)'
     : !audioEngine.initialized || audioEngine.isMuted
       ? 'bingbong (muted)'
@@ -816,14 +816,12 @@ function setReconnecting(neverOpened = false): void {
   }
   // Browsers hide the upgrade's 401, and a down server closes the same way; ask /sessions which it is.
   if (neverOpened && text) {
-    const token = getToken()
-    fetch('/sessions', { headers: token ? { Authorization: `Bearer ${token}` } : {} })
-      .then((res) => {
-        if (res.status === 401 && text.textContent === 'Reconnecting...') {
-          text.textContent = 'Unauthorized — set token in settings'
-        }
-      })
-      .catch(() => {})
+    client.fetchSessions().catch((e) => {
+      // fetchSessions throws "... failed: <status>" on non-ok; a down server throws a TypeError
+      if (String(e).endsWith(': 401') && text.textContent === 'Reconnecting...') {
+        text.textContent = 'Unauthorized — set token in settings'
+      }
+    })
   }
 }
 
@@ -855,29 +853,12 @@ function onAudioBannerClick(): void {
 // ============================================
 // Event Handling
 // ============================================
+// The client has already upserted the event's session into client.sessions
 function handleEvent(event: EnrichedEvent): void {
-  const sessionKey =
-    event.machine_id && event.session_id ? `${event.machine_id}:${event.session_id}` : null
-
-  // Update session tracking
-  if (event.session_id) {
-    const sessionData: Session = {
-      session_id: event.session_id,
-      machine_id: event.machine_id,
-      label: event.session_label,
-      pan: event.pan,
-      index: event.session_index,
-      color: event.color,
-      event_count: (sessions.get(event.session_id)?.event_count || 0) + 1,
-    }
-    sessions.set(event.session_id, sessionData)
-    visualizer?.updateSession(sessionData)
-
-    // Create source overlay if not exists
-    if (sourceOverlay && sessionKey) {
-      sourceOverlay.createSource(sessionData)
-    }
-  }
+  const key = sessionKey(event.machine_id, event.session_id)
+  const session = client.sessions.get(key)!
+  visualizer?.updateSession(session)
+  sourceOverlay?.createSource(session)
 
   // Add to log. It's kept for the tab lifetime, so drop the raw payloads
   const { command, file_path, pattern, url, action } = event.tool_input ?? {}
@@ -888,8 +869,8 @@ function handleEvent(event: EnrichedEvent): void {
   // Play sound
   audioEngine.playEvent(event)
 
-  // Visualize (pass sessionKey for particle positioning)
-  visualizer?.addEvent(event, sessionKey)
+  // Visualize (pass the session key for particle positioning)
+  visualizer?.addEvent(event, key)
 
   // Update UI incrementally: the trace stream appends rather than rebuilding
   updateCaptions()
@@ -902,39 +883,16 @@ function handleEvent(event: EnrichedEvent): void {
   renderMiniRadars()
 }
 
-function handleMessage(data: unknown): void {
-  const msg = data as Record<string, unknown>
-
-  // Handle init message with existing sessions
-  if (msg.type === 'init' && Array.isArray(msg.sessions)) {
-    if (typeof msg.protocol_version === 'number' && msg.protocol_version !== PROTOCOL_VERSION) {
-      console.warn(
-        `[bingbong] Server speaks protocol v${msg.protocol_version}, client expects v${PROTOCOL_VERSION}`,
-      )
-    }
-    // Full cleanup chain on reconnect
-    sessions.clear()
-    sourceOverlay?.clearSources()
-    visualizer?.clearSessions()
-
-    ;(msg.sessions as Session[]).forEach((s: Session) => {
-      sessions.set(s.session_id, s)
-      visualizer?.updateSession(s)
-      if (sourceOverlay) {
-        sourceOverlay.createSource(s)
-      }
-    })
-    updateUI()
-    return
+// client.sessions was just replaced with this snapshot
+function handleInit(snapshot: Session[]): void {
+  // Full cleanup chain on reconnect
+  sourceOverlay?.clearSources()
+  visualizer?.clearSessions()
+  for (const s of snapshot) {
+    visualizer?.updateSession(s)
+    sourceOverlay?.createSource(s)
   }
-
-  // Handle enriched event
-  if (msg.type === 'event' && msg.event && typeof msg.event === 'object') {
-    handleEvent(msg.event as EnrichedEvent)
-    return
-  }
-
-  console.warn('[bingbong] Ignoring unknown server message:', msg.type)
+  updateUI()
 }
 
 // ============================================
@@ -998,19 +956,29 @@ document.addEventListener('DOMContentLoaded', () => {
   visualizer = viz.visualizer
   sourceOverlay = viz.sourceOverlay
 
+  // Client before the first render: it owns the session map (token from #token=... or settings)
+  captureHashToken()
+  client = new BingbongClient({ url: location.origin, token: getToken() })
+  client.on('connected', setConnected)
+  client.on('disconnected', setDisconnected)
+  client.on('reconnecting', setReconnecting)
+  client.on('init', handleInit)
+  client.on('event', handleEvent)
+  client.on('message', (msg) => {
+    if (msg.type === 'init' && msg.protocol_version !== PROTOCOL_VERSION) {
+      console.warn(
+        `[bingbong] Server speaks protocol v${msg.protocol_version}, client expects v${PROTOCOL_VERSION}`,
+      )
+    } else if (msg.type !== 'init' && msg.type !== 'event') {
+      console.warn('[bingbong] Ignoring unknown server message:', (msg as { type: unknown }).type)
+    }
+  })
+
   // Restore persisted view choice
   const savedView = localStorage.getItem(VIEW_STORAGE_KEY)
   setView(savedView === 'lanes' ? 'lanes' : 'combined')
 
-  // Initialize connection with auto-connect (token from #token=... or settings)
-  captureHashToken()
-  connection = new Connection({
-    onConnected: setConnected,
-    onDisconnected: setDisconnected,
-    onMessage: handleMessage,
-    onReconnecting: setReconnecting,
-  })
-  connection.connect()
+  client.connect()
 
   // View toggle
   DOM.segCombined?.addEventListener('click', () => setView('combined'))
@@ -1058,7 +1026,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // moves until the current idle gap hits its cap, then this becomes a no-op.
   let lastTickHead = -1
   setInterval(() => {
-    if (view !== 'lanes' || anchors.length === 0 || sessions.size === 0) return
+    if (view !== 'lanes' || anchors.length === 0 || client.sessions.size === 0) return
     const head = axisHeadX()
     if (head === lastTickHead) return
     lastTickHead = head
@@ -1085,11 +1053,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Connect/Disconnect button
   DOM.connectBtn?.addEventListener('click', () => {
-    if (connection.connected) {
-      connection.disconnect()
+    if (client.connected) {
+      client.disconnect()
       setDisconnected()
     } else {
-      connection.connect()
+      client.connect()
     }
   })
 
@@ -1117,7 +1085,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (tokenInput) tokenInput.value = getToken()
   tokenInput?.addEventListener('change', () => {
     setToken(tokenInput.value.trim())
-    if (connection.active) connection.connect()
+    client.setToken(getToken())
+    if (client.active) client.connect()
   })
 
   // Reverb control (modal)
