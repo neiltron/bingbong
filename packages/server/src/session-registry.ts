@@ -51,6 +51,9 @@ const isIndex = (n: unknown): n is number =>
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
+/** Stereo pan follows the radar: left edge -1, right edge 1 */
+const panFor = (position: Position) => position.x * 2 - 1;
+
 /** Default radar spot: index 0 at centre, then a golden-angle spiral (ported from the web client's PositionManager). */
 export function autoPosition(index: number): Position {
   if (index === 0) return { x: 0.5, y: 0.5 };
@@ -159,6 +162,10 @@ export class SessionRegistry {
         continue;
       }
 
+      const position =
+        Number.isFinite(s.position?.x) && Number.isFinite(s.position?.y)
+          ? { x: clamp(s.position.x, 0, 1), y: clamp(s.position.y, 0, 1) }
+          : autoPosition(s.index);
       registry.sessions.set(`${s.machine_id}:${s.session_id}`, {
         session_id: s.session_id,
         machine_id: s.machine_id,
@@ -169,11 +176,8 @@ export class SessionRegistry {
         first_seen,
         last_seen,
         event_count: Number.isFinite(s.event_count) ? s.event_count : 0,
-        pan: Number.isFinite(s.pan) ? s.pan : 0,
-        position:
-          Number.isFinite(s.position?.x) && Number.isFinite(s.position?.y)
-            ? { x: clamp(s.position.x, 0, 1), y: clamp(s.position.y, 0, 1) }
-            : autoPosition(s.index),
+        pan: panFor(position),
+        position,
         index: s.index,
         color:
           typeof s.color === "string"
@@ -193,6 +197,7 @@ export class SessionRegistry {
     const session = this.sessions.get(`${machineId}:${sessionId}`);
     if (!session || !Number.isFinite(x) || !Number.isFinite(y)) return null;
     session.position = { x: clamp(x, 0, 1), y: clamp(y, 0, 1) };
+    session.pan = panFor(session.position);
     return this.snapshot(session);
   }
 
@@ -232,8 +237,7 @@ export class SessionRegistry {
     }
 
     const index = this.sessionCounter++;
-    const pan =
-      index === 0 ? 0 : ((index % 2 === 1 ? -1 : 1) * Math.ceil(index / 2)) / 5;
+    const position = autoPosition(index);
 
     const { label, fromCwd } = this.deriveLabel(event.cwd, event.session_id);
 
@@ -246,8 +250,8 @@ export class SessionRegistry {
       first_seen: new Date(),
       last_seen: new Date(),
       event_count: 0,
-      pan: Math.max(-1, Math.min(1, pan)),
-      position: autoPosition(index),
+      pan: panFor(position),
+      position,
       index,
       color: SESSION_COLORS[index % SESSION_COLORS.length],
     };

@@ -124,8 +124,9 @@ describe("SessionRegistry positions", () => {
   test("setPosition clamps, rejects non-finite and unknown sessions", () => {
     const r = new SessionRegistry();
     r.enrich(event("s1"));
+    expect(r.snapshots()[0].pan).toBe(0); // first source sits at the centre
     expect(r.setPosition("m1", "s1", 0.2, 0.8)?.position).toEqual({ x: 0.2, y: 0.8 });
-    expect(r.setPosition("m1", "s1", -3, 7)?.position).toEqual({ x: 0, y: 1 });
+    expect(r.setPosition("m1", "s1", -3, 7)).toMatchObject({ position: { x: 0, y: 1 }, pan: -1 });
     expect(r.setPosition("m1", "s1", NaN, 0.5)).toBeNull();
     expect(r.setPosition("m1", "s1", 0.5, Infinity)).toBeNull();
     expect(r.setPosition("m1", "s1", "0.5" as any, 0.5)).toBeNull();

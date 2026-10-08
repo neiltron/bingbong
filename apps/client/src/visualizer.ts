@@ -2,85 +2,6 @@ import type { EnrichedEvent, Session, PulseRing, Position } from './types'
 import type { AudioEngine } from '@bingbong/client/audio'
 
 // ============================================
-// Position Manager - localStorage persistence
-// ============================================
-class PositionManager {
-  private positions = new Map<string, { x: number; y: number; savedAt: string }>()
-
-  constructor() {
-    this.loadFromStorage()
-    this.cleanupStale()
-  }
-
-  private storageKey(sessionKey: string): string {
-    return `bingbong:position:${sessionKey}`
-  }
-
-  private loadFromStorage(): void {
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key?.startsWith('bingbong:position:')) {
-        try {
-          const data = JSON.parse(localStorage.getItem(key) || '')
-          const sessionKey = key.replace('bingbong:position:', '')
-          this.positions.set(sessionKey, data)
-        } catch {
-          /* ignore corrupt data */
-        }
-      }
-    }
-  }
-
-  savePosition(sessionKey: string, x: number, y: number): void {
-    const data = { x, y, savedAt: new Date().toISOString() }
-    this.positions.set(sessionKey, data)
-    localStorage.setItem(this.storageKey(sessionKey), JSON.stringify(data))
-  }
-
-  getPosition(sessionKey: string, index = 0): Position {
-    const saved = this.positions.get(sessionKey)
-    if (saved) return { x: saved.x, y: saved.y }
-    return this.autoAssign(index)
-  }
-
-  hasPosition(sessionKey: string): boolean {
-    return this.positions.has(sessionKey)
-  }
-
-  private autoAssign(index: number): Position {
-    // First source at center
-    if (index === 0) return { x: 0.5, y: 0.5 }
-
-    // Golden angle spiral for subsequent sources
-    const angle = (index * 137.5 * Math.PI) / 180
-    const ring = Math.ceil(Math.sqrt(index))
-    const radius = 0.15 + ring * 0.1
-
-    return {
-      x: Math.max(0.1, Math.min(0.9, 0.5 + Math.cos(angle) * radius)),
-      y: Math.max(0.1, Math.min(0.9, 0.5 + Math.sin(angle) * radius)),
-    }
-  }
-
-  private cleanupStale(): void {
-    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000
-    for (const [key, data] of this.positions) {
-      if (new Date(data.savedAt).getTime() < thirtyDaysAgo) {
-        this.positions.delete(key)
-        localStorage.removeItem(this.storageKey(key))
-      }
-    }
-  }
-
-  clearAll(): void {
-    for (const key of this.positions.keys()) {
-      localStorage.removeItem(this.storageKey(key))
-    }
-    this.positions.clear()
-  }
-}
-
-// ============================================
 // Source Overlay - Draggable HTML elements
 // ============================================
 interface SourceData {
@@ -98,23 +19,22 @@ interface DragState {
 export class SourceOverlay {
   private container: HTMLElement
   private canvas: HTMLCanvasElement
-  private positionManager: PositionManager
   private audioEngine: AudioEngine
+  private onMove: (session: Session, x: number, y: number) => void
   sources = new Map<string, SourceData>()
   private selectedKey: string | null = null
   private dragState: DragState | null = null
-  private sessionIndex = 0
 
   constructor(
     container: HTMLElement,
     canvas: HTMLCanvasElement,
-    positionManager: PositionManager,
-    audioEngine: AudioEngine
+    audioEngine: AudioEngine,
+    onMove: (session: Session, x: number, y: number) => void
   ) {
     this.container = container
     this.canvas = canvas
-    this.positionManager = positionManager
     this.audioEngine = audioEngine
+    this.onMove = onMove
 
     // Global listeners for drag
     document.addEventListener('pointermove', (e) => this.onPointerMove(e))
@@ -131,7 +51,8 @@ export class SourceOverlay {
     window.addEventListener('resize', () => this.repositionAll())
   }
 
-  createSource(session: Session): void {
+  /** Create or refresh a session's source at its server position; true if an existing source moved */
+  applySession(session: Session): boolean {
     const key = `${session.machine_id}:${session.session_id}`
     const labelText = session.label || session.session_id.slice(0, 8)
     const title = session.label
@@ -148,12 +69,14 @@ export class SourceOverlay {
         existing.el.title = title
       }
       existing.session = session
-      return
+      const { x, y } = session.position
+      // Mid-drag the server only echoes stale positions; ours goes out on drop
+      if (this.dragState?.key === key || (existing.pos.x === x && existing.pos.y === y)) return false
+      this.moveSource(key, existing, x, y)
+      return true
     }
 
-    // Get or auto-assign position
-    const index = this.sessionIndex++
-    const pos = this.positionManager.getPosition(key, index)
+    const pos = { ...session.position }
 
     // Create element
     const el = document.createElement('div')
@@ -186,6 +109,13 @@ export class SourceOverlay {
     // Create panner and set initial position
     this.audioEngine.createPannerForSession(key)
     this.audioEngine.updatePannerPosition(key, pos.x, pos.y)
+    return false
+  }
+
+  private moveSource(key: string, source: SourceData, x: number, y: number): void {
+    source.pos = { x, y }
+    this.setElementPosition(source.el, x, y)
+    this.audioEngine.updatePannerPosition(key, x, y)
   }
 
   private setElementPosition(el: HTMLElement, normX: number, normY: number): void {
@@ -255,11 +185,7 @@ export class SourceOverlay {
     normY = Math.max(0.05, Math.min(0.95, normY))
 
     const source = this.sources.get(this.dragState.key)
-    if (source) {
-      source.pos = { x: normX, y: normY }
-      this.setElementPosition(source.el, normX, normY)
-      this.audioEngine.updatePannerPosition(this.dragState.key, normX, normY)
-    }
+    if (source) this.moveSource(this.dragState.key, source, normX, normY)
   }
 
   private onPointerUp(_e: PointerEvent): void {
@@ -269,8 +195,10 @@ export class SourceOverlay {
     if (source) {
       source.el.classList.remove('dragging')
       source.el.releasePointerCapture(this.dragState.pointerId)
-      // Save position to localStorage
-      this.positionManager.savePosition(this.dragState.key, source.pos.x, source.pos.y)
+      const { startPos } = this.dragState
+      if (source.pos.x !== startPos.x || source.pos.y !== startPos.y) {
+        this.onMove(source.session, source.pos.x, source.pos.y)
+      }
     }
 
     this.dragState = null
@@ -323,21 +251,6 @@ export class SourceOverlay {
     }
     this.sources.clear()
     this.selectedKey = null
-    this.sessionIndex = 0
-  }
-
-  resetLayout(): void {
-    this.positionManager.clearAll()
-    this.sessionIndex = 0
-
-    // Reposition all sources
-    for (const [key, source] of this.sources) {
-      const pos = this.positionManager.getPosition(key, this.sessionIndex++)
-      source.pos = pos
-      this.setElementPosition(source.el, pos.x, pos.y)
-      this.audioEngine.updatePannerPosition(key, pos.x, pos.y)
-      this.positionManager.savePosition(key, pos.x, pos.y)
-    }
   }
 }
 
@@ -348,7 +261,6 @@ export class Visualizer {
   private canvas: HTMLCanvasElement
   private ctx: CanvasRenderingContext2D
   private pulses: PulseRing[] = []
-  private sessions = new Map<string, Session>()
   private animationId: number | null = null
   private isAnimating = false
   private dpr = window.devicePixelRatio || 1
@@ -539,16 +451,7 @@ export class Visualizer {
     }
   }
 
-  updateSession(session: Session): void {
-    this.sessions.set(session.session_id, session)
-    // Redraw static elements to show new session
-    if (!this.isAnimating) {
-      this.drawStatic()
-    }
-  }
-
   clearSessions(): void {
-    this.sessions.clear()
     this.pulses = []
     if (!this.isAnimating) {
       this.drawStatic()
@@ -623,11 +526,11 @@ export class Visualizer {
 export function createVisualization(
   container: HTMLElement,
   canvas: HTMLCanvasElement,
-  audioEngine: AudioEngine
+  audioEngine: AudioEngine,
+  onMove: (session: Session, x: number, y: number) => void
 ): { visualizer: Visualizer; sourceOverlay: SourceOverlay } {
-  const positionManager = new PositionManager()
   const visualizer = new Visualizer(canvas)
-  const sourceOverlay = new SourceOverlay(container, canvas, positionManager, audioEngine)
+  const sourceOverlay = new SourceOverlay(container, canvas, audioEngine, onMove)
   visualizer.sourceOverlay = sourceOverlay
 
   return { visualizer, sourceOverlay }
