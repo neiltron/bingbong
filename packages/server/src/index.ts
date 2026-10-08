@@ -10,3 +10,9 @@ export {
   type RuntimeStatsProvider,
 } from "./logger";
 export { SessionRegistry } from "./session-registry";
+export {
+  BingbongHub,
+  type HubClient,
+  type HubLogger,
+  type HubOptions,
+} from "./hub";
