@@ -492,6 +492,7 @@ function sessionsForLanes(): Map<string, Session> {
         machine_id: event.machine_id,
         label: event.session_label,
         pan: event.pan,
+        position: event.position,
         index: event.session_index,
         color: event.color,
         event_count: 1,

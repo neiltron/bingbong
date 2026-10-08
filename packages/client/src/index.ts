@@ -221,6 +221,7 @@ export class BingbongClient {
         parent_session_id: e.parent_session_id ?? prev?.parent_session_id,
         label: e.session_label ?? prev?.label,
         pan: e.pan,
+        position: e.position,
         index: e.session_index,
         color: e.color,
         event_count: (prev?.event_count ?? 0) + 1,

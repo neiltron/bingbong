@@ -9,9 +9,10 @@ import { SessionRegistry } from "./session-registry";
 import {
   PROTOCOL_VERSION,
   type BingbongEvent,
+  type ClientMessage,
   type EnrichedEvent,
-  type EventMessage,
   type InitMessage,
+  type ServerMessage,
 } from "@bingbong/protocol";
 
 export interface HubClient {
@@ -29,7 +30,7 @@ export interface HubOptions {
   registry?: SessionRegistry;
   /** shared secret; when unset every route stays open */
   token?: string;
-  /** called after registry state changes (every ingest, or a prune that removed sessions) so hosts can persist it */
+  /** called after registry state changes (every ingest, a source move, or a prune that removed sessions) so hosts can persist it */
   onChange?: (registry: SessionRegistry) => void;
 }
 
@@ -89,9 +90,28 @@ export class BingbongHub {
       `[Event] ${enriched.event_type} | session=${enriched.session_id.slice(0, 8)} | tool=${enriched.tool_name || "n/a"}`,
     );
 
-    this.broadcast(enriched);
+    this.broadcast({ type: "event", event: enriched });
     this.onChange?.(this.registry);
     return enriched;
+  }
+
+  /** client -> server WebSocket frames; the socket was authorized at upgrade, junk is ignored */
+  handleMessage(_client: HubClient, raw: string | ArrayBuffer | Uint8Array): void {
+    const text = typeof raw === "string" ? raw : new TextDecoder().decode(raw);
+    let msg: ClientMessage | null = null;
+    try {
+      msg = JSON.parse(text);
+    } catch {}
+
+    if (msg?.type !== "move_source") {
+      this.logger.info(`[WS] Received: ${text}`);
+      return;
+    }
+
+    const session = this.registry.setPosition(msg.machine_id, msg.session_id, msg.x, msg.y);
+    if (!session) return;
+    this.broadcast({ type: "session_update", session });
+    this.onChange?.(this.registry);
   }
 
   /** registers a client and sends it the InitMessage; `sendInit: false` re-attaches a surviving (hibernated) socket silently */
@@ -190,8 +210,8 @@ export class BingbongHub {
     return new Response("Not Found", { status: 404, headers: corsHeaders });
   }
 
-  private broadcast(event: EnrichedEvent) {
-    const message = JSON.stringify({ type: "event", event } satisfies EventMessage);
+  private broadcast(msg: ServerMessage) {
+    const message = JSON.stringify(msg);
     for (const client of this.clients) {
       try {
         client.send(message);

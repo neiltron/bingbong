@@ -81,8 +81,8 @@ export async function startServer(
         hub.removeClient(ws);
       },
 
-      message(_ws, message) {
-        logger.info(`[WS] Received: ${String(message)}`);
+      message(ws, message) {
+        hub.handleMessage(ws, message);
       },
     },
   });

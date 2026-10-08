@@ -99,3 +99,53 @@ describe("SessionRegistry parent_session_id", () => {
     expect(r.snapshots().find((s) => s.session_id === "child")?.parent_session_id).toBe("root");
   });
 });
+
+describe("SessionRegistry positions", () => {
+  // the web client's PositionManager.autoAssign, verbatim
+  const legacy = (index: number) => {
+    if (index === 0) return { x: 0.5, y: 0.5 };
+    const angle = (index * 137.5 * Math.PI) / 180;
+    const radius = 0.15 + Math.ceil(Math.sqrt(index)) * 0.1;
+    return {
+      x: Math.max(0.1, Math.min(0.9, 0.5 + Math.cos(angle) * radius)),
+      y: Math.max(0.1, Math.min(0.9, 0.5 + Math.sin(angle) * radius)),
+    };
+  };
+
+  test("auto-assigns the golden-angle spiral by index, in snapshots and events", () => {
+    const r = new SessionRegistry();
+    for (let i = 0; i < 4; i++) {
+      expect(r.enrich(event(`s${i}`)).event.position).toEqual(legacy(i));
+    }
+    expect(r.snapshots().map((s) => s.position)).toEqual([0, 1, 2, 3].map(legacy));
+    expect(r.snapshots()[0].position).toEqual({ x: 0.5, y: 0.5 });
+  });
+
+  test("setPosition clamps, rejects non-finite and unknown sessions", () => {
+    const r = new SessionRegistry();
+    r.enrich(event("s1"));
+    expect(r.setPosition("m1", "s1", 0.2, 0.8)?.position).toEqual({ x: 0.2, y: 0.8 });
+    expect(r.setPosition("m1", "s1", -3, 7)?.position).toEqual({ x: 0, y: 1 });
+    expect(r.setPosition("m1", "s1", NaN, 0.5)).toBeNull();
+    expect(r.setPosition("m1", "s1", 0.5, Infinity)).toBeNull();
+    expect(r.setPosition("m1", "s1", "0.5" as any, 0.5)).toBeNull();
+    expect(r.setPosition("m1", "nope", 0.5, 0.5)).toBeNull();
+    expect(r.setPosition("m2", "s1", 0.5, 0.5)).toBeNull();
+    expect(r.snapshots()[0].position).toEqual({ x: 0, y: 1 });
+    expect(r.enrich(event("s1")).event.position).toEqual({ x: 0, y: 1 });
+  });
+
+  test("moved positions survive a round-trip; old state without one re-derives from index", () => {
+    const r = new SessionRegistry();
+    r.enrich(event("s1"));
+    r.enrich(event("s2"));
+    r.setPosition("m1", "s2", 0.3, 0.4);
+    const state = JSON.parse(JSON.stringify(r)) as RegistryState;
+    expect(SessionRegistry.fromJSON(state).snapshots()).toEqual(r.snapshots());
+
+    for (const s of state.sessions) delete (s as any).position;
+    state.sessions[0].position = { x: "bad" } as any;
+    const restored = SessionRegistry.fromJSON(state).snapshots();
+    expect(restored.map((s) => s.position)).toEqual([legacy(0), legacy(1)]);
+  });
+});
