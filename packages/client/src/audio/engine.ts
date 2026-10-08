@@ -1,6 +1,6 @@
 import type { EnrichedEvent } from '@bingbong/protocol'
 import { BuiltinSoundSystem } from './builtin'
-import type { SoundSystem, Voice } from './sound-system'
+import type { ParamSpec, SoundSystem, Voice } from './sound-system'
 
 export class AudioEngine {
   private ctx: AudioContext | null = null
@@ -104,6 +104,14 @@ export class AudioEngine {
       this.reverbGain.gain.value = value
       this.dryGain.gain.value = 1 - value * 0.5
     }
+  }
+
+  params(): ParamSpec[] {
+    return this.system.params()
+  }
+
+  setParam(id: string, value: number | boolean | string): void {
+    this.system.setParam(id, value)
   }
 
   toggleMute(): boolean {

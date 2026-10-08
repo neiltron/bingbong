@@ -2,10 +2,32 @@ import { SOUND_CONFIG, NOTE_FREQ, type SoundParams } from './config'
 import type { ParamSpec, SoundSystem, TriggerEvent, Voice } from './sound-system'
 
 type Patch = typeof SOUND_CONFIG
+type Value = number | boolean | string
+
+const PARAMS: ParamSpec[] = [
+  { id: 'attack', label: 'Attack', type: 'number', default: 0.01, min: 0.001, max: 0.1, step: 0.001 },
+  { id: 'length', label: 'Length', type: 'number', default: 1, min: 0.25, max: 3, step: 0.05 },
+  { id: 'octave', label: 'Octave', type: 'number', default: 0, min: -2, max: 2, step: 1 },
+  {
+    id: 'waveform',
+    label: 'Waveform',
+    type: 'string',
+    default: 'default',
+    options: ['default', 'sine', 'triangle', 'square', 'sawtooth'],
+  },
+]
+
+interface Shaping {
+  attack: number
+  length: number
+  octave: number
+  waveform: string
+}
 
 /** Today's sounds: one oscillator + envelope per note, looked up in SOUND_CONFIG. */
 export class BuiltinSoundSystem implements SoundSystem {
   private config: Patch = SOUND_CONFIG
+  private values: Record<string, Value> = Object.fromEntries(PARAMS.map((p) => [p.id, p.default]))
 
   start(_ctx: AudioContext): Promise<void> {
     return Promise.resolve()
@@ -18,14 +40,26 @@ export class BuiltinSoundSystem implements SoundSystem {
   }
 
   params(): ParamSpec[] {
-    return []
+    return PARAMS
   }
 
-  setParam(_id: string, _value: number | boolean | string): void {}
+  /** Unknown ids are ignored; numbers are clamped, strings must be one of `options`. */
+  setParam(id: string, value: Value): void {
+    const spec = PARAMS.find((p) => p.id === id)
+    if (!spec) return
+    if (spec.type === 'number') {
+      const n = Number(value)
+      if (Number.isFinite(n)) this.values[id] = Math.min(spec.max!, Math.max(spec.min!, n))
+    } else if (spec.type === 'string') {
+      this.values[id] = spec.options!.includes(String(value)) ? String(value) : spec.default
+    } else {
+      this.values[id] = Boolean(value)
+    }
+  }
 
   createVoice(dest: AudioNode): Voice {
     return {
-      trigger: (event) => playNotes(dest, this.resolve(event)),
+      trigger: (event) => playNotes(dest, this.resolve(event), this.values as unknown as Shaping),
       // Nodes are one-shot: they stop on their own and get collected.
       dispose: () => {},
     }
@@ -73,7 +107,7 @@ function validatePatch(patch: unknown): void {
   }
 }
 
-function playNotes(dest: AudioNode, config: SoundParams): void {
+function playNotes(dest: AudioNode, config: SoundParams, { attack, length, octave, waveform }: Shaping): void {
   const ctx = dest.context
   const now = ctx.currentTime
   const notes = config.notes || (config.note ? [config.note] : [])
@@ -82,22 +116,22 @@ function playNotes(dest: AudioNode, config: SoundParams): void {
     const delay = i * 0.05 // Slight delay for chords
 
     const osc = ctx.createOscillator()
-    osc.type = config.type || 'sine'
-    osc.frequency.value = NOTE_FREQ[note] || 440
+    osc.type = waveform !== 'default' ? (waveform as OscillatorType) : config.type || 'sine'
+    osc.frequency.value = (NOTE_FREQ[note] || 440) * 2 ** octave
 
     const gainNode = ctx.createGain()
     gainNode.gain.value = 0
     osc.connect(gainNode)
     gainNode.connect(dest)
 
-    // Envelope
-    const attackTime = 0.01
+    // Envelope (decay never ends before the attack peaks)
+    const duration = Math.max(config.duration * length, attack)
     const gain = config.gain || 0.2
     gainNode.gain.setValueAtTime(0, now + delay)
-    gainNode.gain.linearRampToValueAtTime(gain, now + delay + attackTime)
-    gainNode.gain.exponentialRampToValueAtTime(0.001, now + delay + config.duration)
+    gainNode.gain.linearRampToValueAtTime(gain, now + delay + attack)
+    gainNode.gain.exponentialRampToValueAtTime(0.001, now + delay + duration)
 
     osc.start(now + delay)
-    osc.stop(now + delay + config.duration + 0.1)
+    osc.stop(now + delay + duration + 0.1)
   })
 }

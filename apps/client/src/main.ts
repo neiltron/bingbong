@@ -2,6 +2,7 @@ import './styles/main.css'
 import { BingbongClient, PROTOCOL_VERSION, sessionKey } from '@bingbong/client'
 import type { EnrichedEvent, Session } from './types'
 import { AudioEngine } from '@bingbong/client/audio'
+import { renderSoundParams } from './sound-params'
 import { captureHashToken, getToken, setToken } from './token'
 import { createVisualization, type SourceOverlay, type Visualizer } from './visualizer'
 
@@ -947,6 +948,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initialize audio engine
   audioEngine = new AudioEngine()
+  renderSoundParams(audioEngine)
 
   // Initialize visualizer and source overlay (lives in the radar modal)
   const canvas = document.getElementById('visualizer') as HTMLCanvasElement

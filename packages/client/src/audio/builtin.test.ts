@@ -26,11 +26,15 @@ function fakeContext() {
   return { oscs, dest: dest as unknown as AudioNode }
 }
 
-function play(event: { type: string; tool?: string }) {
+function play(event: { type: string; tool?: string }, params: Record<string, number | boolean | string> = {}) {
   const { oscs, dest } = fakeContext()
-  new BuiltinSoundSystem().createVoice(dest).trigger(event)
+  const system = new BuiltinSoundSystem()
+  for (const [id, value] of Object.entries(params)) system.setParam(id, value)
+  system.createVoice(dest).trigger(event)
   return { oscs, dest }
 }
+
+const read = { type: 'PreToolUse', tool: 'Read' } // A4, sine, duration 0.08
 
 describe('BuiltinSoundSystem', () => {
   test('PreToolUse Read plays A4 through a gain into dest', () => {
@@ -79,5 +83,36 @@ describe('BuiltinSoundSystem', () => {
     sys.load(undefined)
     sys.createVoice(dest).trigger({ type: 'PreToolUse', tool: 'Read' })
     expect(oscs[1].freq).toBe(440)
+  })
+
+  test('exposes attack, length, octave, waveform', () => {
+    expect(new BuiltinSoundSystem().params().map((p) => p.id)).toEqual(['attack', 'length', 'octave', 'waveform'])
+  })
+
+  test('octave: 1 doubles the frequency', () => {
+    expect(play(read, { octave: 1 }).oscs[0].freq).toBe(880)
+  })
+
+  test("waveform: 'square' overrides the patch type; 'default' keeps it", () => {
+    expect(play(read, { waveform: 'square' }).oscs[0].type).toBe('square')
+    expect(play(read, { waveform: 'default' }).oscs[0].type).toBe('sine')
+    expect(play(read, { waveform: 'banjo' }).oscs[0].type).toBe('sine')
+  })
+
+  test('length: 2 doubles the stop time offset', () => {
+    const base = play(read).oscs[0].stop
+    const long = play(read, { length: 2 }).oscs[0].stop
+    expect(base).toBeCloseTo(0.08 + 0.1)
+    expect(long).toBeCloseTo(0.16 + 0.1)
+  })
+
+  test('out-of-range values are clamped', () => {
+    expect(play(read, { octave: 9 }).oscs[0].freq).toBe(440 * 4)
+    expect(play(read, { octave: -9 }).oscs[0].freq).toBe(440 / 4)
+    expect(play(read, { length: 100 }).oscs[0].stop).toBeCloseTo(0.08 * 3 + 0.1)
+  })
+
+  test('unknown ids are ignored', () => {
+    expect(play(read, { nope: 3 }).oscs[0]).toMatchObject({ freq: 440, type: 'sine' })
   })
 })

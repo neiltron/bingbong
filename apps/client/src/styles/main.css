@@ -1082,7 +1082,12 @@ input[type="range"] {
     flex: 1;
 }
 
-.radar-modal-sliders .ctl-row input[type="password"] {
+#sound-params {
+    display: contents;
+}
+
+.radar-modal-sliders .ctl-row input[type="password"],
+.radar-modal-sliders .ctl-row select {
     flex: 1;
     min-width: 0;
     padding: 6px 10px;
