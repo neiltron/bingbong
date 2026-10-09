@@ -77,7 +77,7 @@ Commands:
   uninstall-hooks <agent>  Remove bingbong hooks for a coding agent
   ping [label]             Send one Ping event to the configured server
   test                     Smoke-test a running bingbong server
-  config                   Show config (url, token, machine_id, payload)
+  config                   Show and validate config (url, token, machine_id, payload)
   config set <key> <val>   Set a config value (e.g. config set url https://...)
   config unset <key>       Remove a config value
 

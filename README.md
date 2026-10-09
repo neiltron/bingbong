@@ -105,10 +105,12 @@ Hooks, `ping` and `test` read `~/.config/bingbong/config.json` (or `$XDG_CONFIG_
 | `payload` | `metadata` | `metadata` or `full` (reserved) |
 
 ```bash
-bingbong config                                # show effective config
+bingbong config                                # show effective config; exits 1 naming the bad key if the file is invalid
 bingbong config set url https://bingbong.example.com
 bingbong config unset machine_id
 ```
+
+A malformed config file (bad JSON, wrong types) makes the server refuse to start rather than run open, so run `bingbong config` after hand-editing the file and before restarting.
 
 Environment variables override the file, which helps for one-off runs:
 
