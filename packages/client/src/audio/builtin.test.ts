@@ -115,4 +115,17 @@ describe('BuiltinSoundSystem', () => {
   test('unknown ids are ignored', () => {
     expect(play(read, { nope: 3 }).oscs[0]).toMatchObject({ freq: 440, type: 'sine' })
   })
+
+  test('setParam returns the normalized stored value', () => {
+    const sys = new BuiltinSoundSystem()
+    expect(sys.setParam('octave', 1)).toBe(1)
+    expect(sys.setParam('octave', 9)).toBe(2) // clamped
+    expect(sys.setParam('octave', 0.5)).toBe(1) // snapped to step 1
+    expect(sys.setParam('attack', 0.0104)).toBe(0.01) // snapped to step 0.001, no float noise
+    expect(sys.setParam('attack', 'banana')).toBe(0.01) // invalid -> default
+    expect(sys.setParam('length', NaN)).toBe(1)
+    expect(sys.setParam('waveform', 'square')).toBe('square')
+    expect(sys.setParam('waveform', 'banjo')).toBe('default')
+    expect(sys.setParam('waveform', 3)).toBe('default')
+  })
 })

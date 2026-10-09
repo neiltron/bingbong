@@ -110,8 +110,8 @@ export class AudioEngine {
     return this.system.params()
   }
 
-  setParam(id: string, value: number | boolean | string): void {
-    this.system.setParam(id, value)
+  setParam(id: string, value: number | boolean | string): number | boolean | string {
+    return this.system.setParam(id, value)
   }
 
   toggleMute(): boolean {

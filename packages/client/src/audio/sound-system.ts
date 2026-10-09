@@ -33,7 +33,8 @@ export interface SoundSystem {
   load(patch: unknown): void
   /** Drives the generated sliders UI. */
   params(): ParamSpec[]
-  setParam(id: string, value: number | boolean | string): void
+  /** Returns the value actually stored (clamped, snapped, or defaulted). */
+  setParam(id: string, value: number | boolean | string): number | boolean | string
   /** One voice per session, wired into that session's panner. */
   createVoice(dest: AudioNode): Voice
   dispose(): void

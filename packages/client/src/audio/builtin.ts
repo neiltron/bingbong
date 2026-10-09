@@ -43,18 +43,14 @@ export class BuiltinSoundSystem implements SoundSystem {
     return PARAMS
   }
 
-  /** Unknown ids are ignored; numbers are clamped, strings must be one of `options`. */
-  setParam(id: string, value: Value): void {
+  /**
+   * Unknown ids are ignored. Numbers are clamped and snapped to `step`, strings must be one of
+   * `options`; anything else of the wrong type falls back to the default. Returns the stored value.
+   */
+  setParam(id: string, value: Value): Value {
     const spec = PARAMS.find((p) => p.id === id)
-    if (!spec) return
-    if (spec.type === 'number') {
-      const n = Number(value)
-      if (Number.isFinite(n)) this.values[id] = Math.min(spec.max!, Math.max(spec.min!, n))
-    } else if (spec.type === 'string') {
-      this.values[id] = spec.options!.includes(String(value)) ? String(value) : spec.default
-    } else {
-      this.values[id] = Boolean(value)
-    }
+    if (!spec) return value
+    return (this.values[id] = normalize(spec, value))
   }
 
   createVoice(dest: AudioNode): Voice {
@@ -105,6 +101,20 @@ function validatePatch(patch: unknown): void {
     if ('gain' in s && !Number.isFinite(s.gain)) throw new TypeError(`${key}.gain must be a finite number`)
     if ('type' in s && !OSC_TYPES.has(s.type as string)) throw new TypeError(`${key}.type must be sine|triangle|square|sawtooth`)
   }
+}
+
+function normalize(spec: ParamSpec, value: Value): Value {
+  if (spec.type === 'number') {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return spec.default
+    const { min = -Infinity, max = Infinity, step } = spec
+    const base = Number.isFinite(min) ? min : 0
+    const snapped = step ? Number((base + Math.round((value - base) / step) * step).toFixed(12)) : value
+    return Math.min(max, Math.max(min, snapped))
+  }
+  if (spec.type === 'string') {
+    return typeof value === 'string' && (!spec.options || spec.options.includes(value)) ? value : spec.default
+  }
+  return typeof value === 'boolean' ? value : spec.default
 }
 
 function playNotes(dest: AudioNode, config: SoundParams, { attack, length, octave, waveform }: Shaping): void {
