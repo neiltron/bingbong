@@ -50,4 +50,28 @@ describe("SessionRegistry toJSON/fromJSON", () => {
     expect(r.snapshots()).toEqual([]);
     expect(r.enrich(event("s1")).event.session_index).toBe(1);
   });
+
+  test("rejects negative/unsafe indexes and counters, non-string dates", () => {
+    const iso = new Date().toISOString();
+    const entry = (session_id: string, extra: object) =>
+      ({ session_id, machine_id: "m", index: 0, first_seen: iso, last_seen: iso, ...extra });
+
+    const r = SessionRegistry.fromJSON({
+      counter: -1,
+      sessions: [
+        entry("neg", { index: -1 }),
+        entry("unsafe", { index: Number.MAX_SAFE_INTEGER }),
+        entry("bigint", { first_seen: 1n }),
+        entry("numeric", { last_seen: Date.now() }),
+      ] as any,
+    });
+    expect(r.snapshots()).toEqual([]);
+    const first = r.enrich(event("s1")).event;
+    expect(first.session_index).toBe(0);
+    expect(first.color).toBe("#FF6B6B");
+
+    const big = SessionRegistry.fromJSON({ counter: 2 ** 53, sessions: [] });
+    expect(big.enrich(event("a")).event.session_index).toBe(0);
+    expect(big.enrich(event("b")).event.session_index).toBe(1);
+  });
 });

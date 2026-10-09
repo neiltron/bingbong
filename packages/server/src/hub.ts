@@ -67,7 +67,9 @@ export class BingbongHub {
     this.registry = opts.registry ?? new SessionRegistry();
     this.token = opts.token;
     this.onChange = opts.onChange;
-    this.lastPruneAt = Date.now();
+    // one interval in the past so the first activity after construction
+    // (every Durable Object wake) may prune
+    this.lastPruneAt = Date.now() - PRUNE_INTERVAL_MS;
   }
 
   /** enrich, log, broadcast; also prunes stale sessions. Returns the enriched event. */

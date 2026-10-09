@@ -44,6 +44,10 @@ const SESSION_COLORS = [
   "#85C1E9",
 ];
 
+/** non-negative and still safe after +1, so a continued counter can never repeat an index */
+const isIndex = (n: unknown): n is number =>
+  Number.isSafeInteger(n) && (n as number) >= 0 && Number.isSafeInteger((n as number) + 1);
+
 export class SessionRegistry {
   private readonly sessions = new Map<string, SessionRecord>();
   private sessionCounter = 0;
@@ -114,18 +118,20 @@ export class SessionRegistry {
       return registry;
     }
 
-    let counter = Number.isInteger(state.counter) ? state.counter : 0;
+    let counter = isIndex(state.counter) ? state.counter : 0;
     for (const s of state.sessions) {
       if (
         !s ||
         typeof s.session_id !== "string" ||
         typeof s.machine_id !== "string" ||
-        !Number.isInteger(s.index)
+        !isIndex(s.index) ||
+        typeof s.first_seen !== "string" ||
+        typeof s.last_seen !== "string"
       ) {
         continue;
       }
-      const first_seen = new Date(s.first_seen ?? NaN);
-      const last_seen = new Date(s.last_seen ?? NaN);
+      const first_seen = new Date(s.first_seen);
+      const last_seen = new Date(s.last_seen);
       if (Number.isNaN(first_seen.getTime()) || Number.isNaN(last_seen.getTime())) {
         continue;
       }

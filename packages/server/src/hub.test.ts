@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import { PROTOCOL_VERSION, type BingbongEvent } from "@bingbong/protocol";
 import { BingbongHub, type HubClient } from "./hub";
+import { SessionRegistry } from "./session-registry";
 
 const event = (session_id: string): BingbongEvent => ({
   event_type: "PreToolUse",
@@ -21,6 +22,8 @@ const req = (method: string, path: string, body?: string) =>
   new Request(`http://hub${path}`, { method, body });
 
 describe("BingbongHub", () => {
+  afterEach(() => setSystemTime());
+
   test("ingest enriches, broadcasts, and drops a throwing client", () => {
     const hub = new BingbongHub({ version: "t" });
     const a = recorder();
@@ -170,9 +173,9 @@ describe("BingbongHub", () => {
   test("onChange fires after ingest and after a pruning addClient, not on a plain addClient", () => {
     const min = 60 * 1000;
     const t0 = Date.now();
-    let t = t0;
+    setSystemTime(t0);
     let changes = 0;
-    const hub = new BingbongHub({ version: "t", now: () => t, onChange: () => changes++ });
+    const hub = new BingbongHub({ version: "t", onChange: () => changes++ });
 
     hub.addClient(recorder().client);
     expect(changes).toBe(0);
@@ -181,14 +184,27 @@ describe("BingbongHub", () => {
     hub.ingest(event("s1"));
     expect(changes).toBe(2);
 
-    t = t0 + 29.5 * min; // prune runs but removes nothing
+    setSystemTime(t0 + 29.5 * min); // prune runs but removes nothing
     hub.addClient(recorder().client);
     expect(changes).toBe(2);
 
-    t = t0 + 31 * min; // prune removes s1
+    setSystemTime(t0 + 31 * min); // prune removes s1
     hub.addClient(recorder().client);
     expect(hub.registry.snapshots()).toHaveLength(0);
     expect(changes).toBe(3);
+  });
+
+  test("a freshly constructed hub prunes on its first activity (Durable Object wake)", () => {
+    const old = new Date(Date.now() - 31 * 60 * 1000).toISOString();
+    const registry = SessionRegistry.fromJSON({
+      counter: 1,
+      sessions: [
+        { session_id: "stale", machine_id: "m1", label: "old", pan: 0, index: 0, color: "#FF6B6B", event_count: 1, first_seen: old, last_seen: old },
+      ],
+    });
+    const hub = new BingbongHub({ version: "t", registry });
+    hub.ingest(event("fresh"));
+    expect(hub.registry.snapshots().map((s) => s.session_id)).toEqual(["fresh"]);
   });
 
   test("addClient with sendInit: false sends nothing but still receives broadcasts", () => {
