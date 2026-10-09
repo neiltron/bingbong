@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import { PROTOCOL_VERSION, type BingbongEvent } from "@bingbong/protocol";
 import { BingbongHub, type HubClient } from "./hub";
 
@@ -82,29 +82,61 @@ describe("BingbongHub", () => {
     expect(await missing.text()).toBe("Not Found");
   });
 
-  test("prunes stale sessions lazily, at most once per 60s", () => {
-    const min = 60 * 1000;
-    const t0 = Date.now();
-    let t = t0;
-    const logs: string[] = [];
+  test("a client whose init send throws is dropped, not propagated", () => {
+    const errors: string[] = [];
     const hub = new BingbongHub({
       version: "t",
-      now: () => t,
-      logger: { info: (m) => logs.push(m), error() {} },
+      logger: { info() {}, error: (m) => errors.push(m) },
     });
-    hub.ingest(event("s1"));
+    expect(() =>
+      hub.addClient({ send: () => { throw new Error("gone"); } }),
+    ).not.toThrow();
+    expect(hub.clientCount).toBe(0);
+    expect(errors).toEqual(["[WS] Failed to send:"]);
+  });
 
-    t = t0 + 29.5 * min; // prune runs, session not yet stale
-    hub.addClient(recorder().client);
-    expect(hub.registry.snapshots()).toHaveLength(1);
+  describe("lazy pruning", () => {
+    const min = 60 * 1000;
+    afterEach(() => setSystemTime());
 
-    t = t0 + 30 * min + 10_000; // stale, but only 40s since last prune
-    hub.addClient(recorder().client);
-    expect(hub.registry.snapshots()).toHaveLength(1);
+    test("prunes stale sessions lazily, at most once per 60s", () => {
+      const t0 = Date.now();
+      setSystemTime(t0);
+      const logs: string[] = [];
+      const hub = new BingbongHub({
+        version: "t",
+        logger: { info: (m) => logs.push(m), error() {} },
+      });
+      hub.ingest(event("s1"));
 
-    t = t0 + 30.5 * min; // 60s since last prune
-    hub.addClient(recorder().client);
-    expect(hub.registry.snapshots()).toHaveLength(0);
-    expect(logs).toContain("[Session] Removing stale session: m1:s1");
+      setSystemTime(t0 + 29.5 * min); // prune runs, session not yet stale
+      hub.addClient(recorder().client);
+      expect(hub.registry.snapshots()).toHaveLength(1);
+
+      setSystemTime(t0 + 30 * min + 10_000); // stale, but only 40s since last prune
+      hub.addClient(recorder().client);
+      expect(hub.registry.snapshots()).toHaveLength(1);
+
+      setSystemTime(t0 + 30.5 * min); // 60s since last prune
+      hub.addClient(recorder().client);
+      expect(hub.registry.snapshots()).toHaveLength(0);
+      expect(logs).toContain("[Session] Removing stale session: m1:s1");
+    });
+
+    test("a session ingested after a clock jump is not pruned as stale", () => {
+      const t0 = Date.now();
+      setSystemTime(t0);
+      const hub = new BingbongHub({ version: "t" });
+      hub.ingest(event("old"));
+
+      setSystemTime(t0 + 31 * min);
+      hub.addClient(recorder().client);
+      expect(hub.registry.snapshots()).toHaveLength(0);
+
+      hub.ingest(event("fresh"));
+      setSystemTime(t0 + 32 * min);
+      hub.addClient(recorder().client);
+      expect(hub.registry.snapshots().map((s) => s.session_id)).toEqual(["fresh"]);
+    });
   });
 });

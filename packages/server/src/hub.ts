@@ -27,7 +27,6 @@ export interface HubOptions {
   version: string;
   logger?: HubLogger;
   registry?: SessionRegistry;
-  now?: () => number;
 }
 
 const PRUNE_INTERVAL_MS = 60 * 1000;
@@ -45,15 +44,13 @@ export class BingbongHub {
   private readonly clients = new Set<HubClient>();
   private readonly version: string;
   private readonly logger: HubLogger;
-  private readonly now: () => number;
   private lastPruneAt: number;
 
   constructor(opts: HubOptions) {
     this.version = opts.version;
     this.logger = opts.logger ?? silentLogger;
     this.registry = opts.registry ?? new SessionRegistry();
-    this.now = opts.now ?? Date.now;
-    this.lastPruneAt = this.now();
+    this.lastPruneAt = Date.now();
   }
 
   /** enrich, log, broadcast; also prunes stale sessions. Returns the enriched event. */
@@ -84,13 +81,18 @@ export class BingbongHub {
     this.clients.add(client);
     this.logger.info(`[WS] Client connected (total: ${this.clients.size})`);
 
-    client.send(
-      JSON.stringify({
-        type: "init",
-        protocol_version: PROTOCOL_VERSION,
-        sessions: this.registry.snapshots(),
-      } satisfies InitMessage),
-    );
+    try {
+      client.send(
+        JSON.stringify({
+          type: "init",
+          protocol_version: PROTOCOL_VERSION,
+          sessions: this.registry.snapshots(),
+        } satisfies InitMessage),
+      );
+    } catch (err) {
+      this.logger.error("[WS] Failed to send:", err);
+      this.clients.delete(client);
+    }
   }
 
   removeClient(client: HubClient): void {
@@ -167,7 +169,7 @@ export class BingbongHub {
   // Pruned lazily on activity instead of on a setInterval: Durable Objects
   // hibernate between requests, so background timers can't be relied on.
   private pruneStale() {
-    const now = this.now();
+    const now = Date.now();
     if (now - this.lastPruneAt < PRUNE_INTERVAL_MS) return;
     this.lastPruneAt = now;
     for (const key of this.registry.removeStale(now)) {
