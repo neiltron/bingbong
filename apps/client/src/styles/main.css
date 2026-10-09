@@ -1063,6 +1063,10 @@ input[type="range"] {
     gap: 24px;
     padding: 14px 20px;
     border-top: 1px solid var(--color-border);
+    /* Short viewports: the controls scroll instead of being clipped by the modal. */
+    min-height: 0;
+    max-height: 45vh;
+    overflow-y: auto;
 }
 
 .radar-modal-sliders {
@@ -1082,7 +1086,13 @@ input[type="range"] {
     flex: 1;
 }
 
-.radar-modal-sliders .ctl-row input[type="password"] {
+#sound-params {
+    display: contents;
+}
+
+.radar-modal-sliders .ctl-row input[type="password"],
+.radar-modal-sliders .ctl-row input[type="text"],
+.radar-modal-sliders .ctl-row select {
     flex: 1;
     min-width: 0;
     padding: 6px 10px;
