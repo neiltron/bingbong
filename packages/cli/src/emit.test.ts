@@ -62,6 +62,18 @@ describe("shapePayload metadata", () => {
     expect(out).toEqual(base as BingbongEvent);
     expect("tool_input" in out).toBe(false);
   });
+
+  test("forwards a string parent_session_id, drops a non-string one", () => {
+    expect(shapePayload({ ...base, parent_session_id: "root" }, "metadata")).toEqual({
+      ...base,
+      parent_session_id: "root",
+    } as BingbongEvent);
+    const malformed = { ...base, parent_session_id: { prompt: "secret" } } as unknown as BingbongEvent;
+    const out = shapePayload(malformed, "metadata");
+    expect(out).toEqual(base as BingbongEvent);
+    expect("parent_session_id" in out).toBe(false);
+    expect(shapePayload(malformed, "full")).toEqual(malformed);
+  });
 });
 
 test("shapePayload full passes everything through unchanged", () => {

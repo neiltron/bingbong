@@ -37,7 +37,7 @@ const CURSOR_EVENT_MAP: Record<string, { type: string; tool?: string }> = {
 
 // Same shape the pi/OpenCode plugins send. The tool_input keys are the ones
 // the web client reads (eventDetail in apps/client/src/main.ts).
-const METADATA_KEYS = ["event_type", "session_id", "machine_id", "parent_session_id", "timestamp", "cwd", "tool_name", "original_event_type"] as const;
+const METADATA_KEYS = ["event_type", "session_id", "machine_id", "timestamp", "cwd", "tool_name", "original_event_type"] as const;
 const DISPLAY_KEYS = ["command", "file_path", "pattern", "url", "action"] as const;
 const MAX_DISPLAY_LEN = 256;
 
@@ -50,6 +50,7 @@ export function shapePayload(payload: BingbongEvent, mode: "metadata" | "full"):
   if (mode === "full") return payload;
   const out: Record<string, unknown> = {};
   for (const k of METADATA_KEYS) if (payload[k] !== undefined) out[k] = payload[k];
+  if (typeof payload.parent_session_id === "string") out.parent_session_id = payload.parent_session_id;
   const input: Record<string, string> = {};
   for (const k of DISPLAY_KEYS) {
     const v = payload.tool_input?.[k];

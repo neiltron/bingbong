@@ -87,4 +87,15 @@ describe("SessionRegistry parent_session_id", () => {
     expect(restored.snapshots().find((s) => s.session_id === "child")?.parent_session_id).toBe("root");
     expect(restored.snapshots().find((s) => s.session_id === "root")?.parent_session_id).toBeUndefined();
   });
+
+  test("enriched events carry the first-sight parent, matching the snapshot", () => {
+    const r = new SessionRegistry();
+    r.enrich(event("late"));
+    expect(r.enrich({ ...event("late"), parent_session_id: "root" }).event.parent_session_id).toBeUndefined();
+    expect(r.snapshots().find((s) => s.session_id === "late")?.parent_session_id).toBeUndefined();
+
+    r.enrich({ ...event("child"), parent_session_id: "root" });
+    expect(r.enrich({ ...event("child"), parent_session_id: "changed" }).event.parent_session_id).toBe("root");
+    expect(r.snapshots().find((s) => s.session_id === "child")?.parent_session_id).toBe("root");
+  });
 });

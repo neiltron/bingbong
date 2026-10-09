@@ -70,6 +70,7 @@ export class SessionRegistry {
     return {
       event: {
         ...event,
+        parent_session_id: session.parent_session_id,
         pan: session.pan,
         session_index: session.index,
         color: session.color,
