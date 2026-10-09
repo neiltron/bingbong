@@ -20,8 +20,9 @@ send_event() {
 
     local timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-    curl -s -X POST \
+    curl -s --fail-with-body -X POST \
         -H "Content-Type: application/json" \
+        ${BINGBONG_TOKEN:+-H "Authorization: Bearer $BINGBONG_TOKEN"} \
         -d "{
             \"event_type\": \"$event_type\",
             \"session_id\": \"$SESSION_ID\",
@@ -32,7 +33,8 @@ send_event() {
             \"tool_input\": {},
             \"tool_output\": {}
         }" \
-        "${SERVER_URL}/events" > /dev/null
+        "${SERVER_URL}/events" > /dev/null \
+        || { echo "Failed: $event_type (is the server up? BINGBONG_TOKEN set if it requires one?)" >&2; exit 1; }
 
     echo "Sent: $event_type ${tool_name:+($tool_name)}"
 }
