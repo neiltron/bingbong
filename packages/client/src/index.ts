@@ -37,6 +37,22 @@ export type ClientEventMap = {
 
 type Listener<K extends keyof ClientEventMap> = (...args: ClientEventMap[K]) => void;
 
+function isObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null;
+}
+
+function hasIds(v: unknown): boolean {
+  return isObject(v) && typeof v.session_id === "string" && typeof v.machine_id === "string";
+}
+
+/** enough shape to update the session map without throwing halfway through */
+function isValidMessage(m: unknown): m is ServerMessage {
+  if (!isObject(m) || typeof m.type !== "string") return false;
+  if (m.type === "init") return Array.isArray(m.sessions) && m.sessions.every(hasIds);
+  if (m.type === "event") return hasIds(m.event);
+  return true;
+}
+
 /** same key the server registry uses */
 export function sessionKey(machineId: string, sessionId: string): string {
   return `${machineId}:${sessionId}`;
@@ -52,7 +68,8 @@ export class BingbongClient {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(opts: ClientOptions) {
-    this.opts = opts;
+    // a copy: the caller's object may be shared between clients or frozen
+    this.opts = { ...opts };
   }
 
   get connected(): boolean {
@@ -74,8 +91,13 @@ export class BingbongClient {
   disconnect(): void {
     this.shouldConnect = false;
     this.clearTimer();
-    this.ws?.close();
+    const ws = this.ws;
+    if (!ws) return;
+    // detach first so a late close/message from the retired socket can't touch the next connection
+    ws.onopen = ws.onmessage = ws.onclose = ws.onerror = null;
+    ws.close();
     this.ws = null;
+    this.fire("disconnected");
   }
 
   on<K extends keyof ClientEventMap>(name: K, fn: Listener<K>): () => void {
@@ -103,7 +125,14 @@ export class BingbongClient {
   }
 
   private fire<K extends keyof ClientEventMap>(name: K, ...args: ClientEventMap[K]): void {
-    for (const fn of this.listeners.get(name) ?? []) (fn as Listener<K>)(...args);
+    for (const fn of this.listeners.get(name) ?? []) {
+      // one throwing observer must not stall bookkeeping, later listeners or the retry timer
+      try {
+        (fn as Listener<K>)(...args);
+      } catch (e) {
+        console.error(`[bingbong] "${name}" listener threw:`, e);
+      }
+    }
   }
 
   private request(path: string, init: RequestInit = {}): Promise<Response> {
@@ -135,17 +164,23 @@ export class BingbongClient {
     let opened = false;
 
     ws.onopen = () => {
+      if (this.ws !== ws) return;
       opened = true;
       this.reconnectAttempts = 0;
       this.fire("connected");
     };
 
     ws.onmessage = (msg) => {
-      let data: ServerMessage;
+      if (this.ws !== ws) return;
+      let data: unknown;
       try {
         data = JSON.parse(String(msg.data));
       } catch (e) {
         console.warn("[bingbong] Failed to parse WebSocket message:", e);
+        return;
+      }
+      if (!isValidMessage(data)) {
+        console.warn("[bingbong] Ignoring malformed WebSocket message:", data);
         return;
       }
       this.handleMessage(data);
@@ -153,7 +188,8 @@ export class BingbongClient {
 
     // onclose is the single source of truth for reconnection; onerror always precedes it
     ws.onclose = () => {
-      if (this.ws === ws) this.ws = null;
+      if (this.ws !== ws) return;
+      this.ws = null;
       this.fire("disconnected");
       if (this.shouldConnect) this.scheduleReconnect(!opened);
     };
@@ -171,6 +207,9 @@ export class BingbongClient {
       const e = msg.event;
       const key = sessionKey(e.machine_id, e.session_id);
       const prev = this.sessions.get(key);
+      // receipt time (approximated by the client clock), like init/fetchSessions; e.timestamp is
+      // the producer's clock and may be deliberately backdated (bingbong test --count)
+      const now = new Date().toISOString();
       const session: SessionSnapshot = {
         session_id: e.session_id,
         machine_id: e.machine_id,
@@ -179,8 +218,8 @@ export class BingbongClient {
         index: e.session_index,
         color: e.color,
         event_count: (prev?.event_count ?? 0) + 1,
-        first_seen: prev?.first_seen ?? e.timestamp,
-        last_seen: e.timestamp,
+        first_seen: prev?.first_seen ?? now,
+        last_seen: now,
       };
       this.sessions.set(key, session);
       // event_count moves on every event, so the snapshot always changed
