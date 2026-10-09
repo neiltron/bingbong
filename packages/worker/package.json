@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@bingbong/server": "file:../server"
+    "@bingbong/server": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261008.1",

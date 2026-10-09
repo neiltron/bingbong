@@ -8,8 +8,8 @@
     "typecheck": "bunx tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@bingbong/client": "file:../../packages/client",
-    "@bingbong/protocol": "file:../../packages/protocol"
+    "@bingbong/client": "workspace:*",
+    "@bingbong/protocol": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.3.0",

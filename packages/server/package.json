@@ -9,6 +9,6 @@
   },
   "types": "./src/index.ts",
   "dependencies": {
-    "@bingbong/protocol": "file:../protocol"
+    "@bingbong/protocol": "workspace:*"
   }
 }

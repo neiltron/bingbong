@@ -8,8 +8,8 @@
     "apps/client": {
       "name": "@bingbong/web",
       "dependencies": {
-        "@bingbong/client": "file:../../packages/client",
-        "@bingbong/protocol": "file:../../packages/protocol",
+        "@bingbong/client": "workspace:*",
+        "@bingbong/protocol": "workspace:*",
       },
       "devDependencies": {
         "typescript": "^5.3.0",
@@ -19,17 +19,17 @@
     "packages/cli": {
       "name": "@bingbong/cli",
       "dependencies": {
-        "@bingbong/protocol": "file:../protocol",
-        "@bingbong/server": "file:../server",
+        "@bingbong/protocol": "workspace:*",
+        "@bingbong/server": "workspace:*",
       },
     },
     "packages/client": {
       "name": "@bingbong/client",
       "dependencies": {
-        "@bingbong/protocol": "file:../protocol",
+        "@bingbong/protocol": "workspace:*",
       },
       "devDependencies": {
-        "@bingbong/server": "file:../server",
+        "@bingbong/server": "workspace:*",
       },
     },
     "packages/design-system": {
@@ -51,14 +51,14 @@
     "packages/server": {
       "name": "@bingbong/server",
       "dependencies": {
-        "@bingbong/protocol": "file:../protocol",
+        "@bingbong/protocol": "workspace:*",
       },
     },
     "packages/worker": {
       "name": "@bingbong/worker",
       "version": "0.1.0",
       "dependencies": {
-        "@bingbong/server": "file:../server",
+        "@bingbong/server": "workspace:*",
       },
       "devDependencies": {
         "@cloudflare/workers-types": "^5.20261008.1",
@@ -348,33 +348,7 @@
 
     "youch-core": ["youch-core@0.3.3", "", { "dependencies": { "@poppinss/exception": "^1.2.2", "error-stack-parser-es": "^1.0.5" } }, "sha512-ho7XuGjLaJ2hWHoK8yFnsUGy2Y5uDpqSTq1FkHLK4/oqKtyUU1AFbOOxY4IpC9f0fTLjwYbslUz0Po5BpD1wrA=="],
 
-    "@bingbong/cli/@bingbong/protocol": ["@bingbong/protocol@file:packages/protocol", {}],
-
-    "@bingbong/cli/@bingbong/server": ["@bingbong/server@file:packages/server", { "dependencies": { "@bingbong/protocol": "file:../protocol" } }],
-
-    "@bingbong/client/@bingbong/protocol": ["@bingbong/protocol@file:packages/protocol", {}],
-
-    "@bingbong/client/@bingbong/server": ["@bingbong/server@file:packages/server", { "dependencies": { "@bingbong/protocol": "file:../protocol" } }],
-
-    "@bingbong/server/@bingbong/protocol": ["@bingbong/protocol@file:packages/protocol", {}],
-
-    "@bingbong/web/@bingbong/client": ["@bingbong/client@file:packages/client", { "dependencies": { "@bingbong/protocol": "file:../protocol" }, "devDependencies": { "@bingbong/server": "file:../server" } }],
-
-    "@bingbong/web/@bingbong/protocol": ["@bingbong/protocol@file:packages/protocol", {}],
-
-    "@bingbong/worker/@bingbong/server": ["@bingbong/server@file:packages/server", { "dependencies": { "@bingbong/protocol": "file:../protocol" } }],
-
     "wrangler/esbuild": ["esbuild@0.28.1", "", { "optionalDependencies": { "@esbuild/aix-ppc64": "0.28.1", "@esbuild/android-arm": "0.28.1", "@esbuild/android-arm64": "0.28.1", "@esbuild/android-x64": "0.28.1", "@esbuild/darwin-arm64": "0.28.1", "@esbuild/darwin-x64": "0.28.1", "@esbuild/freebsd-arm64": "0.28.1", "@esbuild/freebsd-x64": "0.28.1", "@esbuild/linux-arm": "0.28.1", "@esbuild/linux-arm64": "0.28.1", "@esbuild/linux-ia32": "0.28.1", "@esbuild/linux-loong64": "0.28.1", "@esbuild/linux-mips64el": "0.28.1", "@esbuild/linux-ppc64": "0.28.1", "@esbuild/linux-riscv64": "0.28.1", "@esbuild/linux-s390x": "0.28.1", "@esbuild/linux-x64": "0.28.1", "@esbuild/netbsd-arm64": "0.28.1", "@esbuild/netbsd-x64": "0.28.1", "@esbuild/openbsd-arm64": "0.28.1", "@esbuild/openbsd-x64": "0.28.1", "@esbuild/openharmony-arm64": "0.28.1", "@esbuild/sunos-x64": "0.28.1", "@esbuild/win32-arm64": "0.28.1", "@esbuild/win32-ia32": "0.28.1", "@esbuild/win32-x64": "0.28.1" }, "bin": { "esbuild": "bin/esbuild" } }, "sha512-HrJrvZv5ayxBzPfwphOoNzkzOIIlifzk0KJrGK2c8R4+LKpMtpYLQeUdjnwjWv/LZlkH2laZk+4w78pi99D4Vw=="],
-
-    "@bingbong/cli/@bingbong/server/@bingbong/protocol": ["@bingbong/protocol@file:packages/protocol", {}],
-
-    "@bingbong/client/@bingbong/server/@bingbong/protocol": ["@bingbong/protocol@file:packages/protocol", {}],
-
-    "@bingbong/web/@bingbong/client/@bingbong/protocol": ["@bingbong/protocol@file:packages/protocol", {}],
-
-    "@bingbong/web/@bingbong/client/@bingbong/server": ["@bingbong/server@file:packages/server", {}],
-
-    "@bingbong/worker/@bingbong/server/@bingbong/protocol": ["@bingbong/protocol@file:packages/protocol", {}],
 
     "wrangler/esbuild/@esbuild/aix-ppc64": ["@esbuild/aix-ppc64@0.28.1", "", { "os": "aix", "cpu": "ppc64" }, "sha512-Svl7tq8k/08+p6CXPpRjQ1fKX+1odH/BQbb48fV6fj3CWHhsoIOoY87w1oHXm0qEpkIK3ZfVgp0hed3XBXzXMQ=="],
 

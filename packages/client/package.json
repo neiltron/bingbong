@@ -11,9 +11,9 @@
     "typecheck": "bunx tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@bingbong/protocol": "file:../protocol"
+    "@bingbong/protocol": "workspace:*"
   },
   "devDependencies": {
-    "@bingbong/server": "file:../server"
+    "@bingbong/server": "workspace:*"
   }
 }
