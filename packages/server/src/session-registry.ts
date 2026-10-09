@@ -1,6 +1,7 @@
 import type {
   EnrichedEvent,
   BingbongEvent,
+  Position,
   SessionSnapshot,
 } from "@bingbong/protocol";
 import type { RuntimeStats } from "./logger";
@@ -48,6 +49,23 @@ const SESSION_COLORS = [
 const isIndex = (n: unknown): n is number =>
   Number.isSafeInteger(n) && (n as number) >= 0 && Number.isSafeInteger((n as number) + 1);
 
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+/** Stereo pan follows the radar: left edge -1, right edge 1 */
+const panFor = (position: Position) => position.x * 2 - 1;
+
+/** Default radar spot: index 0 at centre, then a golden-angle spiral (ported from the web client's PositionManager). */
+export function autoPosition(index: number): Position {
+  if (index === 0) return { x: 0.5, y: 0.5 };
+  const angle = (index * 137.5 * Math.PI) / 180;
+  const ring = Math.ceil(Math.sqrt(index));
+  const radius = 0.15 + ring * 0.1;
+  return {
+    x: clamp(0.5 + Math.cos(angle) * radius, 0.1, 0.9),
+    y: clamp(0.5 + Math.sin(angle) * radius, 0.1, 0.9),
+  };
+}
+
 export class SessionRegistry {
   private readonly sessions = new Map<string, SessionRecord>();
   private sessionCounter = 0;
@@ -72,6 +90,7 @@ export class SessionRegistry {
         ...event,
         parent_session_id: session.parent_session_id,
         pan: session.pan,
+        position: { ...session.position },
         session_index: session.index,
         color: session.color,
         session_label: session.label,
@@ -88,18 +107,23 @@ export class SessionRegistry {
   }
 
   snapshots(): SessionSnapshot[] {
-    return Array.from(this.sessions.values()).map((session) => ({
+    return Array.from(this.sessions.values(), (session) => this.snapshot(session));
+  }
+
+  private snapshot(session: SessionRecord): SessionSnapshot {
+    return {
       session_id: session.session_id,
       machine_id: session.machine_id,
       parent_session_id: session.parent_session_id,
       label: session.label,
       pan: session.pan,
+      position: { ...session.position },
       index: session.index,
       color: session.color,
       event_count: session.event_count,
       first_seen: session.first_seen.toISOString(),
       last_seen: session.last_seen.toISOString(),
-    }));
+    };
   }
 
   toJSON(): RegistryState {
@@ -138,6 +162,10 @@ export class SessionRegistry {
         continue;
       }
 
+      const position =
+        Number.isFinite(s.position?.x) && Number.isFinite(s.position?.y)
+          ? { x: clamp(s.position.x, 0, 1), y: clamp(s.position.y, 0, 1) }
+          : autoPosition(s.index);
       registry.sessions.set(`${s.machine_id}:${s.session_id}`, {
         session_id: s.session_id,
         machine_id: s.machine_id,
@@ -148,7 +176,8 @@ export class SessionRegistry {
         first_seen,
         last_seen,
         event_count: Number.isFinite(s.event_count) ? s.event_count : 0,
-        pan: Number.isFinite(s.pan) ? s.pan : 0,
+        pan: panFor(position),
+        position,
         index: s.index,
         color:
           typeof s.color === "string"
@@ -160,6 +189,16 @@ export class SessionRegistry {
     registry.sessionCounter = counter;
 
     return registry;
+  }
+
+  /** Moves a session's radar source; null for non-string ids, an unknown session or non-finite coordinates. */
+  setPosition(machineId: string, sessionId: string, x: number, y: number): SessionSnapshot | null {
+    if (typeof machineId !== "string" || typeof sessionId !== "string") return null;
+    const session = this.sessions.get(`${machineId}:${sessionId}`);
+    if (!session || !Number.isFinite(x) || !Number.isFinite(y)) return null;
+    session.position = { x: clamp(x, 0, 1), y: clamp(y, 0, 1) };
+    session.pan = panFor(session.position);
+    return this.snapshot(session);
   }
 
   stats(clientCount: number): RuntimeStats {
@@ -198,8 +237,7 @@ export class SessionRegistry {
     }
 
     const index = this.sessionCounter++;
-    const pan =
-      index === 0 ? 0 : ((index % 2 === 1 ? -1 : 1) * Math.ceil(index / 2)) / 5;
+    const position = autoPosition(index);
 
     const { label, fromCwd } = this.deriveLabel(event.cwd, event.session_id);
 
@@ -212,7 +250,8 @@ export class SessionRegistry {
       first_seen: new Date(),
       last_seen: new Date(),
       event_count: 0,
-      pan: Math.max(-1, Math.min(1, pan)),
+      pan: panFor(position),
+      position,
       index,
       color: SESSION_COLORS[index % SESSION_COLORS.length],
     };

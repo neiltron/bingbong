@@ -57,7 +57,9 @@ export class BingbongDurableObject extends DurableObject<Env> {
     return this.hub.fetch(req);
   }
 
-  webSocketMessage() {}
+  webSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
+    this.hub.handleMessage(ws, message);
+  }
 
   webSocketClose(ws: WebSocket) {
     this.hub.removeClient(ws);

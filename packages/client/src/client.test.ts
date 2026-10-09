@@ -187,3 +187,17 @@ test("disconnect(); connect() retires the old socket: one connected, no retry", 
   expect(reconnects).toBe(0);
   expect(c.connected).toBe(true);
 });
+
+test("moveSource: another client sees the new position", async () => {
+  const [a, b] = [client("t"), client("t")];
+  for (const c of [a, b]) {
+    const init = next(c, "init");
+    c.connect();
+    await init;
+  }
+  const moved = next(b, "session");
+  a.moveSource({ machine_id: "m1", session_id: "s1" }, 0.2, 0.8);
+  const [session] = await moved;
+  expect(session).toMatchObject({ session_id: "s1", position: { x: 0.2, y: 0.8 } });
+  expect(b.sessions.get(sessionKey("m1", "s1"))?.position).toEqual({ x: 0.2, y: 0.8 });
+});

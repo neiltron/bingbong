@@ -492,6 +492,7 @@ function sessionsForLanes(): Map<string, Session> {
         machine_id: event.machine_id,
         label: event.session_label,
         pan: event.pan,
+        position: event.position,
         index: event.session_index,
         color: event.color,
         event_count: 1,
@@ -853,13 +854,9 @@ function onAudioBannerClick(): void {
 // ============================================
 // Event Handling
 // ============================================
-// The client has already upserted the event's session into client.sessions
+// The 'session' listener has already placed this event's source on the radar
 function handleEvent(event: EnrichedEvent): void {
   const key = sessionKey(event.machine_id, event.session_id)
-  const session = client.sessions.get(key)!
-  visualizer?.updateSession(session)
-  sourceOverlay?.createSource(session)
-
   // Add to log. It's kept for the tab lifetime, so drop the raw payloads
   const { command, file_path, pattern, url, action } = event.tool_input ?? {}
   event.tool_input = { command, file_path, pattern, url, action }
@@ -888,10 +885,7 @@ function handleInit(snapshot: Session[]): void {
   // Full cleanup chain on reconnect
   sourceOverlay?.clearSources()
   visualizer?.clearSessions()
-  for (const s of snapshot) {
-    visualizer?.updateSession(s)
-    sourceOverlay?.createSource(s)
-  }
+  for (const s of snapshot) sourceOverlay?.applySession(s)
   updateUI()
 }
 
@@ -952,7 +946,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const canvas = document.getElementById('visualizer') as HTMLCanvasElement
   const spatialContainer = document.getElementById('spatial-container') as HTMLElement
 
-  const viz = createVisualization(spatialContainer, canvas, audioEngine)
+  const viz = createVisualization(spatialContainer, canvas, audioEngine, (session, x, y) => {
+    client.moveSource(session, x, y)
+    renderMiniRadars()
+  })
   visualizer = viz.visualizer
   sourceOverlay = viz.sourceOverlay
 
@@ -964,12 +961,16 @@ document.addEventListener('DOMContentLoaded', () => {
   client.on('reconnecting', setReconnecting)
   client.on('init', handleInit)
   client.on('event', handleEvent)
+  // Server-driven moves (other tabs, spiral auto-position); handleEvent/handleInit redraw for the rest
+  client.on('session', (s) => {
+    if (sourceOverlay?.applySession(s)) renderMiniRadars()
+  })
   client.on('message', (msg) => {
     if (msg.type === 'init' && msg.protocol_version !== PROTOCOL_VERSION) {
       console.warn(
         `[bingbong] Server speaks protocol v${msg.protocol_version}, client expects v${PROTOCOL_VERSION}`,
       )
-    } else if (msg.type !== 'init' && msg.type !== 'event') {
+    } else if (msg.type !== 'init' && msg.type !== 'event' && msg.type !== 'session_update') {
       console.warn('[bingbong] Ignoring unknown server message:', (msg as { type: unknown }).type)
     }
   })
@@ -1105,11 +1106,5 @@ document.addEventListener('DOMContentLoaded', () => {
     target.classList.toggle('muted', muted)
     target.setAttribute('aria-pressed', String(muted))
     updateTitle()
-  })
-
-  // Reset layout button
-  document.getElementById('reset-layout-btn')?.addEventListener('click', () => {
-    sourceOverlay?.resetLayout()
-    renderMiniRadars()
   })
 })

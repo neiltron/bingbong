@@ -215,4 +215,57 @@ describe("BingbongHub", () => {
     const enriched = hub.ingest(event("s1"));
     expect(a.sent).toEqual([{ type: "event", event: enriched }]);
   });
+
+  test("move_source updates the snapshot, broadcasts session_update to every client, fires onChange", () => {
+    let changes = 0;
+    const hub = new BingbongHub({ version: "t", onChange: () => changes++ });
+    hub.ingest(event("s1"));
+    const a = recorder();
+    const b = recorder();
+    hub.addClient(a.client);
+    hub.addClient(b.client);
+    expect(a.sent[0].protocol_version).toBe(2);
+    expect(a.sent[0].sessions[0].position).toEqual({ x: 0.5, y: 0.5 });
+
+    const move = { type: "move_source", machine_id: "m1", session_id: "s1", x: 0.2, y: 1.5 };
+    hub.handleMessage(a.client, JSON.stringify(move));
+    const session = hub.registry.snapshots()[0];
+    expect(session.position).toEqual({ x: 0.2, y: 1 });
+    expect(a.sent[1]).toEqual({ type: "session_update", session });
+    expect(b.sent[1]).toEqual({ type: "session_update", session });
+    expect(changes).toBe(2);
+
+    // binary frames decode the same way
+    hub.handleMessage(a.client, new TextEncoder().encode(JSON.stringify({ ...move, x: 0.7 })));
+    expect(hub.registry.snapshots()[0].position).toEqual({ x: 0.7, y: 1 });
+    expect(changes).toBe(3);
+  });
+
+  test("malformed, unknown, or unmatched messages don't throw or broadcast", () => {
+    let changes = 0;
+    const logs: string[] = [];
+    const hub = new BingbongHub({
+      version: "t",
+      onChange: () => changes++,
+      logger: { info: (m) => logs.push(m), error() {} },
+    });
+    hub.ingest(event("s1"));
+    const a = recorder();
+    hub.addClient(a.client);
+    for (const raw of ["garbage", "null", "42", '{"type":"nope"}', "{}"]) {
+      expect(() => hub.handleMessage(a.client, raw)).not.toThrow();
+    }
+    hub.handleMessage(a.client, JSON.stringify({ type: "move_source", machine_id: "m1", session_id: "zz", x: 0, y: 0 }));
+    hub.handleMessage(a.client, JSON.stringify({ type: "move_source", machine_id: "m1", session_id: "s1", x: "a", y: 0 }));
+    // non-string ids: an array would coerce into "m1:s1", a toString-less object would throw
+    hub.handleMessage(a.client, JSON.stringify({ type: "move_source", machine_id: ["m1"], session_id: "s1", x: 0.1, y: 0.1 }));
+    hub.handleMessage(a.client, JSON.stringify({ type: "move_source", machine_id: "m1", session_id: ["s1"], x: 0.1, y: 0.1 }));
+    const noString = '{"type":"move_source","machine_id":{"toString":null},"session_id":"s1","x":0.1,"y":0.1}';
+    expect(() => hub.handleMessage(a.client, noString)).not.toThrow();
+    expect(hub.registry.snapshots()[0].position).toEqual({ x: 0.5, y: 0.5 });
+    expect(a.sent).toHaveLength(1); // init only
+    expect(changes).toBe(1);
+    expect(logs).toContain("[WS] Received: garbage");
+    expect(logs).toContain('[WS] Received: {"type":"nope"}');
+  });
 });

@@ -8,6 +8,7 @@ import type {
   BingbongEvent,
   EnrichedEvent,
   HealthResponse,
+  MoveSourceMessage,
   ServerMessage,
   SessionSnapshot,
 } from "@bingbong/protocol";
@@ -121,6 +122,19 @@ export class BingbongClient {
     });
   }
 
+  /** Moves a radar source for every client; no-op while disconnected */
+  moveSource(session: Pick<SessionSnapshot, "machine_id" | "session_id">, x: number, y: number): void {
+    if (!this.connected) return;
+    const msg: MoveSourceMessage = {
+      type: "move_source",
+      machine_id: session.machine_id,
+      session_id: session.session_id,
+      x,
+      y,
+    };
+    this.ws!.send(JSON.stringify(msg));
+  }
+
   async fetchSessions(): Promise<SessionSnapshot[]> {
     return this.json("/sessions");
   }
@@ -221,6 +235,7 @@ export class BingbongClient {
         parent_session_id: e.parent_session_id ?? prev?.parent_session_id,
         label: e.session_label ?? prev?.label,
         pan: e.pan,
+        position: e.position,
         index: e.session_index,
         color: e.color,
         event_count: (prev?.event_count ?? 0) + 1,
@@ -231,6 +246,10 @@ export class BingbongClient {
       // event_count moves on every event, so the snapshot always changed
       this.fire("session", session);
       this.fire("event", e);
+    } else if (msg.type === "session_update") {
+      const s = msg.session;
+      this.sessions.set(sessionKey(s.machine_id, s.session_id), s);
+      this.fire("session", s);
     }
   }
 
