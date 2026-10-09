@@ -1,4 +1,14 @@
-import type { SoundParams } from './types'
+export interface SoundParams {
+  note?: string
+  notes?: string[]
+  duration: number
+  type: OscillatorType
+  gain: number
+}
+
+export interface SoundConfig {
+  [key: string]: SoundParams | { [toolName: string]: SoundParams }
+}
 
 // Sound mappings - notes and characteristics for each event/tool
 export const SOUND_CONFIG: Record<string, SoundParams | Record<string, SoundParams>> = {

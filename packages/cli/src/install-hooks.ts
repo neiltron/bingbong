@@ -12,6 +12,7 @@ import { join, dirname } from "node:path";
 
 import opencodePluginSource from "../../../agents/opencode/plugins/bingbong.js" with { type: "text" };
 import piExtensionSource from "../../../agents/pi/extensions/bingbong.ts" with { type: "text" };
+import { loadConfig } from "./config";
 
 function getBingbongCommand(): string {
   try {
@@ -358,17 +359,23 @@ async function installOpencode(dryRun: boolean): Promise<string> {
 
 async function installPi(dryRun: boolean): Promise<string> {
   const targetPath = AGENTS.pi.path;
-  const bingbongUrl = process.env.BINGBONG_URL || "http://localhost:3334";
-  const transformed = piExtensionSource.replace("__BINGBONG_URL__", bingbongUrl);
+  const { url, token } = loadConfig();
+  const fill = (tokenLiteral: string) =>
+    piExtensionSource.replace("__BINGBONG_URL__", url).replace('"__BINGBONG_TOKEN__"', () => tokenLiteral);
+  // JSON-quoted so any token is a valid string literal
+  const transformed = fill(JSON.stringify(token ?? ""));
 
   if (dryRun) {
     const existingContent = existsSync(targetPath) ? await readFile(targetPath, "utf-8") : null;
-    printPreview(targetPath, existingContent, transformed);
+    // Never print the baked token; compare against the real content for "No changes".
+    const preview = token ? fill('"<redacted>"') : transformed;
+    printPreview(targetPath, existingContent === transformed ? preview : existingContent, preview);
     return targetPath;
   }
 
   ensureDir(dirname(targetPath));
   await writeFile(targetPath, transformed, "utf-8");
+  if (token) chmodSync(targetPath, 0o600); // the baked token is a secret
 
   return targetPath;
 }

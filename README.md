@@ -95,15 +95,55 @@ Examples:
 
 ## Configuration
 
-Server defaults to `http://localhost:3334`. Configure agent hooks via environment:
+Hooks, `ping` and `test` read `~/.config/bingbong/config.json` (or `$XDG_CONFIG_HOME/bingbong/config.json`):
+
+| Key | Default | |
+|-----|---------|---|
+| `url` | `http://localhost:3334` | Server the hooks post to |
+| `machine_id` | hostname | Label for this machine |
+| `token` | none | Shared secret for the server and hooks |
+| `payload` | `metadata` | `metadata`: event type, tool name, cwd and a short display detail (command, file path, pattern, URL or action, capped at 256 chars). `full`: the entire hook payload, including tool inputs and outputs |
+
+`payload` defaults to `metadata` because Claude Code, Cursor and Codex hook payloads include full tool inputs and responses (commands, file contents, prompts), and these shouldn't leave the machine just to play a sound. Use `bingbong config set payload full` only when you need the full data and trust the server.
+
+```bash
+bingbong config                                # show effective config; exits 1 naming the bad key if the file is invalid
+bingbong config set url https://bingbong.example.com
+bingbong config unset machine_id
+```
+
+A malformed config file (bad JSON, wrong types) makes the server refuse to start rather than run open, so run `bingbong config` after hand-editing the file and before restarting.
+
+Environment variables override the file, which helps for one-off runs:
 
 ```bash
 BINGBONG_URL=http://localhost:3334
-BINGBONG_ENABLED=true
 BINGBONG_MACHINE_ID=my-laptop
+BINGBONG_TOKEN=...
+BINGBONG_PAYLOAD=metadata
+BINGBONG_ENABLED=true    # false silences hooks
 ```
 
+When `token` is set, the server started on that machine requires it on `/events`, `/sessions` and `/ws` (`/health` stays open), and hooks, `ping` and `test` send it. Set the same token on every machine that posts events; `bingbong --token <value>` overrides it for the server. Without a token everything stays open.
+
+The pi extension bakes in `url` and `token` at install time; re-run `bingbong install-hooks pi` after changing them.
+
 --- 
+
+## Deploy to Cloudflare
+
+`packages/worker` hosts the server in a Durable Object (sessions persist across restarts) and serves the browser client from the same origin. Single tenant: one token, one shared session list.
+
+```bash
+bun run build:client
+bun run deploy:worker
+cd packages/worker && bunx wrangler secret put BINGBONG_TOKEN
+# on each machine that runs hooks:
+bingbong config set url https://bingbong.<account>.workers.dev
+bingbong config set token <same value>
+```
+
+Then open the worker URL and enter the token in the client settings. For local dev, `cp packages/worker/.dev.vars.example packages/worker/.dev.vars`, set `BINGBONG_TOKEN` there (wrangler runs from `packages/worker`, so a root `.dev.vars` is ignored and the server runs open), and run `bun run dev:worker`.
 
 ## Troubleshooting
 

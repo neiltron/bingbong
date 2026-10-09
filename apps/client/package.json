@@ -1,5 +1,5 @@
 {
-  "name": "@bingbong/client",
+  "name": "@bingbong/web",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,6 +8,7 @@
     "typecheck": "bunx tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@bingbong/client": "file:../../packages/client",
     "@bingbong/protocol": "file:../../packages/protocol"
   },
   "devDependencies": {

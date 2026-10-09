@@ -9,9 +9,10 @@ import { SessionRegistry } from "./session-registry";
 import {
   PROTOCOL_VERSION,
   type BingbongEvent,
+  type ClientMessage,
   type EnrichedEvent,
-  type EventMessage,
   type InitMessage,
+  type ServerMessage,
 } from "@bingbong/protocol";
 
 export interface HubClient {
@@ -27,16 +28,29 @@ export interface HubOptions {
   version: string;
   logger?: HubLogger;
   registry?: SessionRegistry;
+  /** shared secret; when unset every route stays open */
+  token?: string;
+  /** called after registry state changes (every ingest, a source move, or a prune that removed sessions) so hosts can persist it */
+  onChange?: (registry: SessionRegistry) => void;
 }
 
 const PRUNE_INTERVAL_MS = 60 * 1000;
+
+// Constant-time for equal lengths; length itself may leak, which is fine
+// for a shared secret. Pure JS so Durable Objects need no nodejs_compat.
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
 
 const silentLogger: HubLogger = { info() {}, error() {} };
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
 export class BingbongHub {
@@ -44,13 +58,19 @@ export class BingbongHub {
   private readonly clients = new Set<HubClient>();
   private readonly version: string;
   private readonly logger: HubLogger;
+  private readonly token?: string;
+  private readonly onChange?: (registry: SessionRegistry) => void;
   private lastPruneAt: number;
 
   constructor(opts: HubOptions) {
     this.version = opts.version;
     this.logger = opts.logger ?? silentLogger;
     this.registry = opts.registry ?? new SessionRegistry();
-    this.lastPruneAt = Date.now();
+    this.token = opts.token;
+    this.onChange = opts.onChange;
+    // one interval in the past so the first activity after construction
+    // (every Durable Object wake) may prune
+    this.lastPruneAt = Date.now() - PRUNE_INTERVAL_MS;
   }
 
   /** enrich, log, broadcast; also prunes stale sessions. Returns the enriched event. */
@@ -70,17 +90,38 @@ export class BingbongHub {
       `[Event] ${enriched.event_type} | session=${enriched.session_id.slice(0, 8)} | tool=${enriched.tool_name || "n/a"}`,
     );
 
-    this.broadcast(enriched);
+    this.broadcast({ type: "event", event: enriched });
+    this.onChange?.(this.registry);
     return enriched;
   }
 
-  /** registers a client and immediately sends it the InitMessage */
-  addClient(client: HubClient): void {
-    this.pruneStale();
+  /** client -> server WebSocket frames; the socket was authorized at upgrade, junk is ignored */
+  handleMessage(_client: HubClient, raw: string | ArrayBuffer | Uint8Array): void {
+    const text = typeof raw === "string" ? raw : new TextDecoder().decode(raw);
+    let msg: ClientMessage | null = null;
+    try {
+      msg = JSON.parse(text);
+    } catch {}
+
+    if (msg?.type !== "move_source") {
+      this.logger.info(`[WS] Received: ${text}`);
+      return;
+    }
+
+    const session = this.registry.setPosition(msg.machine_id, msg.session_id, msg.x, msg.y);
+    if (!session) return;
+    this.broadcast({ type: "session_update", session });
+    this.onChange?.(this.registry);
+  }
+
+  /** registers a client and sends it the InitMessage; `sendInit: false` re-attaches a surviving (hibernated) socket silently */
+  addClient(client: HubClient, opts: { sendInit?: boolean } = {}): void {
+    if (this.pruneStale()) this.onChange?.(this.registry);
 
     this.clients.add(client);
     this.logger.info(`[WS] Client connected (total: ${this.clients.size})`);
 
+    if (opts.sendInit === false) return;
     try {
       client.send(
         JSON.stringify({
@@ -108,12 +149,27 @@ export class BingbongHub {
     return this.registry.stats(this.clients.size);
   }
 
+  /** true when no token is configured, or via `Authorization: Bearer` or `?token=` (browsers can't set WS upgrade headers) */
+  authorized(req: Request): boolean {
+    if (!this.token) return true;
+    const header = req.headers.get("Authorization") ?? "";
+    const query = new URL(req.url).searchParams.get("token") ?? "";
+    return safeEqual(header, `Bearer ${this.token}`) || safeEqual(query, this.token);
+  }
+
   /** HTTP routes only; /ws upgrade is runtime-specific and stays in the adapters. */
   async fetch(req: Request): Promise<Response> {
     const url = new URL(req.url);
 
     if (req.method === "OPTIONS") {
       return new Response(null, { headers: corsHeaders });
+    }
+
+    if ((url.pathname === "/events" || url.pathname === "/sessions") && !this.authorized(req)) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
     }
 
     if (req.method === "POST" && url.pathname === "/events") {
@@ -154,8 +210,8 @@ export class BingbongHub {
     return new Response("Not Found", { status: 404, headers: corsHeaders });
   }
 
-  private broadcast(event: EnrichedEvent) {
-    const message = JSON.stringify({ type: "event", event } satisfies EventMessage);
+  private broadcast(msg: ServerMessage) {
+    const message = JSON.stringify(msg);
     for (const client of this.clients) {
       try {
         client.send(message);
@@ -168,12 +224,15 @@ export class BingbongHub {
 
   // Pruned lazily on activity instead of on a setInterval: Durable Objects
   // hibernate between requests, so background timers can't be relied on.
-  private pruneStale() {
+  /** true when at least one session was removed */
+  private pruneStale(): boolean {
     const now = Date.now();
-    if (now - this.lastPruneAt < PRUNE_INTERVAL_MS) return;
+    if (now - this.lastPruneAt < PRUNE_INTERVAL_MS) return false;
     this.lastPruneAt = now;
-    for (const key of this.registry.removeStale(now)) {
+    const removed = this.registry.removeStale(now);
+    for (const key of removed) {
       this.logger.info(`[Session] Removing stale session: ${key}`);
     }
+    return removed.length > 0;
   }
 }

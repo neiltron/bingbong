@@ -15,6 +15,7 @@ This installs the plugin globally to `~/.config/opencode/plugins/bingbong.js`.
 Optional environment variables (read by the plugin at runtime):
 
 - `BINGBONG_URL` (default: `http://localhost:3334`)
+- `BINGBONG_TOKEN` (sent as `Authorization: Bearer`; required if the server has a token)
 - `BINGBONG_ENABLED` (`false` disables all events)
 - `BINGBONG_MACHINE_ID` (override hostname)
 

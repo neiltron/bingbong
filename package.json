@@ -22,7 +22,9 @@
     "dev": "bun --watch run packages/cli/bin/cli.ts",
     "dev:client": "bun run --cwd apps/client dev",
     "build:client": "bun run --cwd apps/client build",
-    "typecheck:client": "bun run --cwd apps/client typecheck"
+    "typecheck:client": "bun run --cwd apps/client typecheck",
+    "dev:worker": "bun run --cwd packages/worker dev",
+    "deploy:worker": "bun run --cwd packages/worker deploy"
   },
   "keywords": [
     "claude",

@@ -1,6 +1,7 @@
 import type {
   EnrichedEvent,
   BingbongEvent,
+  Position,
   SessionSnapshot,
 } from "@bingbong/protocol";
 import type { RuntimeStats } from "./logger";
@@ -20,6 +21,12 @@ interface SessionCreation {
   pan: number;
 }
 
+/** Persistable registry dump; label_from_cwd is internal, so it rides alongside the snapshot. */
+export interface RegistryState {
+  counter: number;
+  sessions: (SessionSnapshot & { label_from_cwd?: boolean })[];
+}
+
 export interface EnrichmentResult {
   event: EnrichedEvent;
   createdSession: SessionCreation | null;
@@ -37,6 +44,27 @@ const SESSION_COLORS = [
   "#BB8FCE",
   "#85C1E9",
 ];
+
+/** non-negative and still safe after +1, so a continued counter can never repeat an index */
+const isIndex = (n: unknown): n is number =>
+  Number.isSafeInteger(n) && (n as number) >= 0 && Number.isSafeInteger((n as number) + 1);
+
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+/** Stereo pan follows the radar: left edge -1, right edge 1 */
+const panFor = (position: Position) => position.x * 2 - 1;
+
+/** Default radar spot: index 0 at centre, then a golden-angle spiral (ported from the web client's PositionManager). */
+export function autoPosition(index: number): Position {
+  if (index === 0) return { x: 0.5, y: 0.5 };
+  const angle = (index * 137.5 * Math.PI) / 180;
+  const ring = Math.ceil(Math.sqrt(index));
+  const radius = 0.15 + ring * 0.1;
+  return {
+    x: clamp(0.5 + Math.cos(angle) * radius, 0.1, 0.9),
+    y: clamp(0.5 + Math.sin(angle) * radius, 0.1, 0.9),
+  };
+}
 
 export class SessionRegistry {
   private readonly sessions = new Map<string, SessionRecord>();
@@ -60,7 +88,9 @@ export class SessionRegistry {
     return {
       event: {
         ...event,
+        parent_session_id: session.parent_session_id,
         pan: session.pan,
+        position: { ...session.position },
         session_index: session.index,
         color: session.color,
         session_label: session.label,
@@ -77,17 +107,98 @@ export class SessionRegistry {
   }
 
   snapshots(): SessionSnapshot[] {
-    return Array.from(this.sessions.values()).map((session) => ({
+    return Array.from(this.sessions.values(), (session) => this.snapshot(session));
+  }
+
+  private snapshot(session: SessionRecord): SessionSnapshot {
+    return {
       session_id: session.session_id,
       machine_id: session.machine_id,
+      parent_session_id: session.parent_session_id,
       label: session.label,
       pan: session.pan,
+      position: { ...session.position },
       index: session.index,
       color: session.color,
       event_count: session.event_count,
       first_seen: session.first_seen.toISOString(),
       last_seen: session.last_seen.toISOString(),
-    }));
+    };
+  }
+
+  toJSON(): RegistryState {
+    const records = Array.from(this.sessions.values());
+    return {
+      counter: this.sessionCounter,
+      sessions: this.snapshots().map((snapshot, i) => ({
+        ...snapshot,
+        label_from_cwd: records[i].label_from_cwd,
+      })),
+    };
+  }
+
+  /** Tolerant restore: anything malformed is dropped, bad/missing input gives an empty registry. */
+  static fromJSON(state: RegistryState | undefined | null): SessionRegistry {
+    const registry = new SessionRegistry();
+    if (!state || typeof state !== "object" || !Array.isArray(state.sessions)) {
+      return registry;
+    }
+
+    let counter = isIndex(state.counter) ? state.counter : 0;
+    for (const s of state.sessions) {
+      if (
+        !s ||
+        typeof s.session_id !== "string" ||
+        typeof s.machine_id !== "string" ||
+        !isIndex(s.index) ||
+        typeof s.first_seen !== "string" ||
+        typeof s.last_seen !== "string"
+      ) {
+        continue;
+      }
+      const first_seen = new Date(s.first_seen);
+      const last_seen = new Date(s.last_seen);
+      if (Number.isNaN(first_seen.getTime()) || Number.isNaN(last_seen.getTime())) {
+        continue;
+      }
+
+      const position =
+        Number.isFinite(s.position?.x) && Number.isFinite(s.position?.y)
+          ? { x: clamp(s.position.x, 0, 1), y: clamp(s.position.y, 0, 1) }
+          : autoPosition(s.index);
+      registry.sessions.set(`${s.machine_id}:${s.session_id}`, {
+        session_id: s.session_id,
+        machine_id: s.machine_id,
+        parent_session_id:
+          typeof s.parent_session_id === "string" ? s.parent_session_id : undefined,
+        label: typeof s.label === "string" ? s.label : s.session_id.slice(0, 8),
+        label_from_cwd: s.label_from_cwd === true,
+        first_seen,
+        last_seen,
+        event_count: Number.isFinite(s.event_count) ? s.event_count : 0,
+        pan: panFor(position),
+        position,
+        index: s.index,
+        color:
+          typeof s.color === "string"
+            ? s.color
+            : SESSION_COLORS[s.index % SESSION_COLORS.length],
+      });
+      counter = Math.max(counter, s.index + 1);
+    }
+    registry.sessionCounter = counter;
+
+    return registry;
+  }
+
+  /** Moves a session's radar source; null for non-string ids, an unknown session or non-finite coordinates. */
+  setPosition(machineId: string, sessionId: string, x: number, y: number): SessionSnapshot | null {
+    if (typeof machineId !== "string" || typeof sessionId !== "string") return null;
+    const session = this.sessions.get(`${machineId}:${sessionId}`);
+    if (!session || !Number.isFinite(x) || !Number.isFinite(y)) return null;
+    session.position = { x: clamp(x, 0, 1), y: clamp(y, 0, 1) };
+    session.pan = panFor(session.position);
+    return this.snapshot(session);
   }
 
   stats(clientCount: number): RuntimeStats {
@@ -126,20 +237,21 @@ export class SessionRegistry {
     }
 
     const index = this.sessionCounter++;
-    const pan =
-      index === 0 ? 0 : ((index % 2 === 1 ? -1 : 1) * Math.ceil(index / 2)) / 5;
+    const position = autoPosition(index);
 
     const { label, fromCwd } = this.deriveLabel(event.cwd, event.session_id);
 
     const session: SessionRecord = {
       session_id: event.session_id,
       machine_id: event.machine_id,
+      parent_session_id: event.parent_session_id,
       label,
       label_from_cwd: fromCwd,
       first_seen: new Date(),
       last_seen: new Date(),
       event_count: 0,
-      pan: Math.max(-1, Math.min(1, pan)),
+      pan: panFor(position),
+      position,
       index,
       color: SESSION_COLORS[index % SESSION_COLORS.length],
     };

@@ -1,0 +1,14 @@
+{
+  "name": "bingbong",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "durable_objects": {
+    "bindings": [{ "name": "HUB", "class_name": "BingbongDurableObject" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["BingbongDurableObject"] }],
+  "assets": {
+    "directory": "../../apps/client/dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/events", "/sessions", "/health", "/ws"]
+  }
+}

@@ -22,6 +22,8 @@ export interface LoggerContext {
 export interface StartServerOptions {
   port: number;
   version: string;
+  /** shared secret required on /events, /sessions and /ws; unset = open */
+  token?: string;
   /** Bun HTML bundle served at "/" (e.g. the browser client's index.html import). */
   client?: unknown;
   createLogger?: (ctx: LoggerContext) => RuntimeLogger;
@@ -42,6 +44,7 @@ export async function startServer(
   // so the hub forwards to a logger that doesn't exist yet.
   const hub = new BingbongHub({
     version,
+    token: options.token,
     logger: {
       info: (msg) => logger.info(msg),
       error: (msg, err) => logger.error(msg, err),
@@ -58,6 +61,9 @@ export async function startServer(
     fetch(req) {
       // OPTIONS falls through to the hub's CORS preflight, as before
       if (req.method !== "OPTIONS" && new URL(req.url).pathname === "/ws") {
+        if (!hub.authorized(req)) {
+          return new Response("Unauthorized", { status: 401 });
+        }
         if (!server.upgrade(req)) {
           return new Response("WebSocket upgrade failed", { status: 400 });
         }
@@ -75,8 +81,8 @@ export async function startServer(
         hub.removeClient(ws);
       },
 
-      message(_ws, message) {
-        logger.info(`[WS] Received: ${String(message)}`);
+      message(ws, message) {
+        hub.handleMessage(ws, message);
       },
     },
   });
