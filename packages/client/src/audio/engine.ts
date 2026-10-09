@@ -11,8 +11,7 @@ export class AudioEngine {
   private muted = false
   private volume = 0.7
   private reverbAmount = 0.3
-  private sessionPanners = new Map<string, PannerNode>()
-  private sessionVoices = new Map<string, Voice>()
+  private sessions = new Map<string, { panner: PannerNode; voice?: Voice }>()
   private fallbackPanner: StereoPannerNode | null = null
   private fallbackVoice: Voice | null = null
 
@@ -117,9 +116,8 @@ export class AudioEngine {
 
   createPannerForSession(sessionKey: string): PannerNode | null {
     if (!this.ctx) return null
-    if (this.sessionPanners.has(sessionKey)) {
-      return this.sessionPanners.get(sessionKey)!
-    }
+    const existing = this.sessions.get(sessionKey)
+    if (existing) return existing.panner
 
     const panner = this.ctx.createPanner()
     panner.panningModel = 'HRTF'
@@ -134,12 +132,12 @@ export class AudioEngine {
     if (this.dryGain) panner.connect(this.dryGain)
     if (this.convolver) panner.connect(this.convolver)
 
-    this.sessionPanners.set(sessionKey, panner)
+    this.sessions.set(sessionKey, { panner })
     return panner
   }
 
   updatePannerPosition(sessionKey: string, normX: number, normY: number): void {
-    const panner = this.sessionPanners.get(sessionKey)
+    const panner = this.sessions.get(sessionKey)?.panner
     if (!panner || !this.ctx) return
 
     // Convert normalized coords (0-1) to 3D space (-5 to +5)
@@ -152,13 +150,11 @@ export class AudioEngine {
   }
 
   removePannerForSession(sessionKey: string): void {
-    const panner = this.sessionPanners.get(sessionKey)
-    if (panner) {
-      panner.disconnect()
-      this.sessionPanners.delete(sessionKey)
-    }
-    this.sessionVoices.get(sessionKey)?.dispose()
-    this.sessionVoices.delete(sessionKey)
+    const session = this.sessions.get(sessionKey)
+    if (!session) return
+    session.panner.disconnect()
+    session.voice?.dispose()
+    this.sessions.delete(sessionKey)
   }
 
   playEvent(event: EnrichedEvent): void {
@@ -166,12 +162,11 @@ export class AudioEngine {
 
     const { machine_id, session_id } = event
     const sessionKey = machine_id && session_id ? `${machine_id}:${session_id}` : null
-    const panner = sessionKey ? this.sessionPanners.get(sessionKey) : undefined
+    const session = sessionKey ? this.sessions.get(sessionKey) : undefined
 
     let voice: Voice
-    if (sessionKey && panner) {
-      voice = this.sessionVoices.get(sessionKey) ?? this.system.createVoice(panner)
-      this.sessionVoices.set(sessionKey, voice)
+    if (session) {
+      voice = session.voice ??= this.system.createVoice(session.panner)
     } else {
       // Non-session path: shared stereo panner, re-aimed per event.
       // ponytail: overlapping fallback notes with different pans share one panner;

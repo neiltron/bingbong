@@ -11,8 +11,9 @@ export class BuiltinSoundSystem implements SoundSystem {
     return Promise.resolve()
   }
 
-  /** Accepts a SOUND_CONFIG-shaped object; undefined restores the default. */
+  /** Accepts a SOUND_CONFIG-shaped object; undefined restores the default. Throws TypeError and keeps the old patch if invalid. */
   load(patch: unknown): void {
+    if (patch !== undefined) validatePatch(patch)
     this.config = (patch as Patch | undefined) ?? SOUND_CONFIG
   }
 
@@ -48,6 +49,27 @@ export class BuiltinSoundSystem implements SoundSystem {
 
     const eventConfig = this.config[type]
     return eventConfig && 'duration' in eventConfig ? (eventConfig as SoundParams) : tools.default
+  }
+}
+
+const OSC_TYPES = new Set(['sine', 'triangle', 'square', 'sawtooth'])
+const isObject = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v)
+
+function validatePatch(patch: unknown): void {
+  if (!isObject(patch)) throw new TypeError('patch must be an object')
+  const { tools, ...events } = patch
+  if (!isObject(tools)) throw new TypeError('patch.tools must be an object')
+  if (!('default' in tools)) throw new TypeError('patch.tools.default is required')
+  const entries = [
+    ...Object.entries(tools).map(([k, v]) => [`tools.${k}`, v] as const),
+    ...Object.entries(events),
+  ]
+  for (const [key, s] of entries) {
+    if (!isObject(s)) throw new TypeError(`${key} must be an object`)
+    if (!Number.isFinite(s.duration)) throw new TypeError(`${key}.duration must be a finite number`)
+    if ('gain' in s && !Number.isFinite(s.gain)) throw new TypeError(`${key}.gain must be a finite number`)
+    if ('type' in s && !OSC_TYPES.has(s.type as string)) throw new TypeError(`${key}.type must be sine|triangle|square|sawtooth`)
   }
 }
 

@@ -56,4 +56,28 @@ describe('BuiltinSoundSystem', () => {
     expect(oscs).toHaveLength(1)
     expect(oscs[0].freq).toBe(261.63)
   })
+
+  test('invalid patches throw and keep the previous patch', () => {
+    const sys = new BuiltinSoundSystem()
+    const bad: unknown[] = [
+      {},
+      'bad',
+      [],
+      { tools: {} },
+      { tools: { default: { duration: 'x' } } },
+      { tools: { default: { duration: 0.1, gain: NaN } } },
+      { tools: { default: { duration: 0.1, type: 'noise' } } },
+      { tools: { default: { duration: 0.1 } }, Stop: { note: 'C4' } },
+    ]
+    for (const patch of bad) expect(() => sys.load(patch)).toThrow(TypeError)
+
+    const { oscs, dest } = fakeContext()
+    sys.createVoice(dest).trigger({ type: 'PreToolUse', tool: 'Read' })
+    expect(oscs[0]).toMatchObject({ freq: 440, type: 'sine' })
+
+    sys.load({ tools: { default: { note: 'C5', duration: 0.1 } } })
+    sys.load(undefined)
+    sys.createVoice(dest).trigger({ type: 'PreToolUse', tool: 'Read' })
+    expect(oscs[1].freq).toBe(440)
+  })
 })
