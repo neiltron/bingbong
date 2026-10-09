@@ -24,6 +24,8 @@ export class SourceOverlay {
   sources = new Map<string, SourceData>()
   private selectedKey: string | null = null
   private dragState: DragState | null = null
+  /** Dropped positions awaiting the server's echo, by session key */
+  private pending = new Map<string, Position>()
 
   constructor(
     container: HTMLElement,
@@ -70,8 +72,15 @@ export class SourceOverlay {
       }
       existing.session = session
       const { x, y } = session.position
-      // Mid-drag the server only echoes stale positions; ours goes out on drop
-      if (this.dragState?.key === key || (existing.pos.x === x && existing.pos.y === y)) return false
+      // Mid-drag, hold still; existing.session keeps the latest for an unmoved release
+      if (this.dragState?.key === key) return false
+      // After a drop, positions until the echo still carry the old spot
+      const held = this.pending.get(key)
+      if (held) {
+        if (Math.abs(held.x - x) > 1e-6 || Math.abs(held.y - y) > 1e-6) return false
+        this.pending.delete(key)
+      }
+      if (existing.pos.x === x && existing.pos.y === y) return false
       this.moveSource(key, existing, x, y)
       return true
     }
@@ -190,18 +199,20 @@ export class SourceOverlay {
 
   private onPointerUp(_e: PointerEvent): void {
     if (!this.dragState) return
-
-    const source = this.sources.get(this.dragState.key)
-    if (source) {
-      source.el.classList.remove('dragging')
-      source.el.releasePointerCapture(this.dragState.pointerId)
-      const { startPos } = this.dragState
-      if (source.pos.x !== startPos.x || source.pos.y !== startPos.y) {
-        this.onMove(source.session, source.pos.x, source.pos.y)
-      }
-    }
-
+    const { key, pointerId, startPos } = this.dragState
     this.dragState = null
+
+    const source = this.sources.get(key)
+    if (!source) return
+    source.el.classList.remove('dragging')
+    source.el.releasePointerCapture(pointerId)
+    if (source.pos.x !== startPos.x || source.pos.y !== startPos.y) {
+      this.pending.set(key, { ...source.pos })
+      this.onMove(source.session, source.pos.x, source.pos.y)
+    } else {
+      // A remote move may have landed while we held it
+      this.applySession(source.session)
+    }
   }
 
   private select(key: string): void {
@@ -229,6 +240,7 @@ export class SourceOverlay {
   removeSource(key: string): void {
     const source = this.sources.get(key)
     if (!source) return
+    this.pending.delete(key)
 
     // Fade out then remove
     source.el.classList.add('disconnected')
@@ -250,6 +262,7 @@ export class SourceOverlay {
       this.audioEngine.removePannerForSession(key)
     }
     this.sources.clear()
+    this.pending.clear()
     this.selectedKey = null
   }
 }
