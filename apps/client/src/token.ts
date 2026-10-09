@@ -1,6 +1,7 @@
 // Shared server token: `bingbong --open` passes it as #token=..., we keep it in localStorage.
 const KEY = 'bingbong:token'
-let memory = '' // fallback when localStorage throws (private mode)
+let memory = '' // fallback when localStorage throws (private mode, quota full)
+let memoryWins = false // last write failed: storage may hold a stale token
 
 export function tokenFromHash(hash: string): string | null {
   return new URLSearchParams(hash.replace(/^#/, '')).get('token') || null
@@ -18,6 +19,7 @@ export function captureHashToken(): void {
 }
 
 export function getToken(): string {
+  if (memoryWins) return memory
   try {
     return localStorage.getItem(KEY) ?? ''
   } catch {
@@ -30,7 +32,9 @@ export function setToken(token: string): void {
   try {
     if (token) localStorage.setItem(KEY, token)
     else localStorage.removeItem(KEY)
+    memoryWins = false
   } catch {
-    // private mode: kept in memory for this page load
+    // private mode / quota full: kept in memory for this page load
+    memoryWins = true
   }
 }
