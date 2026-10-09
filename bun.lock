@@ -48,7 +48,6 @@
       "name": "@bingbong/worker",
       "version": "0.1.0",
       "dependencies": {
-        "@bingbong/protocol": "file:../protocol",
         "@bingbong/server": "file:../server",
       },
       "devDependencies": {
@@ -344,8 +343,6 @@
     "@bingbong/client/@bingbong/protocol": ["@bingbong/protocol@file:packages/protocol", {}],
 
     "@bingbong/server/@bingbong/protocol": ["@bingbong/protocol@file:packages/protocol", {}],
-
-    "@bingbong/worker/@bingbong/protocol": ["@bingbong/protocol@file:packages/protocol", {}],
 
     "@bingbong/worker/@bingbong/server": ["@bingbong/server@file:packages/server", { "dependencies": { "@bingbong/protocol": "file:../protocol" } }],
 

@@ -143,7 +143,7 @@ bingbong config set url https://bingbong.<account>.workers.dev
 bingbong config set token <same value>
 ```
 
-Then open the worker URL and enter the token in the client settings. For local dev, copy `packages/worker/.dev.vars.example` to `.dev.vars` and run `bun run dev:worker`.
+Then open the worker URL and enter the token in the client settings. For local dev, `cp packages/worker/.dev.vars.example packages/worker/.dev.vars`, set `BINGBONG_TOKEN` there (wrangler runs from `packages/worker`, so a root `.dev.vars` is ignored and the server runs open), and run `bun run dev:worker`.
 
 ## Troubleshooting
 

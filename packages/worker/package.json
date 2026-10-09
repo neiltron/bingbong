@@ -9,7 +9,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@bingbong/protocol": "file:../protocol",
     "@bingbong/server": "file:../server"
   },
   "devDependencies": {
