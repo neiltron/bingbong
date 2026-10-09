@@ -257,6 +257,12 @@ describe("BingbongHub", () => {
     }
     hub.handleMessage(a.client, JSON.stringify({ type: "move_source", machine_id: "m1", session_id: "zz", x: 0, y: 0 }));
     hub.handleMessage(a.client, JSON.stringify({ type: "move_source", machine_id: "m1", session_id: "s1", x: "a", y: 0 }));
+    // non-string ids: an array would coerce into "m1:s1", a toString-less object would throw
+    hub.handleMessage(a.client, JSON.stringify({ type: "move_source", machine_id: ["m1"], session_id: "s1", x: 0.1, y: 0.1 }));
+    hub.handleMessage(a.client, JSON.stringify({ type: "move_source", machine_id: "m1", session_id: ["s1"], x: 0.1, y: 0.1 }));
+    const noString = '{"type":"move_source","machine_id":{"toString":null},"session_id":"s1","x":0.1,"y":0.1}';
+    expect(() => hub.handleMessage(a.client, noString)).not.toThrow();
+    expect(hub.registry.snapshots()[0].position).toEqual({ x: 0.5, y: 0.5 });
     expect(a.sent).toHaveLength(1); // init only
     expect(changes).toBe(1);
     expect(logs).toContain("[WS] Received: garbage");

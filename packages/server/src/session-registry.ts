@@ -87,7 +87,7 @@ export class SessionRegistry {
         ...event,
         parent_session_id: session.parent_session_id,
         pan: session.pan,
-        position: session.position,
+        position: { ...session.position },
         session_index: session.index,
         color: session.color,
         session_label: session.label,
@@ -114,7 +114,7 @@ export class SessionRegistry {
       parent_session_id: session.parent_session_id,
       label: session.label,
       pan: session.pan,
-      position: session.position,
+      position: { ...session.position },
       index: session.index,
       color: session.color,
       event_count: session.event_count,
@@ -187,8 +187,9 @@ export class SessionRegistry {
     return registry;
   }
 
-  /** Moves a session's radar source; null for an unknown session or non-finite coordinates. */
+  /** Moves a session's radar source; null for non-string ids, an unknown session or non-finite coordinates. */
   setPosition(machineId: string, sessionId: string, x: number, y: number): SessionSnapshot | null {
+    if (typeof machineId !== "string" || typeof sessionId !== "string") return null;
     const session = this.sessions.get(`${machineId}:${sessionId}`);
     if (!session || !Number.isFinite(x) || !Number.isFinite(y)) return null;
     session.position = { x: clamp(x, 0, 1), y: clamp(y, 0, 1) };

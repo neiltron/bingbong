@@ -135,6 +135,18 @@ describe("SessionRegistry positions", () => {
     expect(r.enrich(event("s1")).event.position).toEqual({ x: 0, y: 1 });
   });
 
+  test("returned positions are copies, not the live object", () => {
+    const r = new SessionRegistry();
+    r.enrich(event("s1")).event.position.x = 0.9;
+    r.snapshots()[0].position.x = 0.9;
+    r.toJSON().sessions[0].position.y = 0.9;
+    expect(r.snapshots()[0].position).toEqual({ x: 0.5, y: 0.5 });
+    r.setPosition("m1", "s1", 0.2, 0.3)!.position.x = 0.9;
+    expect(r.snapshots()[0].position).toEqual({ x: 0.2, y: 0.3 });
+    r.toJSON().sessions[0].position.y = 0.9;
+    expect(r.enrich(event("s1")).event.position).toEqual({ x: 0.2, y: 0.3 });
+  });
+
   test("moved positions survive a round-trip; old state without one re-derives from index", () => {
     const r = new SessionRegistry();
     r.enrich(event("s1"));
