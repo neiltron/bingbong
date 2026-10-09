@@ -10,7 +10,7 @@ skill (see `.claude/skills/sync-agent-events/SKILL.md`).
 ## Canonical event vocabulary
 
 The server and client key sounds/visuals off these `event_type` values
-(see `apps/client/src/config.ts` and `apps/client/src/audio-engine.ts`):
+(see `packages/client/src/audio/config.ts` and `packages/client/src/audio/engine.ts`):
 
 `SessionStart`, `SessionEnd`, `Stop`, `StopFailure`, `SubagentStart`,
 `SubagentStop`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`,

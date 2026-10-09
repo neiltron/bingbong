@@ -8,8 +8,6 @@ export type {
   SessionSnapshot as Session,
 } from '@bingbong/protocol'
 
-export type { SoundConfig, SoundParams } from '@bingbong/client/audio'
-
 export interface Position {
   x: number
   y: number
