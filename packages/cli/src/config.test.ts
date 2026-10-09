@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadConfig, saveConfig } from "./config";
@@ -64,9 +64,26 @@ test("save merges, preserves unknown keys, unsets with undefined", () => {
   expect(JSON.parse(readFileSync(path, "utf-8"))).toEqual({ url: "https://a", extra: 42, machine_id: "m" });
 });
 
-test("malformed file is ignored", () => {
+test("malformed JSON throws (load and save) and leaves the file alone", () => {
   saveConfig({}, path); // creates the dir
-  writeFileSync(path, "{not json");
-  expect(loadConfig(path).url).toBe("http://localhost:3334");
-  expect(saveConfig({ url: "https://b" }, path).url).toBe("https://b");
+  writeFileSync(path, '{"token": "sec');
+  expect(() => loadConfig(path)).toThrow(path);
+  expect(() => saveConfig({ url: "https://b" }, path)).toThrow(path);
+  expect(readFileSync(path, "utf-8")).toBe('{"token": "sec');
+});
+
+test("non-object document or wrong-typed known key throws", () => {
+  saveConfig({}, path);
+  for (const bad of ['{"token":123}', '{"payload":"everything"}', '{"url":null}', "[]", "null"]) {
+    writeFileSync(path, bad);
+    expect(() => loadConfig(path)).toThrow(path);
+  }
+});
+
+test.skipIf(process.platform === "win32")("config is written 0600, tightening an existing file", () => {
+  saveConfig({ token: "t" }, path);
+  expect(statSync(path).mode & 0o777).toBe(0o600);
+  chmodSync(path, 0o644);
+  saveConfig({ url: "https://c" }, path);
+  expect(statSync(path).mode & 0o777).toBe(0o600);
 });

@@ -136,7 +136,7 @@ async function main() {
     try {
       const { emit } = await import("../src/emit");
       await emit(process.argv.slice(3));
-    } catch {}
+    } catch {} // incl. a malformed config: send nothing, never block the agent's hook
     process.exit(0);
   }
 
@@ -207,6 +207,10 @@ async function main() {
     process.exit(1);
   }
 
+  // Refuse to start on a malformed config rather than silently ignoring it.
+  const { loadConfig } = await import("../src/config");
+  loadConfig();
+
   // Start the server: terminal rendering and the browser client bundle
   // are CLI concerns, injected into the transport-only server package.
   const runtime = await startServer({
@@ -238,6 +242,11 @@ async function main() {
 }
 
 main().catch((err) => {
+  // Malformed config (server start, config, ping, test): clean error, no stack.
+  if (err?.name === "ConfigError") {
+    console.error(`Error: ${err.message}`);
+    process.exit(1);
+  }
   if (activeLogger) {
     activeLogger.error("Fatal error:", err);
     activeLogger.dispose();

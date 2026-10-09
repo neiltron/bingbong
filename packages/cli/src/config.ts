@@ -4,7 +4,7 @@
  * `emit`, so loadConfig stays a single synchronous read.
  */
 
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, hostname } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -23,13 +23,40 @@ export function configPath(): string {
   return join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "bingbong", "config.json");
 }
 
+/** A malformed config file; cli.ts prints it as a clean `Error:` line. */
+export class ConfigError extends Error {
+  override name = "ConfigError";
+}
+
+// A missing file is the default case. Anything unreadable or malformed throws,
+// so a damaged file holding a token can't silently start the server open.
 function readFile(path: string): Record<string, unknown> {
+  let raw: string;
   try {
-    const data = JSON.parse(readFileSync(path, "utf-8"));
-    return data && typeof data === "object" && !Array.isArray(data) ? data : {};
-  } catch {
-    return {};
+    raw = readFileSync(path, "utf-8");
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return {};
+    throw new ConfigError(`cannot read config ${path}: ${(err as Error).message}`);
   }
+  let data: unknown;
+  try {
+    data = JSON.parse(raw);
+  } catch (err) {
+    throw new ConfigError(`invalid JSON in config ${path}: ${(err as Error).message}`);
+  }
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw new ConfigError(`config ${path} must be a JSON object`);
+  }
+  const file = data as Record<string, unknown>;
+  for (const k of KEYS) {
+    const v = file[k];
+    if (v === undefined) continue;
+    if (k === "payload" ? v !== "metadata" && v !== "full" : typeof v !== "string") {
+      const want = k === "payload" ? '"metadata" or "full"' : "a string";
+      throw new ConfigError(`invalid "${k}" in config ${path}: expected ${want}`);
+    }
+  }
+  return file;
 }
 
 export function loadConfig(path = configPath()): BingbongConfig {
@@ -50,7 +77,18 @@ export function saveConfig(patch: Partial<BingbongConfig>, path = configPath()):
   const file = readFile(path);
   for (const k of KEYS) if (k in patch) file[k] = patch[k]; // undefined is dropped by stringify
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, JSON.stringify(file, null, 2) + "\n");
+  // Temp file in the same directory + rename, so a failed write can't truncate
+  // the config. 0600 since it may hold a token; the rename replaces (and so
+  // tightens) an existing looser file.
+  const tmp = `${path}.${process.pid}.tmp`;
+  try {
+    writeFileSync(tmp, JSON.stringify(file, null, 2) + "\n", { mode: 0o600 });
+    chmodSync(tmp, 0o600);
+    renameSync(tmp, path);
+  } catch (err) {
+    rmSync(tmp, { force: true });
+    throw err;
+  }
   return loadConfig(path);
 }
 
@@ -69,7 +107,8 @@ export function configCommand(argv: string[]): void {
   }
 
   const config = loadConfig();
-  if (config.token) config.token = "****" + config.token.slice(-4);
+  // Only show a suffix when it leaves most of the token hidden.
+  if (config.token) config.token = config.token.length > 8 ? "****" + config.token.slice(-4) : "****";
   const fromEnv = KEYS.filter((k) => process.env[envName(k)]);
   console.log(JSON.stringify(config, null, 2));
   console.log(`# ${configPath()}${fromEnv.length ? ` (from env: ${fromEnv.join(", ")})` : ""}`);
